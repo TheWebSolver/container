@@ -10,16 +10,16 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Data;
 
 use LogicException;
+use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
 
 class Aliases {
-	/** @var array<string,string> */
-	private array $stack = array();
+	use KeyStack { KeyStack::remove as remover; }
 
 	/** @var array<string,string[]> */
 	private array $entryStack = array();
 
 	/** @throws LogicException When entry ID and alias is same. */
-	public function add( string $entry, string $alias ): void {
+	public function set( string $entry, string $alias ): void {
 		if ( $alias === $entry ) {
 			throw new LogicException( "[{$entry}] cannot be aliased by same name." );
 		}
@@ -28,7 +28,7 @@ class Aliases {
 		$this->entryStack[ $entry ][] = $alias;
 	}
 
-	public function exists( string $id, bool $asEntry = false ): bool {
+	public function has( string $id, bool $asEntry = false ): bool {
 		return $asEntry ? ! empty( $this->entryStack[ $id ] ) : isset( $this->stack[ $id ] );
 	}
 
@@ -40,10 +40,10 @@ class Aliases {
 		return $asEntry ? ( $this->entryStack[ $id ] ?? array() ) : ( $this->stack[ $id ] ?? $id );
 	}
 
-	public function remove( string $id ): void {
+	public function remove( string $id ): bool {
 		$this->removeEntryAlias( $id );
 
-		unset( $this->stack[ $id ] );
+		return $this->remover( $id );
 	}
 
 	public function flush(): void {
@@ -52,7 +52,7 @@ class Aliases {
 	}
 
 	private function removeEntryAlias( string $id ): void {
-		if ( ! $this->exists( $id ) ) {
+		if ( ! $this->has( $id ) ) {
 			return;
 		}
 

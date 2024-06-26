@@ -31,7 +31,7 @@ class AliasesTest extends TestCase {
 
 	public function testAddingAlias(): Aliases {
 		foreach ( $this->entryAliasMap as $entry => $alias ) {
-			$this->aliases->add( $entry, $alias );
+			$this->aliases->set( $entry, $alias );
 
 			$this->assertSame( $entry, $this->aliases->get( $alias ) );
 			$this->assertSame( $alias, $this->aliases->get( $entry, asEntry: true )[0] );
@@ -47,8 +47,8 @@ class AliasesTest extends TestCase {
 	public function testRemovingAliases( Aliases $aliases ): array {
 		$aliases->remove( 'alias1' );
 
-		$this->assertFalse( $aliases->exists( 'alias1' ) );
-		$this->assertFalse( $aliases->exists( 'entry1', asEntry: true ) );
+		$this->assertFalse( $aliases->has( 'alias1' ) );
+		$this->assertFalse( $aliases->has( 'entry1', asEntry: true ) );
 
 		return array( 1, $aliases );
 	}
@@ -63,21 +63,21 @@ class AliasesTest extends TestCase {
 		$existing = array_splice( $this->entryAliasMap, $noOfTestToSkip );
 
 		foreach ( $existing as $entry => $alias ) {
-			$this->assertTrue( $aliases->exists( $alias ) );
-			$this->assertTrue( $aliases->exists( $entry, asEntry: true ) );
+			$this->assertTrue( $aliases->has( $alias ) );
+			$this->assertTrue( $aliases->has( $entry, asEntry: true ) );
 		}
 
 		$aliases->flush();
 
 		foreach ( $existing as $entry => $alias ) {
-			$this->assertFalse( $aliases->exists( $alias ) );
-			$this->assertFalse( $aliases->exists( $entry, asEntry: true ) );
+			$this->assertFalse( $aliases->has( $alias ) );
+			$this->assertFalse( $aliases->has( $entry, asEntry: true ) );
 		}
 	}
 
 	public function testSameEntryAndAliasThrowsException(): void {
 		$this->expectException( LogicException::class );
 
-		$this->aliases->add( entry: self::class, alias: self::class );
+		$this->aliases->set( entry: self::class, alias: self::class );
 	}
 }

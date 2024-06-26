@@ -112,7 +112,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	public function isAlias( string $name ): bool {
-		return $this->aliases->exists( $name, asEntry: false );
+		return $this->aliases->has( $name, asEntry: false );
 	}
 
 	public function isSingleton( string $id ): bool {
@@ -256,7 +256,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	 * @internal This should never be used as an API to get the contextual data. Contextual
 	 *           data becomes invalidated as soon as entry is resolved coz the respective
 	 *           entry (artefact) is pulled immediately from the stack which makes the
-	 *           contextual data stored to the pool to be orphaned and unretrievable.
+	 *           contextual data stored to the pool to be orphaned & non-retrievable.
 	 *           (unless same contextual data is used again to resolve an entry).
 	 */
 	public function getContextual( Closure|string $id ): Closure|string|null {
@@ -264,7 +264,7 @@ class Container implements ArrayAccess, ContainerInterface {
 			return $binding;
 		}
 
-		if ( $id instanceof Closure || $this->aliases->exists( $id, asEntry: true ) ) {
+		if ( $id instanceof Closure || $this->aliases->has( $id, asEntry: true ) ) {
 			return null;
 		}
 
@@ -295,7 +295,7 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	/** @throws LogicException When entry ID and alias is same. */
 	public function alias( string $entry, string $alias ): void {
-		$this->aliases->add( $entry, $alias );
+		$this->aliases->set( $entry, $alias );
 	}
 
 	/** @param string|string[] $ids */
