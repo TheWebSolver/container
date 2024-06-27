@@ -2,7 +2,7 @@
 /**
  * Parameter Resolver.
  *
- * @package The
+ * @package TheWebSolver\Codegarage\Container
  */
 
 declare( strict_types = 1 );

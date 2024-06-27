@@ -1,6 +1,6 @@
 <?php
 /**
- * Format test.
+ * Event test.
  *
  * @package TheWebSolver\Codegarage\Test
  *
@@ -98,7 +98,7 @@ class EventTest extends TestCase {
 		$event->fireAfterBuild( $fireId, $resolved );
 	}
 
-	public function testEventAfterBuildSameIdMulitpleTimes(): void {
+	public function testEventAfterBuildSameIdMultipleTimes(): void {
 		$container = $this->createMock( Container::class );
 		$event     = new Event( $container );
 		$args      = array_filter(

@@ -1,6 +1,6 @@
 <?php
 /**
- * The builder data.
+ * Stack that stores data in a key/value pair.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -12,12 +12,21 @@ namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 trait KeyStack {
 	use Stack;
 
+	private bool $asCollection = false;
+
+	public function asCollection(): void {
+		$this->asCollection = true;
+	}
+
 	public function has( string $key ): bool {
 		return isset( $this->stack[ $key ] );
 	}
 
 	public function set( string $key, mixed $value ): void {
-		$this->stack[ $key ] = $value;
+		match ( true ) {
+			$this->asCollection => $this->stack[ $key ][] = $value,
+			default             => $this->stack[ $key ]   = $value,
+		};
 	}
 
 	public function get( string $item ): mixed {

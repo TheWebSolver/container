@@ -1,6 +1,6 @@
 <?php
 /**
- * The binding data.
+ * The Event handler for the container.
  *
  * @package TheWebSolver\Codegarage\Container
  */

@@ -1,6 +1,6 @@
 <?php
 /**
- * Format test.
+ * Unwrap test.
  *
  * @package TheWebSolver\Codegarage\Test
  *

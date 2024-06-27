@@ -1,6 +1,6 @@
 <?php
 /**
- * The binding data.
+ * Parameters provided when resolving a container entry.
  *
  * @package TheWebSolver\Codegarage\Container
  */

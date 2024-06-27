@@ -1,8 +1,8 @@
 <?php
 /**
- * Rewindable generator.
+ * Generator that yields object built by the container.
  *
- * @package TheWebSolver\Codegarage\API
+ * @package TheWebSolver\Codegarage\Container
  */
 
 declare( strict_types = 1 );
@@ -16,7 +16,7 @@ use IteratorAggregate;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 
 /**
- * Rewind generator for the container.
+ * Generator that yields object built by the container.
  *
  * @template TKey int
  * @template TValue object
@@ -31,7 +31,7 @@ class Generator implements Countable, IteratorAggregate {
 		$this->generator = $generator;
 	}
 
-	/**  @return Traversable<mixed> */
+	/** @return Traversable<mixed> */
 	public function getIterator(): Traversable {
 		return ( $this->generator )();
 	}
@@ -45,7 +45,7 @@ class Generator implements Countable, IteratorAggregate {
 	/** @param array<string|object> $concretes The concretes to resolve or already resolved. */
 	public static function generate( array $concretes, Container $container ): \Generator {
 		foreach ( $concretes as $concrete ) {
-				yield ! is_object( $concrete ) ? $container->make( $concrete ) : $concrete;
+			yield ! is_object( $concrete ) ? $container->make( $concrete ) : $concrete;
 		}
 	}
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Formatter.
+ * Performs unwrapping for various container APIs.
  *
  * @package TheWebSolver\Codegarage\Container
  *

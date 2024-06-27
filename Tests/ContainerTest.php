@@ -67,7 +67,7 @@ class ContainerTest extends TestCase {
 		$this->container->bind( id: 'testClass', concrete: self::class );
 
 		// Bind will purge alias from the alias pool coz no need for storing same alias
-		// mulitple places (like in alias pool as well as in binding pool).
+		// multiple places (like in alias pool as well as in binding pool).
 		$this->assertFalse( $this->container->isAlias( name: 'testClass' ) );
 		$this->assertTrue( $this->container->has( entryOrAlias: 'testClass' ) );
 		$this->assertFalse( $this->container->has( entryOrAlias: self::class ), 'Bound with alias.' );

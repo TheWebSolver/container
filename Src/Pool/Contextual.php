@@ -1,6 +1,6 @@
 <?php
 /**
- * The binding pool.
+ * Binding based on current artefact.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -22,10 +22,6 @@ class Contextual {
 	 */
 	public function set( string $artefact, string $key, Closure|string $implementation ): void {
 		$this->stack[ $artefact ][ $key ] = $implementation;
-		// $this->stack[ $artefact ] = array(
-		// ...( $this->stack[ $artefact ] ?? array() ),
-		// $key => $implementation,
-		// );
 	}
 
 	/** @return Closure|string|null `null` if cannot find any contextual data. */

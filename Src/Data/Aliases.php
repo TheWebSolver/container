@@ -1,6 +1,6 @@
 <?php
 /**
- * The aliases for container entry.
+ * Aliases for the container entry.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -13,7 +13,9 @@ use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
 
 class Aliases {
-	use KeyStack { KeyStack::remove as remover; }
+	use KeyStack {
+		KeyStack::remove as remover;
+	}
 
 	/** @var array<string,string[]> */
 	private array $entryStack = array();

@@ -10,6 +10,7 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
 use Closure;
+use ArrayAccess;
 use ReflectionMethod;
 use ReflectionFunction;
 use ReflectionException;
@@ -18,14 +19,13 @@ use InvalidArgumentException;
 use ReflectionFunctionAbstract;
 use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\MethodBind;
-use TheWebSolver\Codegarage\Lib\Container\Data\MethodBinding;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 
-/**
- * Auto-wire binding method or function/closure to inject dependencies for the provided class.
- */
 class MethodResolver {
-	public function __construct( private MethodBind $bindings = new MethodBind() ) {}
+	// phpcs:ignore Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
+	/** @param Stack&ArrayAccess<string,Binding> $bindings */
+	public function __construct( private Stack $bindings = new Stack() ) {}
 
 	/**
 	 * @throws LogicException When method name not given if `$object` is a class instance.
@@ -34,7 +34,7 @@ class MethodResolver {
 	public function bind( Closure|string $abstract, Closure $callback ): void {
 		$this->bindings->set(
 			key: $abstract instanceof Closure ? Unwrap::forBinding( object: $abstract ) : $abstract,
-			value: new MethodBinding( $callback )
+			value: new Binding( $callback )
 		);
 	}
 
@@ -44,9 +44,7 @@ class MethodResolver {
 
 	/** @return mixed The method result, or false on error. */
 	public function getBinding( string $id, mixed $instance ): mixed {
-		return $this->hasBinding( $id )
-			? ( $this->bindings->get( key: $id )->concrete )( $instance, $this )
-			: false;
+		return ( $this->bindings[ $id ]->concrete )( $instance, $this );
 	}
 
 	/**
@@ -64,7 +62,7 @@ class MethodResolver {
 	 */
 	public function resolve(
 		Container $container,
-		$cb,
+		callable|string $cb,
 		array $params = array(),
 		string $default = null
 	) {
@@ -178,15 +176,11 @@ class MethodResolver {
 	}
 
 	protected function call( callable $cb, mixed $default ): mixed {
-		if ( ! is_array( $cb ) ) {
-			return Unwrap::andInvoke( $default );
-		}
-
-		$method = Unwrap::callback( $cb );
-
-		return $this->hasBinding( $method )
-			? $this->getBinding( $method, $cb[0] )
-			: Unwrap::andInvoke( $default );
+		return ! is_array( $cb ) ? Unwrap::andInvoke( $default ) : (
+			$this->hasBinding( id: $method = Unwrap::callback( $cb ) )
+				? $this->getBinding( id: $method, instance: $cb[0] )
+				: Unwrap::andInvoke( $default )
+		);
 	}
 
 	/**
@@ -273,6 +267,7 @@ class MethodResolver {
 				$class->getName()
 			);
 
+			// TODO: add exception class.
 			throw new class( $msg ) implements ContainerExceptionInterface{};
 		}//end if
 	}

@@ -2,7 +2,7 @@
 /**
  * The container.
  *
- * @package TheWebSolver\Codegarage\App
+ * @package TheWebSolver\Codegarage\Container
  *
  * @phpcs:disable Squiz.Commenting.FunctionCommentThrowTag.Missing
  * @phpcs:disable Squiz.Commenting.FunctionComment.WrongStyle
@@ -25,7 +25,6 @@ use Container_Entry_Exception;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Container\ContainerExceptionInterface;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Bind;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
@@ -44,25 +43,9 @@ class Container implements ArrayAccess, ContainerInterface {
 	protected static Container $instance;
 
 	/**
-	 * The container's scoped instances.
-	 *
-	 * TODO: Check if it is needed.
-	 *
-	 * @var string[]
-	 */
-	protected array $scoped_instances = array();
-
-	/**
-	 * The extension closures for services.
-	 *
-	 * @var array<string, Closure[]>
-	 */
-	protected array $extenders = array();
-
-	/**
 	 * All of the registered tags.
 	 *
-	 * @var array<array-key, array<int, string>>
+	 * @var array<array-key,array<int,string>>
 	 */
 	protected array $tags = array();
 
@@ -78,16 +61,22 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	protected readonly Event $event;
 
+	/** @var Stack&ArrayAccess<string,Binding> */
+	protected readonly Stack&ArrayAccess $bindings;
+
 	final public function __construct(
 		protected readonly Param $paramPool = new Param(),
 		protected readonly Artefact $artefact = new Artefact(),
 		public readonly Aliases $aliases = new Aliases(),
-		protected readonly Bind $bindPool = new Bind(),
 		protected readonly Stack $resolved = new Stack(),
 		protected readonly Contextual $contextual = new Contextual(),
-		protected readonly MethodResolver $methodResolver = new MethodResolver()
+		protected readonly MethodResolver $methodResolver = new MethodResolver(),
+		protected readonly Stack $extenders = new Stack()
 	) {
-		$this->event = new Event( $this );
+		$this->event    = new Event( $this );
+		$this->bindings = new Stack();
+
+		$this->extenders->asCollection();
 	}
 
 	public static function boot(): static {
@@ -108,7 +97,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	public function hasBinding( string $id ): bool {
-		return $this->bindPool->has( key: $id );
+		return $this->bindings->has( key: $id );
 	}
 
 	public function isAlias( string $name ): bool {
@@ -164,12 +153,12 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	public function getBinding( string $id ): ?Binding {
-		return $this->hasBinding( $id ) ? $this->bindPool->get( key: $id ) : null;
+		return $this->hasBinding( $id ) ? $this->bindings[ $id ] : null;
 	}
 
 	/** @return array<string,Binding>*/
 	public function getBindings(): array {
-		return $this->bindPool->getItems();
+		return $this->bindings->getItems();
 	}
 
 	public function resolveEntryFrom( Closure|string $abstract ): Closure|string {
@@ -325,7 +314,7 @@ class Container implements ArrayAccess, ContainerInterface {
 			? AppGenerator::generateClosure( $id, concrete: $concrete ?? $id )
 			: $concrete;
 
-		$this->bindPool->set( key: $id, value: new Binding( $concrete, $singleton ) );
+		$this->bindings->set( key: $id, value: new Binding( $concrete, $singleton ) );
 
 		if ( $this->resolved( $id ) ) {
 			$this->rebound( $id );
@@ -341,9 +330,9 @@ class Container implements ArrayAccess, ContainerInterface {
 
 		$this->aliases->remove( $id );
 
-		$this->bindPool->set(
+		$this->bindings->set(
 			key: $id,
-			value: new Binding( concrete: $instance, singleton: false, instance: true )
+			value: new Binding( concrete: $instance, instance: true )
 		);
 
 		if ( $hasEntry ) {
@@ -351,12 +340,6 @@ class Container implements ArrayAccess, ContainerInterface {
 		}
 
 		return $instance;
-	}
-
-	public function scoped( string $id, null|Closure|string $concrete = null ): void {
-		$this->scoped_instances[] = $id;
-
-		$this->singleton( $id, $concrete );
 	}
 
 	public function addContext(
@@ -437,7 +420,7 @@ class Container implements ArrayAccess, ContainerInterface {
 			// TODO: Add appropriate exception handler.
 			$msg = sprintf( 'Target class: "%s" does not exist', $concrete );
 
-			throw new class( $msg, 0, $e ) implements ContainerExceptionInterface {};
+			throw new class( $msg ) implements ContainerExceptionInterface {};
 		}
 
 		if ( ! $reflector->isInstantiable() ) {
@@ -506,20 +489,18 @@ class Container implements ArrayAccess, ContainerInterface {
 
 		if ( $this->isInstance( $entry ) ) {
 			$newInstance = new Binding(
-				concrete: $closure( $this->bindPool->get( key: $entry )->concrete, $this ),
-				singleton: false,
+				concrete: $closure( $this->bindings[ $entry ]->concrete, $this ),
 				instance: true
 			);
 
-			$this->bindPool->set( key: $entry, value: $newInstance );
+			$this->bindings->set( key: $entry, value: $newInstance );
 
 			$this->rebound( $entry );
 
 			return;
 		}
 
-		// TODO: add extenders pool.
-		$this->extenders[ $entry ][] = $closure;
+		$this->extenders->set( key: $entry, value: $closure );
 
 		if ( $this->resolved( $entry ) ) {
 			$this->rebound( $entry );
@@ -552,30 +533,22 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	/** @param string $key */
 	public function offsetUnset( $key ): void {
-		$this->bindPool->remove( $key );
+		$this->bindings->remove( $key );
 		$this->removeInstance( id: $key );
 		$this->resolved->remove( $key );
 	}
 
 	public function removeExtenders( string $id ): void {
-		unset( $this->extenders[ $this->getEntryFrom( $id ) ] );
+		$this->extenders->remove( key: $this->getEntryFrom( $id ) );
 	}
 
-	public function removeInstance( string $id ): void {
-		$this->isInstance( $id ) && $this->bindPool->remove( key: $id );
-	}
-
-	public function removeScoped(): void {
-		foreach ( $this->scoped_instances as $scoped ) {
-			$this->removeInstance( id: $scoped );
-		}
+	public function removeInstance( string $id ): bool {
+		return $this->isInstance( $id ) && $this->bindings->remove( key: $id );
 	}
 
 	public function flush(): void {
-		$this->scoped_instances = array();
-
 		$this->aliases->flush();
-		$this->bindPool->flush();
+		$this->bindings->flush();
 		$this->paramPool->flush();
 		$this->artefact->flush();
 		$this->contextual->flush();
@@ -624,7 +597,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		$hasContext = ! empty( $params ) || null !== $concrete;
 
 		if ( ! $id instanceof Closure && $this->isInstance( $id ) && ! $hasContext ) {
-			return $this->bindPool->get( key: $id )->concrete;
+			return $this->bindings[ $id ]->concrete;
 		}
 
 		$this->paramPool->push( value: $params );
@@ -639,9 +612,9 @@ class Container implements ArrayAccess, ContainerInterface {
 		}
 
 		if ( ! $id instanceof Closure && $this->isShared( $id ) && ! $hasContext ) {
-			$this->bindPool->set(
+			$this->bindings->set(
 				key: $id,
-				value: new Binding( concrete: $resolved, singleton: false, instance: true )
+				value: new Binding( concrete: $resolved, instance: true )
 			);
 		}
 
@@ -658,7 +631,7 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	protected function getConcrete( Closure|string $id ): object|string {
 		return is_string( $id ) && $this->hasBinding( $id )
-			? $this->bindPool->get( key: $id )->concrete
+			? $this->bindings[ $id ]->concrete
 			: $id;
 	}
 
@@ -691,9 +664,17 @@ class Container implements ArrayAccess, ContainerInterface {
 	// TODO: check if it returns array or a Closure.
 	/** @return array<int,Closure> */
 	protected function getExtenders( Closure|string $id ): array {
-		return $id instanceof Closure ? array() : (
-			$this->extenders[ $this->getEntryFrom( $id ) ] ?? array()
-		);
+		if ( $id instanceof Closure ) {
+			return array();
+		}
+
+		$entry = $this->getEntryFrom( $id );
+
+		if ( ! $this->extenders->has( key: $entry ) ) {
+			return array();
+		}
+
+		return $this->extenders->get( item: $entry );
 	}
 
 	protected function maybePurgeIfAliasOrInstance( string $id ): void {
