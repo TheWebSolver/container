@@ -67,7 +67,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	final public function __construct(
 		protected readonly Param $paramPool = new Param(),
 		protected readonly Artefact $artefact = new Artefact(),
-		public readonly Aliases $aliases = new Aliases(),
+		protected readonly Aliases $aliases = new Aliases(),
 		protected readonly Stack $resolved = new Stack(),
 		protected readonly Contextual $contextual = new Contextual(),
 		protected readonly MethodResolver $methodResolver = new MethodResolver(),
@@ -347,7 +347,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		string $id,
 		Closure|string $implementation
 	): void {
-		$entry = '$' . ltrim( string: $this->getEntryFrom( alias: $id ), characters: '$' );
+		$entry = $this->getEntryFrom( alias: $id );
 
 		$this->contextual->set( $concrete, $entry, $implementation );
 	}

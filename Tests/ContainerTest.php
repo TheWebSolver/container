@@ -124,7 +124,7 @@ class ContainerTest extends TestCase {
 			$this->container->hasContextualBinding( concrete: $class )
 		);
 
-		$this->container->addContext( concrete: $class, id: 'data', implementation: 'update' );
+		$this->container->addContext( concrete: $class, id: '$data', implementation: 'update' );
 
 		$this->assertTrue(
 			$this->container->hasContextualBinding( concrete: $class )
@@ -133,13 +133,13 @@ class ContainerTest extends TestCase {
 		$this->assertSame( expected: 'update', actual: $this->container->get( id: $class )->data );
 
 		$this->container->when( concrete: $class )
-			->needs( requirement: 'data' )
+			->needs( requirement: '$data' )
 			->give( value: 'With Builder' );
 
 		$this->assertSame( 'With Builder', $this->container->get( id: $class )->data );
 
 		$this->container->when( concrete: $class )
-			->needs( requirement: 'data' )
+			->needs( requirement: '$data' )
 			->give( value: static fn (): string => 'With Builder from closure' );
 
 		$this->assertSame( 'With Builder from closure', $this->container->get( id: $class )->data );
