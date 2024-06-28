@@ -10,10 +10,9 @@ declare( strict_types = 1 );
 use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Data\MethodBinding;
 
 class StackWithArrayAccessTest extends TestCase {
-	/** @var null|Stack&ArrayAccess<string,Binding|MethodBinding> */
+	/** @var null|Stack&ArrayAccess<string,Binding> */
 	private ?Stack $stack;
 
 	protected function setUp(): void {
