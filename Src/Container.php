@@ -61,10 +61,13 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	protected readonly Event $event;
 
-	/** @var Stack&ArrayAccess<string,Binding> */
-	protected readonly Stack&ArrayAccess $bindings;
-
+	// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
+	/**
+	 * @param Stack&ArrayAccess<string,Binding> $bindings
+	 */
+	// phpcs:enable Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
 	final public function __construct(
+		protected readonly Stack $bindings = new Stack(),
 		protected readonly Param $paramPool = new Param(),
 		protected readonly Artefact $artefact = new Artefact(),
 		protected readonly Aliases $aliases = new Aliases(),
@@ -73,8 +76,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		protected readonly MethodResolver $methodResolver = new MethodResolver(),
 		protected readonly Stack $extenders = new Stack()
 	) {
-		$this->event    = new Event( $this );
-		$this->bindings = new Stack();
+		$this->event = new Event( $this );
 
 		$this->extenders->asCollection();
 	}
@@ -161,25 +163,21 @@ class Container implements ArrayAccess, ContainerInterface {
 		return $this->bindings->getItems();
 	}
 
-	public function resolveEntryFrom( Closure|string $abstract ): Closure|string {
-		return $abstract instanceof Closure ? $abstract : $this->getEntryFrom( alias: $abstract );
-	}
-
 	/**
 	 * Resolves the given type from the container.
 	 *
-	 * @param  Closure|string      $id   The entry ID or a callback.
+	 * @param  string              $id   The entry ID or its alias.
 	 * @param  mixed[]|ArrayAccess $with The callback parameters.
 	 * @throws ContainerExceptionInterface When building class and cannot find using the given ID.
 	 * @throws ContainerExceptionInterface When building class and cannot instantiate concrete class.
 	 * @throws NotFoundExceptionInterface  When building class and primitive cannot get resolved.
 	 * @since  1.0
 	 */
-	public function make( Closure|string $id, array|ArrayAccess $with = array() ): mixed {
+	public function make( string $id, array|ArrayAccess $with = array() ): mixed {
 		return $this->resolve( $id, $with, dispatch: true );
 	}
 
-	public function withoutEvents( Closure|string $id, array|ArrayAccess $params = array() ): mixed {
+	public function withoutEvents( string $id, array|ArrayAccess $params = array() ): mixed {
 		return $this->resolve( $id, $params, dispatch: false );
 	}
 
@@ -195,8 +193,8 @@ class Container implements ArrayAccess, ContainerInterface {
 	): mixed {
 		$isBuilding = false;
 
-		if ( $this->hasContextualBinding( $id = Unwrap::callback( $callback ) ) ) {
-			$this->artefact->push( value: $id );
+		if ( $this->hasContextualBinding( concrete: $value = Unwrap::callback( $callback ) ) ) {
+			$this->artefact->push( $value );
 
 			$result = $this->methodResolver->resolveContextual( $this, $callback );
 
@@ -248,12 +246,12 @@ class Container implements ArrayAccess, ContainerInterface {
 	 *           contextual data stored to the pool to be orphaned & non-retrievable.
 	 *           (unless same contextual data is used again to resolve an entry).
 	 */
-	public function getContextual( Closure|string $id ): Closure|string|null {
+	public function getContextual( string $id ): Closure|string|null {
 		if ( null !== ( $binding = $this->fromContextual( $id ) ) ) {
 			return $binding;
 		}
 
-		if ( $id instanceof Closure || $this->aliases->has( $id, asEntry: true ) ) {
+		if ( ! $this->aliases->has( $id, asEntry: true ) ) {
 			return null;
 		}
 
@@ -303,26 +301,12 @@ class Container implements ArrayAccess, ContainerInterface {
 	 * @param string $id If classname was previously aliased, it is recommended to use the classname
 	 *                   instead of an alias as ID to prevent that alias from being purged.
 	 */
-	public function bind(
-		string $id,
-		null|Closure|string $concrete = null,
-		bool $singleton = false
-	): void {
-		$this->maybePurgeIfAliasOrInstance( $id );
-
-		$concrete = ! $concrete instanceof Closure
-			? AppGenerator::generateClosure( $id, concrete: $concrete ?? $id )
-			: $concrete;
-
-		$this->bindings->set( key: $id, value: new Binding( $concrete, $singleton ) );
-
-		if ( $this->resolved( $id ) ) {
-			$this->rebound( $id );
-		}
+	public function bind( string $id, Closure|string|null $concrete = null ): void {
+		$this->register( $id, $concrete, singleton: false );
 	}
 
 	public function singleton( string $id, null|Closure|string $concrete = null ): void {
-		$this->bind( $id, $concrete, singleton: true );
+		$this->register( $id, $concrete, singleton: true );
 	}
 
 	public function instance( string $id, object $instance ): object {
@@ -342,14 +326,10 @@ class Container implements ArrayAccess, ContainerInterface {
 		return $instance;
 	}
 
-	public function addContext(
-		string $concrete,
-		string $id,
-		Closure|string $implementation
-	): void {
+	public function addContext( Closure|string $with, string $concrete, string $id ): void {
 		$entry = $this->getEntryFrom( alias: $id );
 
-		$this->contextual->set( $concrete, $entry, $implementation );
+		$this->contextual->set( $concrete, $entry, $with );
 	}
 
 	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Closure type-hint OK.
@@ -485,25 +465,25 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	/** @throws InvalidArgumentException When invalid arg passed. */
 	public function extend( string $id, Closure $closure ): void {
-		$entry = $this->getEntryFrom( $id );
+		$id = $this->getEntryFrom( alias: $id );
 
-		if ( $this->isInstance( $entry ) ) {
+		if ( $this->isInstance( $id ) ) {
 			$newInstance = new Binding(
-				concrete: $closure( $this->bindings[ $entry ]->concrete, $this ),
+				concrete: $closure( $this->bindings[ $id ]->concrete, $this ),
 				instance: true
 			);
 
-			$this->bindings->set( key: $entry, value: $newInstance );
+			$this->bindings->set( key: $id, value: $newInstance );
 
-			$this->rebound( $entry );
+			$this->rebound( $id );
 
 			return;
 		}
 
-		$this->extenders->set( key: $entry, value: $closure );
+		$this->extenders->set( key: $id, value: $closure );
 
-		if ( $this->resolved( $entry ) ) {
-			$this->rebound( $entry );
+		if ( $this->resolved( $id ) ) {
+			$this->rebound( $id );
 		}
 	}
 
@@ -563,6 +543,20 @@ class Container implements ArrayAccess, ContainerInterface {
 	 |================================================================================================
 	 */
 
+	protected function register( string $id, Closure|string|null $concrete, bool $singleton ): void {
+		$this->maybePurgeIfAliasOrInstance( $id );
+
+		$concrete = ! $concrete instanceof Closure
+			? AppGenerator::generateClosure( $id, concrete: $concrete ?? $id )
+			: $concrete;
+
+		$this->bindings->set( key: $id, value: new Binding( $concrete, $singleton ) );
+
+		if ( $this->resolved( $id ) ) {
+			$this->rebound( $id );
+		}
+	}
+
 	protected function rebound( string $id ): void {
 		$instance = $this->make( $id );
 
@@ -577,41 +571,35 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	/**
-	 * @param Closure|string $id     The entry ID or a callback to resolve the given ID.
-	 * @param mixed[]        $params The parameters to be auto-wired when entry is being resolved.
+	 * @param string  $id     The entry ID.
+	 * @param mixed[] $params The parameters to be auto-wired when entry is being resolved.
 	 */
-	protected function resolve(
-		Closure|string $id,
-		array $params = array(),
-		bool $dispatch = false
-	): mixed {
-		if ( ! $id instanceof Closure ) {
-			$id = $this->getEntryFrom( alias: $id );
-		}
+	protected function resolve( string $id, array $params, bool $dispatch ): mixed {
+		$id = $this->getEntryFrom( alias: $id );
 
 		if ( $dispatch ) {
-			$this->event->fireBeforeBuild( type: $id, params: $params );
+			$this->event->fireBeforeBuild( $id, params: $params );
 		}
 
 		$concrete   = $this->getContextual( $id );
 		$hasContext = ! empty( $params ) || null !== $concrete;
 
-		if ( ! $id instanceof Closure && $this->isInstance( $id ) && ! $hasContext ) {
+		if ( $this->isInstance( $id ) && ! $hasContext ) {
 			return $this->bindings[ $id ]->concrete;
 		}
 
 		$this->paramPool->push( value: $params );
 
 		$concrete ??= $this->getConcrete( $id );
-		$resolved   = $this->isBuildable( $concrete, $id )
+		$resolved   = ( $concrete instanceof Closure || $concrete === $id )
 			? $this->build( $concrete )
-			: $this->make( $concrete );
+			: $this->make( id: $concrete ); // Auto-wire nested dependencies recursively.
 
 		foreach ( $this->getExtenders( $id ) as $extender ) {
 			$resolved = $extender( $resolved, $this );
 		}
 
-		if ( ! $id instanceof Closure && $this->isShared( $id ) && ! $hasContext ) {
+		if ( $this->isSingleton( $id ) && ! $hasContext ) {
 			$this->bindings->set(
 				key: $id,
 				value: new Binding( concrete: $resolved, instance: true )
@@ -629,17 +617,17 @@ class Container implements ArrayAccess, ContainerInterface {
 		return $resolved;
 	}
 
-	protected function getConcrete( Closure|string $id ): object|string {
-		return is_string( $id ) && $this->hasBinding( $id )
-			? $this->bindings[ $id ]->concrete
-			: $id;
-	}
-
-	protected function fromContextual( Closure|string $id ): Closure|string|null {
-		if ( $id instanceof Closure ) {
+	protected function getConcrete( string $id ): Closure|string {
+		if ( ! $this->hasBinding( $id ) ) {
 			return $id;
 		}
 
+		$concrete = $this->bindings[ $id ]->concrete;
+
+		return $concrete instanceof Closure ? $concrete : $id;
+	}
+
+	protected function fromContextual( string $id ): Closure|string|null {
 		$artefact = $this->artefact->latest();
 
 		if ( empty( $artefact ) ) {
@@ -649,7 +637,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		return $this->contextual->get( artefact: $artefact, key: $id );
 	}
 
-	protected function isBuildable( Closure|string $concrete, Closure|string $id ): bool {
+	protected function isBuildable( Closure|string $concrete, string $id ): bool {
 		return $concrete === $id || $concrete instanceof Closure;
 	}
 

@@ -26,7 +26,7 @@ readonly class ContextBuilder {
 
 	public function give( Closure|string $value ): void {
 		foreach ( Unwrap::asArray( $this->for ) as $entry ) {
-			$this->container->addContext( $entry, id: $this->toBeResolved, implementation: $value );
+			$this->container->addContext( with: $value, concrete: $entry, id: $this->toBeResolved );
 		}
 	}
 

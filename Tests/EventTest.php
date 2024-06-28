@@ -25,15 +25,17 @@ class EventTest extends TestCase {
 		array $params,
 		?Closure $callback,
 		Closure|string $id,
-		Closure|string $fireId,
+		string $fireId,
 	): void {
 		$container = $this->createMock( Container::class );
 		$event     = new Event( $container );
 
-		$container->expects( $this->once() )
-			->method( 'resolveEntryFrom' )
-			->with( $id )
-			->willReturn( $id );
+		if ( ! $id instanceof Closure ) {
+			$container->expects( $this->once() )
+				->method( 'getEntryFrom' )
+				->with( $id )
+				->willReturn( $id );
+		}
 
 		$event->subscribeWith( $id, $callback, Event::FIRE_BEFORE_BUILD );
 		$event->fireBeforeBuild( $fireId, $params );
@@ -47,7 +49,6 @@ class EventTest extends TestCase {
 				'callback' => static function ( string $type, array $params, Container $container ) {
 					self::assertSame( expected: 'idAsAliasAndScoped', actual: $type );
 					self::assertSame( expected: 'test', actual: $params['name'] );
-					self::assertInstanceOf( MockObject::class, $container );
 				},
 				'id'       => 'idAsAliasAndScoped',
 				'fireId'   => 'idAsAliasAndScoped', // Fire Id same as subscribe Id if alias used.
@@ -57,23 +58,18 @@ class EventTest extends TestCase {
 				'callback' => static function ( string $type, array $params, Container $container ) {
 					self::assertSame( expected: self::class, actual: $type );
 					self::assertSame( expected: 'test', actual: $params['name'] );
-					self::assertInstanceOf( MockObject::class, $container );
 				},
 				'id'       => TestCase::class, // Scoped Id as fqcn.
 				'fireId'   => self::class,     // Must be subscribeType subclass. Else subscriber wont fire.
 			),
 			array(
-				'params'   => array( 'global' => 'closure as ID' ),
+				'params'   => array( 'global' => 'Global scoped without ID' ),
 				'callback' => null, // Subscribe Type is a closure. Providing subscriber wont register event.
-				'id'       => static function ( Closure $type, array $params, Container $container ) {
-					self::assertSame( expected: 'Global Scoped Hook', actual: $type( $params ) );
-					self::assertInstanceOf( MockObject::class, $container );
+				'id'       => static function ( string $type, array $params, Container $container ) {
+					self::assertSame( expected: 'doesNotMatterAsItIsGlobalScoped', actual: $type );
+					self::assertSame( array( 'global' => 'Global scoped without ID' ), $params );
 				},
-				'fireId'   => static function ( array $params ) {
-					self::assertSame( expected: 'closure as ID', actual: $params['global'] );
-
-					return 'Global Scoped Hook';
-				},
+				'fireId'   => 'doesNotMatterAsItIsGlobalScoped',
 			),
 		);
 	}
@@ -82,16 +78,18 @@ class EventTest extends TestCase {
 	public function testEventAfterBuild(
 		?Closure $callback,
 		Closure|string $id,
-		string $fireId,
+		?string $fireId,
 		object $resolved
 	): void {
 		$container = $this->createMock( Container::class );
 		$event     = new Event( $container );
 
-		$container->expects( $this->exactly( 2 ) )
-			->method( 'resolveEntryFrom' )
-			->with( $id )
-			->willReturn( $id );
+		if ( ! $id instanceof Closure ) {
+			$container->expects( $this->exactly( 2 ) )
+				->method( 'getEntryFrom' )
+				->with( $id )
+				->willReturn( $id );
+		}
 
 		$event->subscribeWith( $id, $callback, Event::FIRE_BUILT );
 		$event->subscribeWith( $id, $callback, Event::FIRE_AFTER_BUILT );
@@ -151,9 +149,8 @@ class EventTest extends TestCase {
 				'callback' => null,
 				'id'       => static function ( object $type, Container $container ) {
 					self::assertSame( expected: 'closure instead if ID', actual: $type->do() );
-					self::assertInstanceOf( MockObject::class, $container );
 				},
-				'fireId'   => 'idAsAliasAndScoped',
+				'fireId'   => 'doesNotMatterAsItIsGlobalScoped',
 				'resolved' => new class { public function do() { return 'closure instead if ID'; } },
 			),
 		);

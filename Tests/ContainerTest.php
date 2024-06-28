@@ -36,21 +36,6 @@ class ContainerTest extends TestCase {
 		$this->assertFalse( isset( $this->container[ self::class ] ) );
 	}
 
-	public function testResolvingEntry(): void {
-		$this->assertSame( 'test', $this->container->resolveEntryFrom( 'test' ) );
-		$this->assertSame( $c = static function () {}, $this->container->resolveEntryFrom( $c ) );
-
-		$this->container->alias( entry: self::class, alias: 'test' );
-		$this->assertSame( self::class, $this->container->resolveEntryFrom( 'test' ) );
-
-		$this->container->bind( id: 'test', concrete: self::class );
-		$this->assertSame( 'test', $this->container->resolveEntryFrom( 'test' ) );
-
-		// This works but is wrong. Always alias concrete as entry and not the other way around.
-		$this->container->alias( entry: 'test', alias: self::class );
-		$this->assertSame( 'test', $this->container->resolveEntryFrom( self::class ) );
-	}
-
 	public function testBasicSetterGetterAndAssertionIntegration(): void {
 		$this->assertFalse( $this->container->has( entryOrAlias: 'testClass' ) );
 		$this->assertFalse( $this->container->has( entryOrAlias: self::class ) );
@@ -124,7 +109,7 @@ class ContainerTest extends TestCase {
 			$this->container->hasContextualBinding( concrete: $class )
 		);
 
-		$this->container->addContext( concrete: $class, id: '$data', implementation: 'update' );
+		$this->container->addContext( with: 'update', concrete: $class, id: '$data' );
 
 		$this->assertTrue(
 			$this->container->hasContextualBinding( concrete: $class )

@@ -45,56 +45,45 @@ class Event {
 	 *                                 are `CallbackResolver::FIRE_*` constants.
 	 */
 	public function subscribeWith( Closure|string $id, ?Closure $callback, string $when ): void {
-		$entry = $this->container->resolveEntryFrom( abstract: $id );
+		$entry = $id instanceof Closure ? $id : $this->container->getEntryFrom( alias: $id );
 
 		match ( true ) {
 			default                   => $this->addTo( $when, $callback, $entry ),
-			$entry instanceof Closure => null === $callback && $this->addTo(
-				when: $when,
-				callback: $entry,
-				entry: null
-			)
+			$entry instanceof Closure => null === $callback && $this->addTo( $when, $entry, entry: null )
 		};
 	}
 
 	/**
-	 * @param Closure|string     $type   Generally expected to be a string. Closure is meant to be used
-	 *                                   for building entry. User can technically invoke the closure
-	 *                                   before build also (_NOT RECOMMENDED_).
-	 * @param mixed[|ArrayAccess $params The dependency parameter values.
+	 * @param string              $id     The entry ID.
+	 * @param mixed[]|ArrayAccess $params The dependency parameter values.
 	 */
-	public function fireBeforeBuild(
-		Closure|string $type,
-		array|ArrayAccess|null $params = array()
-	): void {
-		$this->resolve( $type, $params, callbacks: $this->beforeBuild );
+	public function fireBeforeBuild( string $id, array|ArrayAccess|null $params = array() ): void {
+		$this->resolve( $id, $params, callbacks: $this->beforeBuild );
 
-		foreach ( ( $this->beforeBuildForEntry ) as $id => $callbacks ) {
-			if ( $id === $type || is_subclass_of( $type, class: $id, allow_string: true ) ) {
-				$this->resolve( $type, $params, $callbacks );
+		foreach ( ( $this->beforeBuildForEntry ) as $entry => $callbacks ) {
+			if ( $entry === $id || is_subclass_of( $id, class: $entry, allow_string: true ) ) {
+				$this->resolve( $id, $params, $callbacks );
 			}
 		}
 	}
 
 	/**
-	 * @param Closure|string $type     Generally expected to be a string. Closure was meant to be used
-	 *                                 for building entry. User can technically invoke the closure
-	 *                                 before build also (_NOT RECOMMENDED_).
-	 * @param object         $resolved The resolved instance.
+	 * @param string $id       The entry ID.
+	 * @param object $resolved The resolved instance.
 	 */
-	public function fireAfterBuild( Closure|string $type, object $resolved ): void {
+	public function fireAfterBuild( string $id, object $resolved ): void {
 		foreach ( array( false, true ) as $after ) {
-			$this->fireBuilt( $type, $resolved, $after );
+			$this->fireBuilt( $id, $resolved, $after );
 		}
 	}
 
-	private function fireBuilt( Closure|string $type, object $resolved, bool $after = false ): void {
+	private function fireBuilt( string $id, object $resolved, bool $after = false ): void {
 		$global = $after ? $this->afterBuilt : $this->built;
 		$scoped = $after ? $this->afterBuiltForEntry : $this->builtForEntry;
 
 		$this->resolve( type: $resolved, params: null, callbacks: $global );
 
-		$scopedCallbacks = $this->merge( $scoped, $type, $resolved );
+		$scopedCallbacks = $this->merge( $scoped, $id, $resolved );
 
 		$this->resolve( type: $resolved, params: null, callbacks: $scopedCallbacks );
 	}
@@ -115,7 +104,7 @@ class Event {
 	 * @param ArrayAccess|mixed[]|null $params    The use provided params (only when building).
 	 * @param array<?Closure>          $callbacks Registered callbacks to be fired.
 	 */
-	public function resolve(
+	private function resolve(
 		object|string $type,
 		ArrayAccess|array|null $params,
 		array $callbacks
@@ -143,9 +132,5 @@ class Event {
 		}
 
 		return $finalCallbacks;
-	}
-
-	private function isValidScopeBeforeBuild( string $key, string $given ): bool {
-		return $given === $key || is_subclass_of( object_or_class: $given, class: $key );
 	}
 }

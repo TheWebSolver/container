@@ -117,9 +117,8 @@ class MethodResolver {
 	}
 
 	/**
-	 * Calls the given class method and inject its dependencies using contextual bindings.
+	 * Calls the given class method and inject its dependencies using contextual binding.
 	 *
-	 * Only resolves contextual bindings whose concrete is passed as "class@method".
 	 * Beware that during contextual binding, the parameter position must
 	 * be maintained and should be passed in the same order.
 	 *
@@ -127,29 +126,12 @@ class MethodResolver {
 	 * Parameter that has default value will be skipped if cannot
 	 * be resolved from the contextual binding.
 	 *
-	 * @param Container                   $container The container instance.
-	 * @param array<string|object,string> $cb        The object method as callback.
 	 * @throws ContainerExceptionInterface When required param has no contextual binding value.
-	 * @since 1.0
-	 * @example usage
-	 * ```
-	 * app()->when( "someClass@invocableMethod" )
-	 *  ->needs('$firstParam')
-	 *  ->give('AnotherClassNameToResolve');
-	 *
-	 *  app()->when( "someClass@invocableMethod" )
-	 *  ->needs('$secondParam')
-	 *  ->give(static fn():array => array('An', 'Array', 'Value'));
-	 *
-	 * // ...
-	 *
-	 * app()->call(array($someClass, 'invocableMethod'));
-	 * ```
 	 */
-	public function resolveContextual( Container $container, $cb ) {
+	public function resolveContextual( Container $container, callable|string $callback ) {
 		$stack = array();
 
-		foreach ( static::reflector( $cb )->getParameters() as $param ) {
+		foreach ( static::reflector( $callback )->getParameters() as $param ) {
 			$concrete = $container->getContextual( id: '$' . $param->getName() );
 			$hasValue = null !== $concrete;
 
@@ -172,7 +154,7 @@ class MethodResolver {
 			$stack[] = is_callable( $concrete ) ? $concrete() : $container->make( $concrete );
 		}//end foreach
 
-		return $this->call( $cb, default: static fn() => $cb( ...$stack ) );
+		return $this->call( $callback, default: static fn() => $callback( ...$stack ) );
 	}
 
 	protected function call( callable $cb, mixed $default ): mixed {

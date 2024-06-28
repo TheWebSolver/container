@@ -11,7 +11,7 @@ namespace TheWebSolver\Codegarage\Lib\Container\Data;
 
 readonly class Binding {
 	public function __construct(
-		public object $concrete,
+		public mixed $concrete,
 		public bool $singleton = false,
 		public bool $instance = false
 	) {}

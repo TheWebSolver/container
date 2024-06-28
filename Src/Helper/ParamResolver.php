@@ -64,7 +64,7 @@ class ParamResolver {
 	}
 
 	public function resolvePrimitive( ReflectionParameter $param ): mixed {
-		if ( null !== ( $concrete = $this->container->getContextual( '$' . $param->getName() ) ) ) {
+		if ( null !== ( $concrete = $this->container->getContextual( id: '$' . $param->getName() ) ) ) {
 			return Unwrap::andInvoke( $concrete, $this->container );
 		}
 
@@ -127,7 +127,7 @@ class ParamResolver {
 		}
 
 		$abstract = $this->container->getEntryFrom( $class_name );
-		$concrete = $concrete = $this->container->getContextual( $abstract );
+		$concrete = $concrete = $this->container->getContextual( id: $abstract );
 
 		return is_array( $concrete )
 			? array_map( static fn ( $abstract ) => $this->container->make( $abstract ), $concrete )
