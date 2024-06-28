@@ -42,23 +42,11 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 class Container implements ArrayAccess, ContainerInterface {
 	protected static Container $instance;
 
-	/**
-	 * All of the registered tags.
-	 *
-	 * @var array<array-key,array<int,string>>
-	 */
+	/** @var array<array-key,array<int,string>> */
 	protected array $tags = array();
 
-	/**
-	 * All of the registered rebound callbacks.
-	 *
-	 * @var array<string,Closure[]>
-	 */
+	/** @var array<string,Closure[]> */
 	protected array $rebound_callbacks = array();
-
-	/** @var array<string,array<string,Closure(string $paramName)>> */
-	private array $during_resolving;
-
 	protected readonly Event $event;
 
 	// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
@@ -626,11 +614,7 @@ class Container implements ArrayAccess, ContainerInterface {
 
 		$entry = $this->getEntryFrom( $id );
 
-		if ( ! $this->extenders->has( key: $entry ) ) {
-			return array();
-		}
-
-		return $this->extenders->get( item: $entry );
+		return $this->extenders->has( key: $entry ) ? $this->extenders->get( item: $entry ) : array();
 	}
 
 	protected function maybePurgeIfAliasOrInstance( string $id ): void {
