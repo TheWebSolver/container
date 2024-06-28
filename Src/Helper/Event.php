@@ -12,17 +12,20 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use Closure;
 use ArrayAccess;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 
 class Event {
 	public const FIRE_BEFORE_BUILD = 'beforeBuild';
 	public const FIRE_BUILT        = 'built';
-	public const FIRE_AFTER_BUILT  = 'afterBuilt';
 
 	/** @var Closure[] */
 	private array $beforeBuild = array();
 
 	/** @var array<string,(Closure|null)[]> */
 	private array $beforeBuildForEntry = array();
+
+	/** @var array<string,array<string,Closure>> */
+	private array $building = array();
 
 	/** @var Closure[] */
 	private array $built = array();
@@ -53,6 +56,14 @@ class Event {
 		};
 	}
 
+	public function subscribeDuringBuild(
+		string $id,
+		string $dependencyName,
+		Closure $callback
+	): void {
+		$this->building[ $this->container->getEntryFrom( $id ) ][ $dependencyName ] = $callback;
+	}
+
 	/**
 	 * @param string              $id     The entry ID.
 	 * @param mixed[]|ArrayAccess $params The dependency parameter values.
@@ -65,6 +76,13 @@ class Event {
 				$this->resolve( $id, $params, $callbacks );
 			}
 		}
+	}
+
+	/** @return mixed The resolved value, `null` if no resolver found. */
+	public function fireDuringBuild( string $id, string $paramName ): ?Binding {
+		$resolver = $this->building[ $id ][ $paramName ] ?? false;
+
+		return $resolver ? $resolver( $paramName ) : null;
 	}
 
 	/**

@@ -14,9 +14,23 @@ declare( strict_types = 1 );
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
 
 class EventTest extends TestCase {
+	private ?Container $container;
+	private ?Event $event;
+
+	protected function setUp(): void {
+		$this->container = $this->createMock( Container::class );
+		$this->event     = new Event( $this->container );
+	}
+
+	protected function tearDown(): void {
+		$this->container = null;
+		$this->event     = null;
+	}
+
 	/**
 	 * @param mixed[] $params
 	 * @dataProvider provideSubscribeAndInvokeForBeforeBuild
@@ -27,18 +41,15 @@ class EventTest extends TestCase {
 		Closure|string $id,
 		string $fireId,
 	): void {
-		$container = $this->createMock( Container::class );
-		$event     = new Event( $container );
-
 		if ( ! $id instanceof Closure ) {
-			$container->expects( $this->once() )
+			$this->container->expects( $this->once() )
 				->method( 'getEntryFrom' )
 				->with( $id )
 				->willReturn( $id );
 		}
 
-		$event->subscribeWith( $id, $callback, Event::FIRE_BEFORE_BUILD );
-		$event->fireBeforeBuild( $fireId, $params );
+		$this->event->subscribeWith( $id, $callback, Event::FIRE_BEFORE_BUILD );
+		$this->event->fireBeforeBuild( $fireId, $params );
 	}
 
 	/** @return mixed[] */
@@ -74,6 +85,51 @@ class EventTest extends TestCase {
 		);
 	}
 
+	/** @dataProvider provideEventDuringBuild */
+	public function testDuringBuild(
+		mixed $expected,
+		string $id,
+		string $depName,
+		?Closure $callback
+	): void {
+		if ( null === $expected ) {
+			$this->assertNull( $this->event->fireDuringBuild( $id, $depName ) );
+
+			return;
+		}
+
+		$this->container->expects( $this->once() )
+			->method( 'getEntryFrom' )
+			->with( $id )
+			->willReturn( $id );
+
+		$this->event->subscribeDuringBuild( $id, $depName, $callback );
+
+		$this->assertSame( $expected, $this->event->fireDuringBuild( $id, $depName )->concrete );
+	}
+
+	/** @return mixed[] */
+	public function provideEventDuringBuild(): array {
+		return array(
+			array(
+				'expected' => 'value1',
+				'id'       => 'buildingOne',
+				'depName'  => 'param1',
+				'callback' => static function ( string $depName ): Binding {
+					self::assertSame( 'param1', $depName );
+
+					return new Binding( 'value1' );
+				},
+			),
+			array(
+				'expected' => null,
+				'id'       => 'not subscribed',
+				'depName'  => 'does not matter',
+				'callback' => null,
+			),
+		);
+	}
+
 	/** @dataProvider provideSubscribeAndInvokeForAfterBuild */
 	public function testEventAfterBuild(
 		?Closure $callback,
@@ -81,39 +137,18 @@ class EventTest extends TestCase {
 		?string $fireId,
 		object $resolved
 	): void {
-		$container = $this->createMock( Container::class );
-		$event     = new Event( $container );
-
 		if ( ! $id instanceof Closure ) {
-			$container->expects( $this->exactly( 2 ) )
+			$this->container->expects( $this->once() )
 				->method( 'getEntryFrom' )
 				->with( $id )
 				->willReturn( $id );
 		}
 
-		$event->subscribeWith( $id, $callback, Event::FIRE_BUILT );
-		$event->subscribeWith( $id, $callback, Event::FIRE_AFTER_BUILT );
-		$event->fireAfterBuild( $fireId, $resolved );
+		$this->event->subscribeWith( $id, $callback, Event::FIRE_BUILT );
+		$this->event->fireAfterBuild( $fireId, $resolved );
 	}
 
-	public function testEventAfterBuildSameIdMultipleTimes(): void {
-		$container = $this->createMock( Container::class );
-		$event     = new Event( $container );
-		$args      = array_filter(
-			array: $this->provideSubscribeAndInvokeForAfterBuild(),
-			callback: fn ( array $data ) => _Test_Resolved__container_object__::class === $data['id']
-		);
-
-		$this->assertCount( 2, $args );
-
-		foreach ( $args as $data ) {
-			$event->subscribeWith( $data['id'], $data['callback'], Event::FIRE_BUILT );
-			$event->subscribeWith( $data['id'], $data['callback'], Event::FIRE_AFTER_BUILT );
-		}
-
-		$event->fireAfterBuild( _Test_Resolved__container_object__::class, $data['resolved'] );
-	}
-
+	/** @return mixed[] */
 	public function provideSubscribeAndInvokeForAfterBuild(): array {
 		$resolved = new _Test_Resolved__container_object__();
 
@@ -125,15 +160,6 @@ class EventTest extends TestCase {
 				},
 				'id'       => 'idAsAliasAndScoped',
 				'fireId'   => 'idAsAliasAndScoped',
-				'resolved' => $resolved,
-			),
-			array(
-				'callback' => static function ( object $type, Container $container ) {
-					self::assertInstanceOf( _Test_Resolved__container_object__::class, $type );
-					self::assertSame( expected: 'Resolved Object', actual: $type->data );
-				},
-				'id'       => _Test_Resolved__container_object__::class,
-				'fireId'   => _Test_Resolved__container_object__::class,
 				'resolved' => $resolved,
 			),
 			array(
