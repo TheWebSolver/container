@@ -78,7 +78,6 @@ class Event {
 		}
 	}
 
-	/** @return mixed The resolved value, `null` if no resolver found. */
 	public function fireDuringBuild( string $id, string $paramName ): ?Binding {
 		$resolver = $this->building[ $id ][ $paramName ] ?? false;
 

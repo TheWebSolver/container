@@ -17,9 +17,9 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 
 class ParamResolver {
 	public function __construct(
-		private Container $container,
-		private Param $paramPool,
-		private array $during_resolving = array(),
+		private readonly Container $container,
+		private readonly Param $paramPool,
+		private readonly Event $event
 	) {}
 
 	/**
@@ -30,21 +30,14 @@ class ParamResolver {
 		$results = array();
 
 		foreach ( $dependencies as $dependency ) {
-			$paramName = $dependency->getName();
-			$type      = $dependency->getType();
-			$type      = $type instanceof ReflectionNamedType ? $type->getName() : null;
-
-			// If we have something that is directly resolved by external service, we'll use it.
-			if ( $resolver = ( $this->during_resolving[ $type ][ $paramName ] ?? false ) ) {
-				$results[] = $resolver( $dependency->getName() );
-
-				unset( $this->during_resolving[ $type ][ $paramName ] );
+			if ( $this->paramPool->hasLatest( $dependency ) ) {
+				$results[] = $this->paramPool->getLatest( $dependency );
 
 				continue;
 			}
 
-			if ( $this->paramPool->hasLatest( $dependency ) ) {
-				$results[] = $this->paramPool->getLatest( $dependency );
+			if ( $result = $this->getResultFromEvent( param: $dependency ) ) {
+				$results[] = $result;
 
 				continue;
 			}
@@ -90,7 +83,7 @@ class ParamResolver {
 		try {
 			return $parameter->isVariadic()
 				? $this->resolveVariadicClass( $parameter )
-				: $this->container->make( Unwrap::paramTypeFrom( $parameter ) ?? '' );
+				: $this->container->get( Unwrap::paramTypeFrom( $parameter ) ?? '' );
 		} catch ( ContainerExceptionInterface $e ) {
 			if ( $parameter->isDefaultValueAvailable() ) {
 				$this->paramPool->pull();
@@ -130,7 +123,15 @@ class ParamResolver {
 		$concrete = $concrete = $this->container->getContextual( id: $abstract );
 
 		return is_array( $concrete )
-			? array_map( static fn ( $abstract ) => $this->container->make( $abstract ), $concrete )
-			: $this->container->make( $class_name );
+			? array_map( static fn ( $abstract ) => $this->container->get( $abstract ), $concrete )
+			: $this->container->get( $class_name );
+	}
+
+	protected function getResultFromEvent( ReflectionParameter $param ): mixed {
+		$type = $param->getType();
+
+		return $type instanceof ReflectionNamedType
+			? $this->event->fireDuringBuild( $type->getName(), $param->getName() )?->concrete
+			: null;
 	}
 }
