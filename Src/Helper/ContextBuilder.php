@@ -16,7 +16,10 @@ readonly class ContextBuilder {
 	protected string $toBeResolved;
 
 	/** @param string|string[] $for */
-	public function __construct( private array $for, private Container $container ) {}
+	public function __construct(
+		private readonly array $for,
+		private readonly Container $container
+	) {}
 
 	public function needs( string $requirement ): self {
 		$this->toBeResolved = $requirement;
@@ -25,7 +28,7 @@ readonly class ContextBuilder {
 	}
 
 	public function give( Closure|string $value ): void {
-		foreach ( Unwrap::asArray( $this->for ) as $entry ) {
+		foreach ( $this->for as $entry ) {
 			$this->container->addContext( with: $value, concrete: $entry, id: $this->toBeResolved );
 		}
 	}
