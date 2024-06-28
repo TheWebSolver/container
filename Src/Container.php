@@ -120,11 +120,9 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	public function resolved( string $id ): bool {
-		if ( $this->isAlias( name: $id ) ) {
-			$id = $this->getEntryFrom( alias: $id );
-		}
+		$entry = $this->isAlias( name: $id ) ? $this->getEntryFrom( alias: $id ) : $id;
 
-		return $this->resolved->has( key: $id ) || $this->isInstance( $id );
+		return $this->resolved->has( key: $entry ) || $this->isInstance( id: $entry );
 	}
 
 	public function isShared( string $id ): bool {
@@ -327,51 +325,35 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	public function addContext( Closure|string $with, string $concrete, string $id ): void {
-		$entry = $this->getEntryFrom( alias: $id );
-
-		$this->contextual->set( $concrete, $entry, $with );
+		$this->contextual->set( $concrete, $this->getEntryFrom( alias: $id ), $with );
 	}
 
-	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Closure type-hint OK.
+	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch, Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
 	/**
-	 * @param string|(Closure(Closure|string $idOrClosure, mixed[] $params, Container $container): void) $id
-	 *                       The entry ID to fire event for the particular entry, or closure to fire
-	 *                       event for every resolving entry. When closure is passed, `$callback`
-	 *                       parameter value must not be passed (must be null).
-	 * @param ?Closure(Closure|string        $idOrClosure, mixed[] $params, Container $container): void $callback
-	 *                              The closure to use when {@param `$id`} is an entry ID making
-	 *                              closure scoped to the given entry ID.
+	 * @param string|(Closure(Closure|string $id, mixed[] $params, Container $container): void) $id
+	 * @param ?Closure(Closure|string        $id, mixed[] $params, Container $container): void $callback
 	 */
-	public function beforeResolving( Closure|string $id, ?Closure $callback = null ): void {
+	public function subscribeBeforeBuild( Closure|string $id, ?Closure $callback = null ): void {
 		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_BEFORE_BUILD );
 	}
 
 	/**
-	 * @param string|(Closure(string  $id, Container $container): void) $id
-	 *                        The entry ID to fire event for the particular entry, or closure to fire
-	 *                        event for every resolved entry. When closure is passed, `$callback`
-	 *                        parameter value must not be passed (must be null).
-	 * @param ?Closure(Closure|string $id, Container $container): void $callback
-	 *                       The closure to use when {@param `$id`} is an entry ID making
-	 *                       closure scoped to the given entry ID.
+	 * @param string         $id
+	 * @param string         $paramName
+	 * @param Closure(string $paramName): Binding $callback
 	 */
-	public function resolving( Closure|string $id, ?Closure $callback = null ): void {
-		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_BUILT );
+	public function subscribeDuringBuild( string $id, string $paramName, Closure $callback ): void {
+		$this->event->subscribeDuringBuild( $id, $paramName, $callback );
 	}
 
 	/**
 	 * @param string|(Closure(string  $id, Container $container): void) $id
-	 *                        The entry ID to fire event for the particular entry, or closure to fire
-	 *                        event for every resolved entry. When closure is passed, `$callback`
-	 *                        parameter value must not be passed (must be null).
 	 * @param ?Closure(Closure|string $id, Container $container): void $callback
-	 *                       The closure to use when {@param `$id`} is an entry ID making
-	 *                       closure scoped to the given entry ID.
 	 */
-	public function afterResolving( Closure|string $id, ?Closure $callback = null ): void {
-		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_AFTER_BUILT );
+	public function subscribeAfterBuild( Closure|string $id, ?Closure $callback = null ): void {
+		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_BUILT );
 	}
-	// phpcs:enable Squiz.Commenting.FunctionComment.ParamNameNoMatch
+	// phpcs:enable Squiz.Commenting.FunctionComment.ParamNameNoMatch, Squiz.Commenting.FunctionComment.IncorrectTypeHint
 
 	/*
 	 |================================================================================================
@@ -416,7 +398,8 @@ class Container implements ArrayAccess, ContainerInterface {
 		$dependencies = $constructor->getParameters();
 
 		try {
-			$resolved = ( new ParamResolver( $this, $this->paramPool ) )->resolve( $dependencies );
+			$autoWired = ( new ParamResolver( $this, $this->paramPool, $this->event ) )
+				->resolve( $dependencies );
 		} catch ( ContainerExceptionInterface $e ) {
 			$this->artefact->pull();
 
@@ -425,11 +408,7 @@ class Container implements ArrayAccess, ContainerInterface {
 
 		$this->artefact->pull();
 
-		return $reflector->newInstanceArgs( $resolved );
-	}
-
-	public function setDuringResolving( string $type, string $paramName, Closure $resolver ): void {
-		$this->during_resolving[ $type ][ $paramName ] = $resolver;
+		return $reflector->newInstanceArgs( $autoWired );
 	}
 
 	/**
@@ -590,10 +569,7 @@ class Container implements ArrayAccess, ContainerInterface {
 
 		$this->paramPool->push( value: $params );
 
-		$concrete ??= $this->getConcrete( $id );
-		$resolved   = ( $concrete instanceof Closure || $concrete === $id )
-			? $this->build( $concrete )
-			: $this->make( id: $concrete ); // Auto-wire nested dependencies recursively.
+		$resolved = $this->build( $concrete ?? $this->getConcrete( $id ) );
 
 		foreach ( $this->getExtenders( $id ) as $extender ) {
 			$resolved = $extender( $resolved, $this );
@@ -628,17 +604,9 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	protected function fromContextual( string $id ): Closure|string|null {
-		$artefact = $this->artefact->latest();
-
-		if ( empty( $artefact ) ) {
-			return null;
-		}
-
-		return $this->contextual->get( artefact: $artefact, key: $id );
-	}
-
-	protected function isBuildable( Closure|string $concrete, string $id ): bool {
-		return $concrete === $id || $concrete instanceof Closure;
+		return ! empty( $artefact = $this->artefact->latest() )
+			? $this->contextual->get( $artefact, key: $id )
+			: null;
 	}
 
 	protected function notInstantiable( string $concrete ): void {

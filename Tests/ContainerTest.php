@@ -3,12 +3,18 @@
  * Container test.
  *
  * @package TheWebSolver\Codegarage\Test
+ *
+ * @phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound
+ * @phpcs:disable PEAR.NamingConventions.ValidClassName.StartWithCapital
+ * @phpcs:disable PEAR.NamingConventions.ValidClassName.Invalid
  */
 
 declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 
 class ContainerTest extends TestCase {
 	private ?Container $container;
@@ -91,6 +97,7 @@ class ContainerTest extends TestCase {
 		$this->container->alias( entry: self::class, alias: 'testClass' );
 
 		$this->assertInstanceOf( self::class, $this->container->get( id: 'testClass' ) );
+		$this->assertInstanceOf( self::class, $this->container->get( id: self::class ) );
 	}
 
 	public function testKeepingBothAliasAndBinding(): void {
@@ -128,5 +135,85 @@ class ContainerTest extends TestCase {
 			->give( value: static fn (): string => 'With Builder from closure' );
 
 		$this->assertSame( 'With Builder from closure', $this->container->get( id: $class )->data );
+
+		$stack = $this->createMock( Stack::class );
+		$class = _TestStack__Contextual_Binding_WithArrayAccess::class;
+
+		$stack->expects( $this->once() )
+			->method( 'offsetExists' )
+			->with( 'testKey' )
+			->willReturn( true );
+
+		$this->container->when( $class )
+			->needs( requirement: ArrayAccess::class )
+			->give( value: static fn(): Stack => $stack );
+
+		$this->assertTrue( $this->container->get( $class )->has( 'testKey' ) );
 	}
+
+	public function testAutoWireDependenciesRecursively(): void {
+		$this->container->get( _TestMain__EntryClass::class );
+
+		$toBeResolved = array(
+			_TestMain__EntryClass::class,
+			_TestPrimary__EntryClass::class,
+			_TestSecondary__EntryClass::class,
+			stdClass::class,
+		);
+
+		foreach ( $toBeResolved as $classname ) {
+			$this->assertTrue( $this->container->resolved( id: $classname ) );
+		}
+	}
+
+	public function testResolvingParamDuringBuildEventIntegration(): void {
+		$subscribedClass = new class() extends _TestPrimary__EntryClass {
+			public function __construct( public readonly string $value = 'Using Event' ) {}
+		};
+
+		$this->container->subscribeDuringBuild(
+			id: _TestPrimary__EntryClass::class,
+			paramName: 'primary',
+			callback: static fn ( string $paramName ): Binding => new Binding( $subscribedClass )
+		);
+
+		$this->assertSame(
+			expected: 'Using Event',
+			actual: $this->container->make( _TestMain__EntryClass::class )->primary->value
+		);
+
+		$AutoWiredClass = new class() extends _TestPrimary__EntryClass {
+			public function __construct( public readonly string $value = 'Using Injection' ) {}
+		};
+
+		$this->assertSame(
+			message: 'The injected param value when resolving entry must override event value.',
+			expected: 'Using Injection',
+			actual: $this->container->make(
+				id: _TestMain__EntryClass::class,
+				with: array( 'primary' => $AutoWiredClass )
+			)->primary->value
+		);
+	}
+}
+
+
+class _TestStack__Contextual_Binding_WithArrayAccess {
+	public function __construct( public readonly ArrayAccess $array ) {}
+
+	public function has( string $key ) {
+		return $this->array->offsetExists( $key );
+	}
+}
+
+class _TestMain__EntryClass {
+	public function __construct( public readonly _TestPrimary__EntryClass $primary ) {}
+}
+
+class _TestPrimary__EntryClass {
+	public function __construct( public readonly _TestSecondary__EntryClass $secondary ) {}
+}
+
+class _TestSecondary__EntryClass {
+	public function __construct( public readonly stdClass $opt ) {}
 }
