@@ -14,21 +14,27 @@ declare( strict_types = 1 );
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
 
 class EventTest extends TestCase {
+	/** @var Container&MockObject|null */
 	private ?Container $container;
 	private ?Event $event;
+	/** @var Stack&MockObject|null */
+	private ?Stack $bindings;
 
 	protected function setUp(): void {
 		$this->container = $this->createMock( Container::class );
-		$this->event     = new Event( $this->container );
+		$this->bindings  = $this->createMock( Stack::class );
+		$this->event     = new Event( $this->container, $this->bindings );
 	}
 
 	protected function tearDown(): void {
 		$this->container = null;
 		$this->event     = null;
+		$this->bindings  = null;
 	}
 
 	/**
@@ -106,6 +112,10 @@ class EventTest extends TestCase {
 		$this->event->subscribeDuringBuild( $id, $depName, $callback );
 
 		$this->assertSame( $expected, $this->event->fireDuringBuild( $id, $depName )->concrete );
+		$this->assertNull(
+			message: 'Non-instanced binding will only be resolved per subscription basis.',
+			actual: $this->event->fireDuringBuild( $id, $depName )
+		);
 	}
 
 	/** @return mixed[] */
@@ -127,6 +137,45 @@ class EventTest extends TestCase {
 				'depName'  => 'does not matter',
 				'callback' => null,
 			),
+		);
+	}
+
+	public function testFireDuringBuildWithSameInstanceMultipleTimes(): void {
+		$class   = _Test_Resolved__container_object__::class;
+		$binding = new Binding(
+			concrete: new _Test_Resolved__container_object__( 'Resolved Object' ),
+			instance: true
+		);
+
+		$this->container->expects( $this->once() )
+			->method( 'getEntryFrom' )
+			->with( $class )
+			->willReturn( $class );
+
+		$this->bindings->expects( $this->exactly( 2 ) )
+			->method( 'has' )
+			->with( 'withSameInstance' )
+			->willReturn( false, true );
+
+		$this->bindings->expects( $this->once() )
+			->method( 'set' )
+			->with( 'withSameInstance', $binding );
+
+		$this->bindings->expects( $this->once() )
+			->method( 'get' )
+			->with( 'withSameInstance' )
+			->willReturn( $binding );
+
+		$this->event->subscribeDuringBuild(
+			id: $class,
+			dependencyName: 'withSameInstance',
+			implementation: $binding
+		);
+
+		$this->assertSame(
+			message: 'Instanced binding will return the same resolved object once subscribed.',
+			expected: $this->event->fireDuringBuild( id: $class, paramName: 'withSameInstance' ),
+			actual: $this->event->fireDuringBuild( id: $class, paramName: 'withSameInstance' )
 		);
 	}
 

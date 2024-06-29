@@ -34,6 +34,7 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Contextual;
 use TheWebSolver\Codegarage\Exceptions\Container_Exception;
+use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
@@ -64,7 +65,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		protected readonly MethodResolver $methodResolver = new MethodResolver(),
 		protected readonly Stack $extenders = new Stack()
 	) {
-		$this->event = new Event( $this );
+		$this->event = new Event( $this, $bindings );
 
 		$this->extenders->asCollection();
 	}
@@ -318,25 +319,29 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch, Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
 	/**
-	 * @param string|(Closure(Closure|string $id, mixed[] $params, Container $container): void) $id
-	 * @param ?Closure(Closure|string        $id, mixed[] $params, Container $container): void $callback
+	 * @param string|(Closure(Closure|string $id, mixed[] $params, Container $app): void) $id
+	 * @param ?Closure(Closure|string        $id, mixed[] $params, Container $app): void $callback
 	 */
 	public function subscribeBeforeBuild( Closure|string $id, ?Closure $callback = null ): void {
 		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_BEFORE_BUILD );
 	}
 
 	/**
-	 * @param string         $id
-	 * @param string         $paramName
-	 * @param Closure(string $paramName): Binding $callback
+	 * @param string                 $id
+	 * @param string                 $paramName
+	 * @param Binding|Closure(string $paramName, Container $app): Binding $callback
 	 */
-	public function subscribeDuringBuild( string $id, string $paramName, Closure $callback ): void {
-		$this->event->subscribeDuringBuild( $id, $paramName, $callback );
+	public function subscribeDuringBuild(
+		string $id,
+		string $paramName,
+		Binding|Closure $implementation
+	): void {
+		$this->event->subscribeDuringBuild( $id, $paramName, $implementation );
 	}
 
 	/**
-	 * @param string|(Closure(string  $id, Container $container): void) $id
-	 * @param ?Closure(Closure|string $id, Container $container): void $callback
+	 * @param string|(Closure(string  $id, Container $app): void) $id
+	 * @param ?Closure(Closure|string $id, Container $app): void $callback
 	 */
 	public function subscribeAfterBuild( Closure|string $id, ?Closure $callback = null ): void {
 		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_BUILT );
@@ -357,6 +362,10 @@ class Container implements ArrayAccess, ContainerInterface {
 			for: array_map( callback: $this->getEntryFrom( ... ), array: Unwrap::asArray( $concrete ) ),
 			container: $this
 		);
+	}
+
+	public function matches( string $paramName ): EventBuilder {
+		return new EventBuilder( $this, $paramName );
 	}
 
 	public function build( Closure|string $concrete ): mixed {

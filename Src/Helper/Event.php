@@ -12,34 +12,27 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use Closure;
 use ArrayAccess;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Eventual;
+use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
 
-class Event {
+readonly class Event {
 	public const FIRE_BEFORE_BUILD = 'beforeBuild';
 	public const FIRE_BUILT        = 'built';
 
-	/** @var Closure[] */
-	private array $beforeBuild = array();
-
-	/** @var array<string,(Closure|null)[]> */
-	private array $beforeBuildForEntry = array();
-
-	/** @var array<string,array<string,Closure>> */
-	private array $building = array();
-
-	/** @var Closure[] */
-	private array $built = array();
-
-	/** @var array<string,(Closure|null)[]> */
-	private array $builtForEntry = array();
-
-	/** @var Closure[] */
-	private array $afterBuilt = array();
-
-	/** @var array<string,(Closure|null)[]> */
-	private array $afterBuiltForEntry = array();
-
-	public function __construct( private readonly Container $container ) {}
+	public function __construct(
+		private Container $container,
+		private Stack $bindings,
+		private IndexStack $beforeBuild = new IndexStack(),
+		private Stack $beforeBuildForEntry = new Stack(),
+		private IndexStack $built = new IndexStack(),
+		private Stack $builtForEntry = new Stack(),
+		private Eventual $building = new Eventual()
+	) {
+		$this->beforeBuildForEntry->asCollection();
+		$this->builtForEntry->asCollection();
+	}
 
 	/**
 	 * @param Closure|string $id       The entry ID to make the given `$callback` scoped to it.
@@ -59,9 +52,13 @@ class Event {
 	public function subscribeDuringBuild(
 		string $id,
 		string $dependencyName,
-		Closure $callback
+		Binding|Closure $implementation
 	): void {
-		$this->building[ $this->container->getEntryFrom( $id ) ][ $dependencyName ] = $callback;
+		$this->building->set(
+			artefact: $this->container->getEntryFrom( $id ),
+			dependency: $dependencyName,
+			implementation: $implementation
+		);
 	}
 
 	/**
@@ -69,9 +66,9 @@ class Event {
 	 * @param mixed[]|ArrayAccess $params The dependency parameter values.
 	 */
 	public function fireBeforeBuild( string $id, array|ArrayAccess|null $params = array() ): void {
-		$this->resolve( $id, $params, callbacks: $this->beforeBuild );
+		$this->resolve( $id, $params, callbacks: $this->beforeBuild->getItems() );
 
-		foreach ( ( $this->beforeBuildForEntry ) as $entry => $callbacks ) {
+		foreach ( $this->beforeBuildForEntry->getItems() as $entry => $callbacks ) {
 			if ( $entry === $id || is_subclass_of( $id, class: $entry, allow_string: true ) ) {
 				$this->resolve( $id, $params, $callbacks );
 			}
@@ -79,9 +76,24 @@ class Event {
 	}
 
 	public function fireDuringBuild( string $id, string $paramName ): ?Binding {
-		$resolver = $this->building[ $id ][ $paramName ] ?? false;
+		if ( $this->bindings->has( $paramName ) ) {
+			return $this->bindings->get( $paramName );
+		}
 
-		return $resolver ? $resolver( $paramName ) : null;
+		if ( ! $this->building->has( $id, $paramName ) ) {
+			return null;
+		}
+
+		$given   = $this->building->get( $id, $paramName );
+		$binding = $given instanceof Binding ? $given : $given( $paramName, $this->container );
+
+		if ( $binding?->isInstance() ) {
+			$this->bindings->set( key: $paramName, value: $binding );
+		}
+
+		$this->building->remove( $id, $paramName );
+
+		return $binding;
 	}
 
 	/**
@@ -89,31 +101,27 @@ class Event {
 	 * @param object $resolved The resolved instance.
 	 */
 	public function fireAfterBuild( string $id, object $resolved ): void {
-		foreach ( array( false, true ) as $after ) {
-			$this->fireBuilt( $id, $resolved, $after );
-		}
+		$this->fireBuilt( $id, $resolved );
 	}
 
-	private function fireBuilt( string $id, object $resolved, bool $after = false ): void {
-		$global = $after ? $this->afterBuilt : $this->built;
-		$scoped = $after ? $this->afterBuiltForEntry : $this->builtForEntry;
+	private function fireBuilt( string $id, object $resolved ): void {
+		$this->resolve( type: $resolved, params: null, callbacks: $this->built->getItems() );
 
-		$this->resolve( type: $resolved, params: null, callbacks: $global );
-
-		$scopedCallbacks = $this->merge( $scoped, $id, $resolved );
+		$scopedCallbacks = $this->merge( $this->builtForEntry->getItems(), $id, $resolved );
 
 		$this->resolve( type: $resolved, params: null, callbacks: $scopedCallbacks );
 	}
 
 	private function addTo( string $when, ?Closure $callback, Closure|string|null $entry ): void {
 		if ( $entry ) {
-			$prop                      = "{$when}ForEntry";
-			$this->{$prop}[ $entry ][] = $callback;
+			$prop = "{$when}ForEntry";
+
+			$this->{$prop}->set( $entry, $callback );
 
 			return;
 		}
 
-		$this->{$when}[] = $callback;
+		$this->{$when}->set( $callback );
 	}
 
 	/**

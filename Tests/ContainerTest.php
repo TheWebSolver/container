@@ -13,8 +13,8 @@ declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 
 class ContainerTest extends TestCase {
 	private ?Container $container;
@@ -174,7 +174,7 @@ class ContainerTest extends TestCase {
 		$this->container->subscribeDuringBuild(
 			id: _TestPrimary__EntryClass::class,
 			paramName: 'primary',
-			callback: static fn ( string $paramName ): Binding => new Binding( $subscribedClass )
+			implementation: new Binding( $subscribedClass )
 		);
 
 		$this->assertSame(
@@ -194,6 +194,27 @@ class ContainerTest extends TestCase {
 				with: array( 'primary' => $AutoWiredClass )
 			)->primary->value
 		);
+	}
+
+	public function testWithEventBuilder(): void {
+		$this->assertInstanceOf(
+			expected: _TestSecondary__EntryClass::class,
+			actual: $this->container->get( _TestPrimary__EntryClass::class )->secondary
+		);
+
+		$eventualClass = new class() extends _TestSecondary__EntryClass {
+			public function __construct( public readonly string $value = 'Using Event Builder' ) {}
+		};
+
+		$this->container
+			->matches( paramName: 'secondary' )
+			->for( concrete: _TestSecondary__EntryClass::class )
+			->give( implementation: new Binding( $eventualClass ) );
+
+		$secondaryClass = $this->container->get( _TestPrimary__EntryClass::class )->secondary;
+
+		$this->assertInstanceOf( $eventualClass::class, $secondaryClass );
+		$this->assertSame( expected: 'Using Event Builder', actual: $secondaryClass->value );
 	}
 }
 
