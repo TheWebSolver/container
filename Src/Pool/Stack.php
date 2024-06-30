@@ -39,18 +39,18 @@ class Stack implements ArrayAccess {
 		$this->remove( $key );
 	}
 
-	public function count( ?string $id = null ): int {
-		if ( ! $id ) {
+	public function count( ?string $collectionId = null ): int {
+		if ( ! $collectionId ) {
 			return count( $this->stack );
 		}
 
-		[ $for, $key ] = $this->getKeys( from: $id );
+		[ $for, $key ] = $this->getKeys( from: $collectionId );
 
 		return count(
 			match ( true ) {
-			null !== $key       => $this->getNestedData( $for, $key ),
-			$this->asCollection => $this->stack[ $for ] ?? array(),
-			default             => $this->stack,
+				null !== $key       => $this->getNestedData( $for, $key ),
+				$this->asCollection => $this->stack[ $for ] ?? array(),
+				default             => $this->stack,
 			}
 		);
 	}

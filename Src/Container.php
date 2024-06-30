@@ -42,9 +42,6 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 class Container implements ArrayAccess, ContainerInterface {
 	protected static Container $instance;
 
-	/** @var array<array-key,array<int,string>> */
-	protected array $tags = array();
-
 	/** @var array<string,Closure[]> */
 	protected array $rebound_callbacks = array();
 	protected readonly Event $event;
@@ -53,6 +50,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	/**
 	 * @param Stack&ArrayAccess<string,Binding>                           $bindings
 	 * @param Stack&ArrayAccess<string,array<string,Closure|string|null>> $contextual
+	 * @param Stack&ArrayAccess<string,array<int,string>>                 $tags
 	 */
 	// phpcs:enable Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
 	final public function __construct(
@@ -63,11 +61,13 @@ class Container implements ArrayAccess, ContainerInterface {
 		protected readonly Stack $resolved = new Stack(),
 		protected readonly Stack $contextual = new Stack(),
 		protected readonly MethodResolver $methodResolver = new MethodResolver(),
-		protected readonly Stack $extenders = new Stack()
+		protected readonly Stack $extenders = new Stack(),
+		protected readonly Stack $tags = new Stack(),
 	) {
 		$this->event = new Event( $this, $bindings );
 
 		$this->extenders->asCollection();
+		$this->tags->asCollection();
 	}
 
 	public static function boot(): static {
@@ -268,12 +268,9 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	/** @param string|string[] $ids */
 	public function tag( string|array $ids, string $tag, string ...$tags ): void {
-		foreach ( array( $tag, ...$tags ) as $tag ) {
-			// TODO: add tag stack.
-			$this->tags[ $tag ] ??= array();
-
-			foreach ( (array) $ids as $id ) {
-				$this->tags[ $tag ][] = $id;
+		foreach ( array( $tag, ...$tags ) as $key ) {
+			foreach ( Unwrap::asArray( thing: $ids ) as $id ) {
+				$this->tags->set( $key, value: $id );
 			}
 		}
 	}
@@ -422,12 +419,8 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	/** @return iterable<int,object> */
 	public function tagged( string $name ) {
-		if ( ! isset( $this->tags[ $name ] ) ) {
-			return array();
-		}
-
-		return new AppGenerator(
-			count: count( $this->tags[ $name ] ),
+		return ! $this->tags->has( key: $name ) ? array() : new AppGenerator(
+			count: $this->tags->count( collectionId: $name ),
 			generator: function () use ( $name ) {
 				foreach ( $this->tags[ $name ] as $id ) {
 					yield $this->get( $id );
