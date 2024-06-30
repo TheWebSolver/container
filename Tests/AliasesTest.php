@@ -33,8 +33,8 @@ class AliasesTest extends TestCase {
 		foreach ( $this->entryAliasMap as $entry => $alias ) {
 			$this->aliases->set( $entry, $alias );
 
-			$this->assertSame( $entry, $this->aliases->get( $alias ) );
-			$this->assertSame( $alias, $this->aliases->get( $entry, asEntry: true )[0] );
+			$this->assertSame( expected: $entry, actual: $this->aliases->get( $alias ) );
+			$this->assertSame( expected: $alias, actual: $this->aliases->get( $entry, asEntry: true )[0] );
 		}
 
 		return $this->aliases;
@@ -47,8 +47,8 @@ class AliasesTest extends TestCase {
 	public function testRemovingAliases( Aliases $aliases ): array {
 		$aliases->remove( 'alias1' );
 
-		$this->assertFalse( $aliases->has( 'alias1' ) );
-		$this->assertFalse( $aliases->has( 'entry1', asEntry: true ) );
+		$this->assertFalse( condition: $aliases->has( 'alias1' ) );
+		$this->assertEmpty( actual: $aliases->get( 'entry1', asEntry: true ) );
 
 		return array( 1, $aliases );
 	}
@@ -63,15 +63,15 @@ class AliasesTest extends TestCase {
 		$existing = array_splice( $this->entryAliasMap, $noOfTestToSkip );
 
 		foreach ( $existing as $entry => $alias ) {
-			$this->assertTrue( $aliases->has( $alias ) );
-			$this->assertTrue( $aliases->has( $entry, asEntry: true ) );
+			$this->assertTrue( condition: $aliases->has( $alias ) );
+			$this->assertTrue( condition: $aliases->has( $entry, asEntry: true ) );
 		}
 
 		$aliases->flush();
 
 		foreach ( $existing as $entry => $alias ) {
-			$this->assertFalse( $aliases->has( $alias ) );
-			$this->assertFalse( $aliases->has( $entry, asEntry: true ) );
+			$this->assertFalse( condition: $aliases->has( $alias ) );
+			$this->assertFalse( condition: $aliases->has( $entry, asEntry: true ) );
 		}
 	}
 

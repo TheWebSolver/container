@@ -10,6 +10,7 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Data;
 
 use LogicException;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
 
 class Aliases {
@@ -17,8 +18,11 @@ class Aliases {
 		KeyStack::remove as remover;
 	}
 
-	/** @var array<string,string[]> */
-	private array $entryStack = array();
+	// phpcs:ignore Squiz.Commenting.FunctionComment.ParamNameNoMatch, Squiz.Commenting.FunctionComment.SpacingAfterParamType
+	/** @param Stack&ArrayAccess<string,array<int,string>> $entryStack */
+	public function __construct( private Stack $entryStack = new Stack() ) {
+		$this->entryStack->asCollection();
+	}
 
 	/** @throws LogicException When entry ID and alias is same. */
 	public function set( string $entry, string $alias ): void {
@@ -26,17 +30,18 @@ class Aliases {
 			throw new LogicException( "[{$entry}] cannot be aliased by same name." );
 		}
 
-		$this->stack[ $alias ]        = $entry;
-		$this->entryStack[ $entry ][] = $alias;
+		$this->stack[ $alias ] = $entry;
+
+		$this->entryStack->set( key: $entry, value: $alias );
 	}
 
 	public function has( string $id, bool $asEntry = false ): bool {
-		return $asEntry ? ! empty( $this->entryStack[ $id ] ) : isset( $this->stack[ $id ] );
+		return $asEntry ? $this->entryStack->has( key: $id ) : isset( $this->stack[ $id ] );
 	}
 
 	/**
-	 * @return string|string[]
-	 * @phpstan-return ($asEntry is true ? string[] : string)
+	 * @return string|array<int,string>
+	 * @phpstan-return ($asEntry is true ? array<int,string> : string)
 	 */
 	public function get( string $id, bool $asEntry = false ): string|array {
 		return $asEntry ? ( $this->entryStack[ $id ] ?? array() ) : ( $this->stack[ $id ] ?? $id );
@@ -49,8 +54,9 @@ class Aliases {
 	}
 
 	public function flush(): void {
-		$this->stack      = array();
-		$this->entryStack = array();
+		$this->stack = array();
+
+		$this->entryStack->flush();
 	}
 
 	private function removeEntryAlias( string $id ): void {
@@ -58,7 +64,7 @@ class Aliases {
 			return;
 		}
 
-		foreach ( $this->entryStack as $entry => $aliases ) {
+		foreach ( $this->entryStack->getItems() as $entry => $aliases ) {
 			$this->removeFromEntryStack( $aliases, $entry, given: $id );
 		}
 	}
@@ -66,11 +72,9 @@ class Aliases {
 	/** @param string[] $aliases */
 	private function removeFromEntryStack( array $aliases, string $entry, string $given ): void {
 		foreach ( $aliases as $index => $storedAlias ) {
-			if ( $storedAlias !== $given ) {
-				continue;
+			if ( $storedAlias === $given ) {
+				$this->entryStack->remove( "{$entry}:{$index}" );
 			}
-
-			unset( $this->entryStack[ $entry ][ $index ] );
 		}
 	}
 }

@@ -37,13 +37,15 @@ trait KeyStack {
 	public function get( string $item ): mixed {
 		[ $for, $key ] = $this->getKeys( $item );
 
-		return $key ? $this->stack[ $for ][ $key ] ?? null : $this->stack[ $for ] ?? null;
+		return null !== $key
+			? $this->stack[ $for ][ $this->normalizeKey( $key ) ] ?? null
+			: $this->stack[ $for ] ?? null;
 	}
 
 	public function remove( string $key ): bool {
 		[ $for, $key ] = $this->getKeys( $key );
 
-		if ( ! $key ) {
+		if ( null === $key ) {
 			if ( ! isset( $this->stack[ $for ] ) ) {
 				return false;
 			}
@@ -52,6 +54,8 @@ trait KeyStack {
 
 			return true;
 		}
+
+		$key = $this->normalizeKey( $key );
 
 		if ( ! isset( $this->stack[ $for ][ $key ] ) ) {
 			return false;
@@ -67,5 +71,9 @@ trait KeyStack {
 		$keys = explode( separator: ':', string: $from, limit: 2 );
 
 		return array( $keys[0], $keys[1] ?? null );
+	}
+
+	private function normalizeKey( string $key ): string|int {
+		return $this->asCollection && is_numeric( $key ) ? (int) $key : $key;
 	}
 }
