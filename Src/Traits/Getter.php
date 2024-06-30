@@ -1,6 +1,6 @@
 <?php
 /**
- * Get data from stack using key.
+ * Stacked data getter using key.
  *
  * @package TheWebSolver\Codegarage\Container
  */

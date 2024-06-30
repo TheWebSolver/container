@@ -1,6 +1,6 @@
 <?php
 /**
- * Stack of stored items inside container.
+ * Stack of keyed stored items.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -36,5 +36,9 @@ class Stack implements ArrayAccess {
 	/** @param string $key */
 	public function offsetUnset( $key ): void {
 		$this->remove( $key );
+	}
+
+	public static function keyFrom( string $id, string $name ): string {
+		return implode( separator: ':', array: func_get_args() );
 	}
 }

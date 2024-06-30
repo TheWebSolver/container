@@ -104,7 +104,7 @@ class EventTest extends TestCase {
 			return;
 		}
 
-		$this->container->expects( $this->once() )
+		$this->container->expects( $this->exactly( 3 ) )
 			->method( 'getEntryFrom' )
 			->with( $id )
 			->willReturn( $id );
@@ -147,7 +147,7 @@ class EventTest extends TestCase {
 			instance: true
 		);
 
-		$this->container->expects( $this->once() )
+		$this->container->expects( $this->exactly( 2 ) )
 			->method( 'getEntryFrom' )
 			->with( $class )
 			->willReturn( $class );

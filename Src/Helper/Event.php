@@ -1,6 +1,6 @@
 <?php
 /**
- * The Event handler for the container.
+ * Event handler for the container.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -14,12 +14,14 @@ use ArrayAccess;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Eventual;
 use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
 
 readonly class Event {
 	public const FIRE_BEFORE_BUILD = 'beforeBuild';
 	public const FIRE_BUILT        = 'built';
+
+	/** @var Stack&ArrayAccess<string,array<string,Binding|Closure(string $param, Container $app): Binding> */
+	private Stack $building;
 
 	public function __construct(
 		private Container $container,
@@ -28,10 +30,11 @@ readonly class Event {
 		private Stack $beforeBuildForEntry = new Stack(),
 		private IndexStack $built = new IndexStack(),
 		private Stack $builtForEntry = new Stack(),
-		private Eventual $building = new Eventual()
 	) {
 		$this->beforeBuildForEntry->asCollection();
 		$this->builtForEntry->asCollection();
+
+		$this->building = new Stack();
 	}
 
 	/**
@@ -55,9 +58,8 @@ readonly class Event {
 		Binding|Closure $implementation
 	): void {
 		$this->building->set(
-			artefact: $this->container->getEntryFrom( $id ),
-			dependency: $dependencyName,
-			implementation: $implementation
+			key: Stack::keyFrom( $this->container->getEntryFrom( alias: $id ), name: $dependencyName ),
+			value: $implementation
 		);
 	}
 
@@ -80,18 +82,20 @@ readonly class Event {
 			return $this->bindings->get( $paramName );
 		}
 
-		if ( ! $this->building->has( $id, $paramName ) ) {
+		$key = Stack::keyFrom( id: $this->container->getEntryFrom( $id ), name: $paramName );
+
+		if ( ! $this->building->has( $key ) ) {
 			return null;
 		}
 
-		$given   = $this->building->get( $id, $paramName );
+		$given   = $this->building[ $id ][ $paramName ];
 		$binding = $given instanceof Binding ? $given : $given( $paramName, $this->container );
 
 		if ( $binding?->isInstance() ) {
 			$this->bindings->set( key: $paramName, value: $binding );
 		}
 
-		$this->building->remove( $id, $paramName );
+		$this->building->remove( $key );
 
 		return $binding;
 	}

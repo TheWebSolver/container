@@ -109,8 +109,8 @@ class MethodResolver {
 			throw new InvalidArgumentException( 'Method not provided.' );
 		}
 
-		if ( ! is_callable( array( $container->make( $segments[0] ), $method ), false, $object ) ) {
-			throw new InvalidArgumentException( 'Uninstantiable concrete provided.' );
+		if ( ! is_callable( array( $container->get( $segments[0] ), $method ), false, $object ) ) {
+			throw new InvalidArgumentException( 'Non-instantiable concrete provided.' );
 		}
 
 		return $this->call( $object, $params );
@@ -132,7 +132,7 @@ class MethodResolver {
 		$stack = array();
 
 		foreach ( static::reflector( $callback )->getParameters() as $param ) {
-			$concrete = $container->getContextual( id: '$' . $param->getName() );
+			$concrete = $container->getContextualFor( context: '$' . $param->getName() );
 			$hasValue = null !== $concrete;
 
 			if ( ! $param->isOptional() && ! $hasValue ) {
@@ -151,7 +151,7 @@ class MethodResolver {
 				continue;
 			}
 
-			$stack[] = is_callable( $concrete ) ? $concrete() : $container->make( $concrete );
+			$stack[] = is_callable( $concrete ) ? $concrete() : $container->get( $concrete );
 		}//end foreach
 
 		return $this->call( $callback, default: static fn() => $callback( ...$stack ) );
@@ -231,10 +231,10 @@ class MethodResolver {
 
 				unset( $params[ $class_name ] );
 			} elseif ( $param->isVariadic() ) {
-				$variadic = $container->make( $class_name );
+				$variadic = $container->get( $class_name );
 				$deps     = array_merge( $deps, is_array( $variadic ) ? $variadic : array( $variadic ) );
 			} else {
-				$deps[] = $container->make( $class_name );
+				$deps[] = $container->get( $class_name );
 			}
 		} elseif ( $param->isDefaultValueAvailable() ) {
 			$deps[] = $param->getDefaultValue();

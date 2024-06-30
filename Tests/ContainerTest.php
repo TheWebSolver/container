@@ -76,11 +76,16 @@ class ContainerTest extends TestCase {
 
 		$this->assertTrue( $this->container->isSingleton( id: stdClass::class ) );
 		$this->assertTrue( $this->container->isShared( id: stdClass::class ) );
+		$this->assertFalse( $this->container->isInstance( stdClass::class ) );
 
 		$this->assertSame(
 			expected: $this->container->get( id: stdClass::class ),
 			actual: $this->container->get( id: stdClass::class )
 		);
+
+		// The singleton is resolved and bound as an instance thereafter.
+		$this->assertFalse( $this->container->isSingleton( stdClass::class ) );
+		$this->assertTrue( $this->container->isInstance( stdClass::class ) );
 
 		$this->assertFalse( $this->container->isInstance( id: 'instance' ) );
 		$this->assertFalse( $this->container->resolved( id: 'instance' ) );
@@ -116,13 +121,18 @@ class ContainerTest extends TestCase {
 			$this->container->hasContextualBinding( concrete: $class )
 		);
 
-		$this->container->addContext( with: 'update', concrete: $class, id: '$data' );
+		$this->container->addContextual( with: 'update', for: $class, id: '$data' );
 
 		$this->assertTrue(
 			$this->container->hasContextualBinding( concrete: $class )
 		);
+		$this->assertTrue(
+			$this->container->hasContextualBinding( concrete: $class, toBeResolved: '$data' )
+		);
 
 		$this->assertSame( expected: 'update', actual: $this->container->get( id: $class )->data );
+
+		$this->assertSame( 'update', $this->container->getContextual( $class, '$data' ) );
 
 		$this->container->when( concrete: $class )
 			->needs( requirement: '$data' )
@@ -149,6 +159,18 @@ class ContainerTest extends TestCase {
 			->give( value: static fn(): Stack => $stack );
 
 		$this->assertTrue( $this->container->get( $class )->has( 'testKey' ) );
+	}
+
+	public function testContextualBindingWithAliasing(): void {
+		$class = _Test_Resolved__container_object__::class;
+
+		$this->container->alias( entry: $class, alias: 'test' );
+		$this->container->addContextual( with: 'update', for: 'test', id: '$data' );
+
+		$this->assertSame(
+			actual: $this->container->getContextual( for: 'test', id: '$data' ),
+			expected: 'update'
+		);
 	}
 
 	public function testAutoWireDependenciesRecursively(): void {
@@ -179,7 +201,7 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame(
 			expected: 'Using Event',
-			actual: $this->container->make( _TestMain__EntryClass::class )->primary->value
+			actual: $this->container->get( _TestMain__EntryClass::class )->primary->value
 		);
 
 		$AutoWiredClass = new class() extends _TestPrimary__EntryClass {
@@ -189,7 +211,7 @@ class ContainerTest extends TestCase {
 		$this->assertSame(
 			message: 'The injected param value when resolving entry must override event value.',
 			expected: 'Using Injection',
-			actual: $this->container->make(
+			actual: $this->container->get(
 				id: _TestMain__EntryClass::class,
 				with: array( 'primary' => $AutoWiredClass )
 			)->primary->value

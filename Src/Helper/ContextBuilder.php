@@ -1,6 +1,6 @@
 <?php
 /**
- * Contextual bindings for the container.
+ * Contextual bindings for the container during the entry's build process.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -29,7 +29,7 @@ readonly class ContextBuilder {
 
 	public function give( Closure|string $value ): void {
 		foreach ( $this->for as $entry ) {
-			$this->container->addContext( with: $value, concrete: $entry, id: $this->toBeResolved );
+			$this->container->addContextual( with: $value, for: $entry, id: $this->toBeResolved );
 		}
 	}
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Eventual bindings for the container.
+ * Eventual binding for the container during the entry's build process.
  *
  * @package TheWebSolver\Codegarage\Container
  *

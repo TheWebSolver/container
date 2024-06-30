@@ -1,6 +1,6 @@
 <?php
 /**
- * Pull item from the stack.
+ * Data extractor from the end of a stack.
  *
  * @package TheWebSolver\Codegarage\Container
  */

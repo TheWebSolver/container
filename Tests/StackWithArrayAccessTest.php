@@ -50,4 +50,27 @@ class StackWithArrayAccessTest extends TestCase {
 			),
 		);
 	}
+
+	public function testAsCollection(): void {
+		$this->stack->asCollection();
+
+		$this->stack->set( key: 'center', value: '1' );
+		$this->stack->set( key: 'center', value: '2' );
+		$this->stack->set( key: 'centre', value: '3' );
+
+		$this->assertSame( expected: array( '1', '2' ), actual: $this->stack['center'] );
+		$this->assertSame( expected: array( '3' ), actual: $this->stack['centre'] );
+	}
+
+	public function testWithNestedKeyedValue(): void {
+		$key = Stack::keyFrom( id: 'key', name: 'john' );
+
+		$this->stack[ $key ] = 'doe';
+
+		$this->assertSame( expected: array( 'john' => 'doe' ), actual: $this->stack->get( 'key' ) );
+		$this->assertSame( expected: 'doe', actual: $this->stack->get( item: $key ) );
+		$this->assertSame( expected: array( 'john' => 'doe' ), actual: $this->stack['key'] );
+		$this->assertSame( expected: 'doe', actual: $this->stack['key']['john'] );
+		$this->assertSame( expected: 'doe', actual: $this->stack[ $key ] );
+	}
 }

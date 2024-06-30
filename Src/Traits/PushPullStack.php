@@ -1,6 +1,6 @@
 <?php
 /**
- * Stack to be used for pushing and pulling data constantly.
+ * Stack to be used for pushing and pulling data.
  *
  * @package TheWebSolver\Codegarage\Container
  */
