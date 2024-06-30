@@ -12,7 +12,6 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 
 class StackWithArrayAccessTest extends TestCase {
-	/** @var null|Stack&ArrayAccess<string,Binding> */
 	private ?Stack $stack;
 
 	protected function setUp(): void {
@@ -63,6 +62,8 @@ class StackWithArrayAccessTest extends TestCase {
 	}
 
 	public function testWithNestedKeyedValue(): void {
+		$this->stack->asCollection();
+
 		$key = Stack::keyFrom( id: 'key', name: 'john' );
 
 		$this->stack[ $key ] = 'doe';
