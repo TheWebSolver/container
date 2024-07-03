@@ -59,14 +59,17 @@ class StackWithArrayAccessTest extends TestCase {
 
 		$this->assertSame( expected: array( '1', '2' ), actual: $this->stack['center'] );
 		$this->assertSame( expected: array( '3' ), actual: $this->stack['centre'] );
-		$this->assertSame( expected: 2, actual: $this->stack->count( collectionId: 'center' ) );
-		$this->assertSame( expected: 1, actual: $this->stack->count( collectionId: 'centre' ) );
+		$this->assertSame( expected: 2, actual: $this->stack->count( key: 'center' ) );
+		$this->assertSame( expected: 1, actual: $this->stack->count( key: 'centre' ) );
 	}
 
 	public function testWithNestedKeyedValue(): void {
 		$this->stack->asCollection();
 
-		$key                 = Stack::keyFrom( id: 'key', name: 'john' );
+		$key = Stack::keyFrom( id: 'key', name: 'john' );
+
+		$this->assertSame( expected: 'key:john', actual: $key );
+
 		$this->stack[ $key ] = 'doe';
 
 		$this->assertSame( expected: array( 'john' => 'doe' ), actual: $this->stack->get( 'key' ) );
@@ -75,7 +78,7 @@ class StackWithArrayAccessTest extends TestCase {
 		$this->assertSame( expected: 'doe', actual: $this->stack['key']['john'] );
 		$this->assertSame( expected: 'doe', actual: $this->stack[ $key ] );
 
-		$this->assertSame( expected: 1, actual: $this->stack->count( collectionId: 'key' ) );
-		$this->assertSame( expected: 0, actual: $this->stack->count( collectionId: $key ) );
+		$this->assertSame( expected: 1, actual: $this->stack->count( key: 'key' ) );
+		$this->assertNull( actual: $this->stack->count( key: $key ) );
 	}
 }

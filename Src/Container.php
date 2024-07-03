@@ -418,7 +418,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	/** @return iterable<int,object> */
 	public function tagged( string $name ) {
 		return ! $this->tags->has( key: $name ) ? array() : new AppGenerator(
-			count: $this->tags->count( collectionId: $name ),
+			count: $this->tags->withKey( $name ),
 			generator: function () use ( $name ) {
 				foreach ( $this->tags[ $name ] as $id ) {
 					yield $this->get( $id );

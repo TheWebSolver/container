@@ -13,7 +13,7 @@ use Countable;
 use ArrayAccess;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
 
-class Stack implements ArrayAccess {
+class Stack implements ArrayAccess, Countable {
 	use KeyStack;
 
 	public function offsetExists( $key ): bool {
@@ -37,33 +37,6 @@ class Stack implements ArrayAccess {
 	/** @param string $key */
 	public function offsetUnset( $key ): void {
 		$this->remove( $key );
-	}
-
-	public function count( ?string $collectionId = null ): int {
-		if ( ! $collectionId ) {
-			return count( $this->stack );
-		}
-
-		[ $for, $key ] = $this->getKeys( from: $collectionId );
-
-		return count(
-			match ( true ) {
-				null !== $key       => $this->getNestedData( $for, $key ),
-				$this->asCollection => $this->stack[ $for ] ?? array(),
-				default             => $this->stack,
-			}
-		);
-	}
-
-	/** @return mixed[] */
-	private function getNestedData( string $for, string $key ): array {
-		if ( ! isset( $this->stack[ $for ][ $key ] ) ) {
-			return array();
-		}
-
-		$data = $this->stack[ $for ][ $key ];
-
-		return is_array( $data ) || $data instanceof Countable ? $data : array();
 	}
 
 	public static function keyFrom( string $id, string $name ): string {

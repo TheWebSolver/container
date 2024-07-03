@@ -23,10 +23,10 @@ use TheWebSolver\Codegarage\Lib\Container\Container;
  * @implements IteratorAggregate<TKey, TValue>
  */
 class Generator implements Countable, IteratorAggregate {
+	private Closure|Countable|int $count;
 	private Closure $generator;
-	private Closure|int $count;
 
-	public function __construct( Closure $generator, Closure|int $count ) {
+	public function __construct( Closure $generator, Closure|Countable|int $count ) {
 		$this->count     = $count;
 		$this->generator = $generator;
 	}
@@ -39,7 +39,11 @@ class Generator implements Countable, IteratorAggregate {
 	public function count(): int {
 		$count = $this->count;
 
-		return $this->count = is_callable( $count ) ? $count() : $count;
+		return match ( true ) {
+			$count instanceof Countable => count( $count ),
+			$count instanceof Closure   => $count(),
+			default                     => $count,
+		};
 	}
 
 	/** @param array<string|object> $concretes The concretes to resolve or already resolved. */
