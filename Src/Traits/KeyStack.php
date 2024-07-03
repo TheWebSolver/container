@@ -22,18 +22,16 @@ trait KeyStack {
 	}
 
 	public function has( string $key ): bool {
-		[ $for, $key ] = $this->getKeys( $key );
-
-		return $key ? isset( $this->stack[ $for ][ $key ] ) : isset( $this->stack[ $for ] );
+		return null !== $this->get( $key );
 	}
 
 	public function set( string $key, mixed $value ): void {
 		[ $for, $key ] = $this->getKeys( $key );
 
 		match ( true ) {
-			null !== $key       => $this->stack[ $for ][ $key ] = $value,
-			$this->asCollection => $this->stack[ $for ][]       = $value,
-			default             => $this->stack[ $for ]         = $value,
+			null === $key && $this->asCollection => $this->stack[ $for ][]       = $value,
+			null === $key                        => $this->stack[ $for ]         = $value,
+			default                              => $this->stack[ $for ][ $key ] = $value,
 		};
 	}
 
@@ -41,9 +39,7 @@ trait KeyStack {
 	public function get( string $item ): mixed {
 		[ $for, $key ] = $this->getKeys( $item );
 
-		return null !== $key
-			? $this->stack[ $for ][ $this->normalizeKey( $key ) ] ?? null
-			: $this->stack[ $for ] ?? null;
+		return null !== $key ? $this->stack[ $for ][ $key ] ?? null : $this->stack[ $for ] ?? null;
 	}
 
 	public function remove( string $key ): bool {
@@ -58,8 +54,6 @@ trait KeyStack {
 
 			return true;
 		}
-
-		$key = $this->normalizeKey( $key );
 
 		if ( ! isset( $this->stack[ $for ][ $key ] ) ) {
 			return false;
@@ -91,9 +85,5 @@ trait KeyStack {
 		$keys = explode( separator: ':', string: $from, limit: 2 );
 
 		return array( $keys[0], $keys[1] ?? null );
-	}
-
-	private function normalizeKey( string $key ): string|int {
-		return $this->asCollection && is_numeric( $key ) ? (int) $key : $key;
 	}
 }
