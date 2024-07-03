@@ -371,7 +371,7 @@ class Container implements ArrayAccess, ContainerInterface {
 			// TODO: Add appropriate exception handler.
 			$msg = sprintf( 'Target class: "%s" does not exist', $concrete );
 
-			throw new class( $msg ) implements ContainerExceptionInterface {};
+			throw new class( $msg ) extends Exception implements ContainerExceptionInterface {};
 		}
 
 		if ( ! $reflector->isInstantiable() ) {
@@ -586,7 +586,7 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	protected function fromContextual( string $id ): Closure|string|null {
 		return is_string( $artefact = $this->artefact->latest() )
-			? $this->contextual[ $artefact ][ $id ] ?? null
+			? $this->getContextual( for: $artefact, id: $id )
 			: null;
 	}
 

@@ -14,39 +14,39 @@ use ReflectionParameter;
 use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
+use TheWebSolver\Codegarage\Lib\Container\Error\InvalidParam;
 
 class ParamResolver {
 	public function __construct(
-		private readonly Container $container,
+		private readonly Container $app,
 		private readonly Param $paramPool,
 		private readonly Event $event
 	) {}
 
 	/**
 	 * @param ReflectionParameter[] $dependencies
-	 * @throws ContainerExceptionInterface When dependencies resolving failed.
+	 * @throws InvalidParam&ContainerExceptionInterface When dependencies resolving failed.
 	 */
 	public function resolve( array $dependencies ): array {
 		$results = array();
 
-		foreach ( $dependencies as $dependency ) {
-			if ( $this->paramPool->hasLatest( $dependency ) ) {
-				$results[] = $this->paramPool->getLatest( $dependency );
+		foreach ( $dependencies as $param ) {
+			if ( $this->paramPool->hasLatest( dependency: $param ) ) {
+				$results[] = $this->paramPool->getLatest( dependency: $param );
 
 				continue;
 			}
 
-			if ( $result = $this->getResultFromEvent( param: $dependency ) ) {
+			if ( $result = $this->getResultFromEvent( $param ) ) {
 				$results[] = $result;
 
 				continue;
 			}
 
-			$result = null === Unwrap::paramTypeFrom( $dependency )
-				? $this->resolvePrimitive( $dependency )
-				: $this->resolveClass( $dependency );
+			$type   = Unwrap::paramTypeFrom( $param );
+			$result = ! $type ? $this->fromUntyped( $param ) : $this->fromType( $param, $type );
 
-			if ( $dependency->isVariadic() ) {
+			if ( $param->isVariadic() ) {
 				$results = array( ...$results, $result );
 			} else {
 				$results[] = $result;
@@ -56,42 +56,31 @@ class ParamResolver {
 		return $results;
 	}
 
-	public function resolvePrimitive( ReflectionParameter $param ): mixed {
-		if ( null !== ( $concrete = $this->container->getContextualFor( '$' . $param->getName() ) ) ) {
-			return Unwrap::andInvoke( $concrete, $this->container );
-		}
+	public function fromUntyped( ReflectionParameter $param ): mixed {
+		$value = $this->app->getContextualFor( '$' . $param->getName() );
 
-		if ( $param->isDefaultValueAvailable() ) {
-			return $param->getDefaultValue();
-		}
-
-		if ( $param->isVariadic() ) {
-			return array();
-		}
-
-		// FIXME: Add appropriate exception handler.
-		throw new class(
-			sprintf(
-				'Unable to resolve dependency parameter: %1$s in class: %2$s',
-				$param,
-				( $class = $param->getDeclaringClass() ) ? $class->getName() : ''
-			)
-		) implements ContainerExceptionInterface {};
+		return match ( true ) {
+			null !== $value                   => Unwrap::andInvoke( $value, $this->app ),
+			$param->isDefaultValueAvailable() => $param->getDefaultValue(),
+			$param->isVariadic()              => array(),
+			default                           => throw InvalidParam::error( $param )
+		};
 	}
 
-	protected function resolveClass( ReflectionParameter $parameter ): mixed {
+	public function fromType( ReflectionParameter $param, string $type ): mixed {
+		$id    = $this->app->getEntryFrom( alias: $type );
+		$value = $this->app->getContextualFor( context: $id );
+
 		try {
-			return $parameter->isVariadic()
-				? $this->resolveVariadicClass( $parameter )
-				: $this->container->get( Unwrap::paramTypeFrom( $parameter ) ?? '' );
+			return $value ? Unwrap::andInvoke( $value, $this->app ) : $this->app->get( $id );
 		} catch ( ContainerExceptionInterface $e ) {
-			if ( $parameter->isDefaultValueAvailable() ) {
+			if ( $param->isDefaultValueAvailable() ) {
 				$this->paramPool->pull();
 
-				return $parameter->getDefaultValue();
+				return $param->getDefaultValue();
 			}
 
-			if ( $parameter->isVariadic() ) {
+			if ( $param->isVariadic() ) {
 				$this->paramPool->pull();
 
 				return array();
@@ -99,32 +88,6 @@ class ParamResolver {
 
 			throw $e;
 		}
-	}
-
-	/**
-	 * Resolves a class based variadic dependency from the container.
-	 *
-	 * @param  ReflectionParameter $parameter The method parameter.
-	 * @return mixed
-	 * @throws ContainerExceptionInterface When classname can't be extracted from parameter.
-	 * @since  1.0
-	 */
-	protected function resolveVariadicClass( ReflectionParameter $parameter ): mixed {
-		$class_name = Unwrap::paramTypeFrom( $parameter );
-
-		if ( ! $class_name ) {
-			// FIXME: Add appropriate exception handler.
-			throw new class(
-				'Unable to resolve classname for given parameter.'
-			) implements ContainerExceptionInterface {};
-		}
-
-		$abstract = $this->container->getEntryFrom( $class_name );
-		$concrete = $concrete = $this->container->getContextualFor( context: $abstract );
-
-		return is_array( $concrete )
-			? array_map( static fn ( $abstract ) => $this->container->get( $abstract ), $concrete )
-			: $this->container->get( $class_name );
 	}
 
 	protected function getResultFromEvent( ReflectionParameter $param ): mixed {

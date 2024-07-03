@@ -33,7 +33,7 @@ readonly class ContextBuilder {
 		}
 	}
 
-	public function giveTagged( $tag ): void {
+	public function giveTagged( string $tag ): void {
 		$this->give(
 			static fn( Container $container ) => is_array( $tagged = $container->tagged( $tag ) )
 				? $tagged
