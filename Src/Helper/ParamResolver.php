@@ -12,16 +12,12 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use ReflectionNamedType;
 use ReflectionParameter;
 use Psr\Container\ContainerExceptionInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
+use TheWebSolver\Codegarage\Lib\Container\Container as App;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Param as Pool;
 use TheWebSolver\Codegarage\Lib\Container\Error\InvalidParam;
 
-class ParamResolver {
-	public function __construct(
-		private readonly Container $app,
-		private readonly Param $paramPool,
-		private readonly Event $event
-	) {}
+readonly class ParamResolver {
+	public function __construct( private App $app, private Pool $pool, private Event $event ) {}
 
 	/**
 	 * @param ReflectionParameter[] $dependencies
@@ -31,8 +27,8 @@ class ParamResolver {
 		$results = array();
 
 		foreach ( $dependencies as $param ) {
-			if ( $this->paramPool->hasLatest( dependency: $param ) ) {
-				$results[] = $this->paramPool->getLatest( dependency: $param );
+			if ( $this->pool->hasLatest( dependency: $param ) ) {
+				$results[] = $this->pool->getLatest( dependency: $param );
 
 				continue;
 			}
@@ -75,13 +71,13 @@ class ParamResolver {
 			return $value ? Unwrap::andInvoke( $value, $this->app ) : $this->app->get( $id );
 		} catch ( ContainerExceptionInterface $e ) {
 			if ( $param->isDefaultValueAvailable() ) {
-				$this->paramPool->pull();
+				$this->pool->pull();
 
 				return $param->getDefaultValue();
 			}
 
 			if ( $param->isVariadic() ) {
-				$this->paramPool->pull();
+				$this->pool->pull();
 
 				return array();
 			}
