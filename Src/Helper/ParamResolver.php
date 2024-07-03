@@ -59,7 +59,7 @@ readonly class ParamResolver {
 			null !== $value                   => Unwrap::andInvoke( $value, $this->app ),
 			$param->isDefaultValueAvailable() => $param->getDefaultValue(),
 			$param->isVariadic()              => array(),
-			default                           => throw InvalidParam::error( $param )
+			default                           => throw InvalidParam::for( $param )
 		};
 	}
 

@@ -14,7 +14,7 @@ use InvalidArgumentException;
 use Psr\Container\ContainerExceptionInterface;
 
 class InvalidParam extends InvalidArgumentException implements ContainerExceptionInterface {
-	public static function error( ReflectionParameter $param ) {
+	public static function for( ReflectionParameter $param ) {
 		$msg = "Unable to resolve dependency parameter: {$param}";
 
 		if ( $class = $param->getDeclaringClass() ) {
