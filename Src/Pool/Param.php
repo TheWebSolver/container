@@ -9,7 +9,6 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Pool;
 
-use ReflectionParameter;
 use TheWebSolver\Codegarage\Lib\Container\Traits\PushPullStack;
 
 class Param {
@@ -18,12 +17,11 @@ class Param {
 	/** @var array<mixed[]> */
 	private array $stack = array();
 
-	public function hasLatest( ReflectionParameter $dependency ): bool {
-		return isset( $this->latest()[ $dependency->name ] );
+	public function has( string $paramName ): bool {
+		return isset( $this->latest()[ $paramName ] );
 	}
 
-	/** @return mixed `null` if no items or all items from stack has been pulled. */
-	public function getLatest( ReflectionParameter $dependency ): mixed {
-		return $this->latest()[ $dependency->name ] ?? null;
+	public function getFrom( string $paramName ): mixed {
+		return $this->latest()[ $paramName ];
 	}
 }

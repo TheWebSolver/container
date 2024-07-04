@@ -33,17 +33,14 @@ class ParamPoolTest extends TestCase {
 		$this->assertTrue( $this->paramPool->hasItems() );
 
 		foreach ( $reflection->getParameters() as $param ) {
-			$this->assertTrue( $this->paramPool->hasLatest( dependency: $param ) );
+			$this->assertTrue( $this->paramPool->has( $param->name ) );
 			$this->assertSame(
 				expected: $param->getDefaultValue(),
-				actual: $this->paramPool->getLatest( dependency: $param )
+				actual: $this->paramPool->getFrom( $param->name )
 			);
 		}
 
-		$custom = new ReflectionParameter(
-			function: fn( int $custom = 12345 ): int => $custom,
-			param: 0
-		);
+		$custom = new ReflectionParameter( fn( int $custom = 12345 ): int => $custom, param: 0 );
 
 		$this->paramPool->push( value: array( 'custom' => 12345 ) );
 
@@ -58,10 +55,10 @@ class ParamPoolTest extends TestCase {
 			),
 		);
 
-		$this->assertTrue( $this->paramPool->hasLatest( dependency: $custom ) );
+		$this->assertTrue( $this->paramPool->has( $custom->name ) );
 		$this->assertSame(
 			expected: 12345,
-			actual: $this->paramPool->getLatest( dependency: $custom )
+			actual: $this->paramPool->getFrom( $custom->name )
 		);
 
 		$this->assertSame( expected: array( 'custom' => 12345 ), actual: $this->paramPool->latest() );
@@ -84,13 +81,11 @@ class ParamPoolTest extends TestCase {
 			)
 		);
 
-		$this->assertFalse( $this->paramPool->hasLatest( dependency: $custom ) );
+		$this->assertFalse( $this->paramPool->has( $custom->name ) );
 		$this->assertSame(
 			expected: array(),
 			actual: $this->paramPool->latest(),
 			message: 'Nothing left in the Param Pool Stack.'
 		);
-
-		$this->assertNull( $this->paramPool->getLatest( $custom ) );
 	}
 }
