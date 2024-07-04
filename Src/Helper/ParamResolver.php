@@ -12,29 +12,33 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use ReflectionNamedType;
 use ReflectionParameter;
 use Psr\Container\ContainerExceptionInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container as App;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param as Pool;
+use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
+use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
 use TheWebSolver\Codegarage\Lib\Container\Error\InvalidParam;
 
 readonly class ParamResolver {
-	public function __construct( private App $app, private Pool $pool, private Event $event ) {}
+	public function __construct(
+		private Container $app,
+		private Param $dependencyInjection,
+		private Event $event,
+		private IndexStack $result = new IndexStack(),
+	) {}
 
 	/**
 	 * @param ReflectionParameter[] $dependencies
-	 * @throws InvalidParam&ContainerExceptionInterface When dependencies resolving failed.
+	 * @throws ContainerExceptionInterface When dependencies resolving failed.
 	 */
 	public function resolve( array $dependencies ): array {
-		$results = array();
-
 		foreach ( $dependencies as $param ) {
-			if ( $this->pool->hasLatest( dependency: $param ) ) {
-				$results[] = $this->pool->getLatest( dependency: $param );
+			if ( $this->dependencyInjection->has( $param->name ) ) {
+				$this->setFor( $param, result: $this->dependencyInjection->getFrom( $param->name ) );
 
 				continue;
 			}
 
 			if ( $result = $this->getResultFromEvent( $param ) ) {
-				$results[] = $result;
+				$this->setFor( $param, $result );
 
 				continue;
 			}
@@ -42,24 +46,20 @@ readonly class ParamResolver {
 			$type   = Unwrap::paramTypeFrom( $param );
 			$result = ! $type ? $this->fromUntyped( $param ) : $this->fromType( $param, $type );
 
-			if ( $param->isVariadic() ) {
-				$results = array( ...$results, $result );
-			} else {
-				$results[] = $result;
-			}
-		}//end foreach
+			$this->setFor( $param, $result );
+		}
 
-		return $results;
+		$this->dependencyInjection->pull();
+
+		return $this->result->getItems();
 	}
 
 	public function fromUntyped( ReflectionParameter $param ): mixed {
-		$value = $this->app->getContextualFor( '$' . $param->getName() );
+		$value = $this->app->getContextualFor( context: '$' . $param->getName() );
 
 		return match ( true ) {
-			null !== $value                   => Unwrap::andInvoke( $value, $this->app ),
-			$param->isDefaultValueAvailable() => $param->getDefaultValue(),
-			$param->isVariadic()              => array(),
-			default                           => throw InvalidParam::for( $param )
+			null !== $value => Unwrap::andInvoke( $value, $this->app ),
+			default         => self::coerce( $param, exception: InvalidParam::for( $param ) )
 		};
 	}
 
@@ -69,28 +69,32 @@ readonly class ParamResolver {
 
 		try {
 			return $value ? Unwrap::andInvoke( $value, $this->app ) : $this->app->get( $id );
-		} catch ( ContainerExceptionInterface $e ) {
-			if ( $param->isDefaultValueAvailable() ) {
-				$this->pool->pull();
-
-				return $param->getDefaultValue();
-			}
-
-			if ( $param->isVariadic() ) {
-				$this->pool->pull();
-
-				return array();
-			}
-
-			throw $e;
+		} catch ( ContainerExceptionInterface $unresolvable ) {
+			return self::coerce( $param, exception: $unresolvable );
 		}
 	}
 
-	protected function getResultFromEvent( ReflectionParameter $param ): mixed {
-		$type = $param->getType();
+	protected function setFor( ReflectionParameter $param, mixed $result ): void {
+		match ( true ) {
+			$param->isVariadic() => $this->result->restackWith( newValue: $result, mergeArray: true ),
+			default              => $this->result->set( value: $result )
+		};
+	}
 
-		return $type instanceof ReflectionNamedType
+	protected function getResultFromEvent( ReflectionParameter $param ): mixed {
+		return ( $type = $param->getType() ) instanceof ReflectionNamedType
 			? $this->event->fireDuringBuild( $type->getName(), $param->getName() )?->concrete
 			: null;
+	}
+
+	protected static function coerce(
+		ReflectionParameter $param,
+		ContainerExceptionInterface $exception
+	): mixed {
+		return match ( true ) {
+			$param->isDefaultValueAvailable() => $param->getDefaultValue(),
+			$param->isVariadic()              => array(),
+			default                           => throw $exception,
+		};
 	}
 }
