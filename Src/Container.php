@@ -172,7 +172,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		if ( $this->hasContextualBinding( concrete: $value = Unwrap::callback( $callback ) ) ) {
 			$this->artefact->push( $value );
 
-			$result = $this->methodResolver->resolveContextual( $this, $callback );
+			$result = $this->methodResolver->resolveContextual( $params, $this, $callback, $this->event );
 
 			$this->artefact->pull();
 
@@ -302,6 +302,16 @@ class Container implements ArrayAccess, ContainerInterface {
 		}
 
 		return $instance;
+	}
+
+	/**
+	 * @param Closure|string $abstract Either a first-class callable from instantiated class method,
+	 *                                 or pre-composed `Unwrap::toString()` value (*preferred*).
+	 * @throws LogicException When method name not given if `$object` is a class instance.
+	 * @throws TypeError      When first-class callable was not created using non-static method.
+	 */
+	public function bindMethod( Closure|string $abstract, Closure $callback ): void {
+		$this->methodResolver->bind( $abstract, $callback );
 	}
 
 	public function addContextual( Closure|string $with, string $for, string $id ): void {

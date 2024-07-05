@@ -19,6 +19,7 @@ use InvalidArgumentException;
 use ReflectionFunctionAbstract;
 use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
@@ -32,7 +33,7 @@ class MethodResolver {
 	 * @throws LogicException When method name not given if `$object` is a class instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
 	 */
-	public function define( Closure|string $abstract, Closure $callback ): void {
+	public function bind( Closure|string $abstract, Closure $callback ): void {
 		$this->bindings->set(
 			key: $abstract instanceof Closure ? Unwrap::forBinding( object: $abstract ) : $abstract,
 			value: new Binding( $callback )
@@ -44,16 +45,14 @@ class MethodResolver {
 	}
 
 	/** @return mixed The method result, or false on error. */
-	public function fromInstanceMethod( string $id, mixed $instance ): mixed {
+	public function fromBinding( string $id, mixed $instance ): mixed {
 		return ( $this->bindings[ $id ]->concrete )( $instance, $this );
 	}
 
 	/**
 	 * @param Container                $app      The container instance.
-	 * @param callable|callable-string $callback Closure, array, or string with `{$class}::{$method}` format.
+	 * @param callable|callable-string $callback Closure, array, or pre-composed `Unwrap::toString()` value (*preferred*).
 	 * @param array<string,mixed>      $params   The method/function parameters.
-	 * @param ?string                  $default  The fallback method/function.
-	 * @return mixed
 	 * @throws ReflectionException      When the class or method does not exist.
 	 *                                  If `$callback` is function, when the function does not exist.
 	 * @throws InvalidArgumentException When method cannot be resolved and passed $default is `null`.
@@ -62,13 +61,13 @@ class MethodResolver {
 		Container $app,
 		callable|string $callback,
 		array $params = array(),
-		string $default = null
-	) {
+		?string $default = null
+	): mixed {
 		if ( is_string( $callback ) ) {
 			$default = ! $default && method_exists( $callback, method: '__invoke' ) ? '__invoke' : null;
 
 			if ( static::isValid( $callback ) || $default ) {
-				return $this->fromClass( $params, $app, $callback, $default );
+				return $this->lazy( $params, $app, $callback, $default );
 			}
 		}
 
@@ -76,26 +75,23 @@ class MethodResolver {
 			...array_values( static::dependenciesFrom( $params, $app, $callback ) )
 		);
 
-		return $this->call( $callback, $default );
+		return $this->fromBindingOrDefault( $callback, $default );
 	}
 
 	/**
-	 * @param mixed[] $params The method/function parameters.
+	 * @param array<string,mixed> $params The method/function parameters.
 	 * @throws BadResolverArgument When neither method nor entry is resolvable.
 	 */
-	protected function fromClass( array $params, Container $app, string $cb, ?string $default ): mixed {
-		$parts  = explode( '::', $cb );
-		$method = count( $parts ) === 2 ? $parts[1] : $default;
+	protected function lazy( array $params, Container $app, string $cb, ?string $method ): mixed {
+		$parts = explode( '::', $cb );
 
-		if ( null === $method ) {
+		if ( null === ( $method = $parts[1] ?? $method ) ) {
 			throw BadResolverArgument::noMethod( class: $parts[0] );
 		}
 
-		if ( ! is_callable( array( $app->get( $parts[0] ), $method ), false, $object ) ) {
-			throw BadResolverArgument::nonInstantiableEntry( id: $app->getEntryFrom( $parts[0] ) );
-		}
-
-		return $this->call( $object, $params );
+		return ! is_callable( $callback = array( $app->get( $parts[0] ), $method ) )
+			? BadResolverArgument::nonInstantiableEntry( id: $app->getEntryFrom( $parts[0] ) )
+			: $this->resolve( $app, $callback, $params );
 	}
 
 	/**
@@ -108,13 +104,26 @@ class MethodResolver {
 	 * Parameter that has default value will be skipped if cannot
 	 * be resolved from the contextual binding.
 	 *
+	 * @param array<string,mixed> $params
 	 * @throws ContainerExceptionInterface When required param has no contextual binding value.
 	 */
-	public function resolveContextual( Container $container, callable|string $callback ) {
+	public function resolveContextual(
+		array $params,
+		Container $app,
+		callable $callback,
+		Event $event,
+	): mixed {
 		$stack = array();
+		$pool  = new Param();
+
+		$pool->push( $params );
+
+		// TODO: use this.
+		$resolved = ( new ParamResolver( $app, $pool, $event ) )
+			->resolve( static::reflector( $callback )->getParameters() );
 
 		foreach ( static::reflector( $callback )->getParameters() as $param ) {
-			$concrete = $container->getContextualFor( context: '$' . $param->getName() );
+			$concrete = $app->getContextualFor( context: '$' . $param->getName() );
 			$hasValue = null !== $concrete;
 
 			if ( ! $param->isOptional() && ! $hasValue ) {
@@ -133,20 +142,16 @@ class MethodResolver {
 				continue;
 			}
 
-			$stack[] = is_callable( $concrete ) ? $concrete() : $container->get( $concrete );
+			$stack[] = is_callable( $concrete ) ? $concrete() : $app->get( $concrete );
 		}//end foreach
 
-		return $this->call( $callback, default: static fn() => $callback( ...$stack ) );
+		return $this->fromBindingOrDefault( $callback, default: static fn() => $callback( ...$stack ) );
 	}
 
-	protected function call( callable $callback, mixed $default ): mixed {
-		if ( ! is_array( $callback ) ) {
-			return Unwrap::andInvoke( value: $default );
-		}
-
-		return is_object( $callback[0] )
-			? $this->fromInstanceMethod( id: Unwrap::callback( $callback ), instance: $callback[0] )
-			: Unwrap::andInvoke( value: $default );
+	protected function fromBindingOrDefault( callable $callback, Closure $default ): mixed {
+		return ! is_array( $callback ) || ! $this->hasBinding( $id = Unwrap::callback( $callback ) )
+			? Unwrap::andInvoke( value: $default )
+			: $this->fromBinding( $id, instance: $callback[0] );
 	}
 
 	/**

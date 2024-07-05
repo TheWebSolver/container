@@ -18,7 +18,7 @@ class MethodResolverTest extends TestCase {
 		$resolver = new MethodResolver( new Stack() );
 		$test     = new Binding( 'test' );
 
-		$resolver->define(
+		$resolver->bind(
 			abstract: $test->isInstance( ... ),
 			callback: static function ( $binding, $methodResolver ) {
 				self::assertInstanceOf( expected: Binding::class, actual: $binding );
@@ -31,12 +31,32 @@ class MethodResolverTest extends TestCase {
 		$key = Binding::class . '.' . spl_object_id( $test ) . '::isInstance';
 
 		$this->assertTrue( condition: $resolver->hasBinding( $key ) );
-		$this->assertFalse( condition: $resolver->fromInstanceMethod( $key, $test ) );
+		$this->assertFalse( condition: $resolver->fromBinding( $key, $test ) );
 		$this->assertFalse(
 			condition: $resolver->resolve(
 				app: $this->createMock( Container::class ),
 				callback: array( $test, 'isInstance' )
 			)
+		);
+	}
+
+	public function testLazyMethodCall(): void {
+		$resolver = new MethodResolver( new Stack() );
+		$app      = $this->createMock( Container::class );
+		$test     = new class() {
+			public function test( int $base = 3 ): int {
+				return $base + 2;
+			}
+		};
+
+		$app->expects( $this->once() )
+			->method( 'get' )
+			->with( $test::class )
+			->willReturn( new $test() );
+
+		$this->assertSame(
+			actual: $resolver->resolve( $app, callback: $test::class . '::test' ),
+			expected: 5
 		);
 	}
 }
