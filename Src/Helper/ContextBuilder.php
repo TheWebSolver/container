@@ -15,11 +15,8 @@ use TheWebSolver\Codegarage\Lib\Container\Container;
 readonly class ContextBuilder {
 	protected string $toBeResolved;
 
-	/** @param string|string[] $for */
-	public function __construct(
-		private readonly array $for,
-		private readonly Container $container
-	) {}
+	/** @param string[] $for */
+	public function __construct( private array $for, private Container $container ) {}
 
 	public function needs( string $requirement ): self {
 		$this->toBeResolved = $requirement;
