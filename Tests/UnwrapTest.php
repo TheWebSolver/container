@@ -52,11 +52,10 @@ class UnwrapTest extends TestCase {
 	 */
 	public function testMethodBindingId(
 		string $expected,
-		object $object,
+		object|string $object,
 		string $methodName,
 		?string $exception
 	): void {
-
 		if ( $exception ) {
 			$this->expectException( $exception );
 		}
@@ -66,6 +65,7 @@ class UnwrapTest extends TestCase {
 
 	public function provideDataForMethodBinding(): array {
 		return array(
+			array( self::class . '::assertTrue', self::class, 'assertTrue', null ),
 			array( 'lambda method is invalid', function () {}, '', TypeError::class ),
 			array( "{$this->_gIdSpl()}assertTrue", $this, 'assertTrue', null ),
 			array( 'Undefined method given', $this, 'method-does-not-exist', LogicException::class ),
@@ -100,7 +100,7 @@ class UnwrapTest extends TestCase {
 
 	private function _gIdSpl( ?object $object = null ): string {
 		return ( $object ? $object::class : self::class )
-			. ':' . spl_object_id( $object ?? $this ) . '@';
+			. '.' . spl_object_id( $object ?? $this ) . '::';
 	}
 
 	/**
