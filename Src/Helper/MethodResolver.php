@@ -21,6 +21,7 @@ use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
+use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 class MethodResolver {
 	// phpcs:ignore Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
@@ -31,7 +32,7 @@ class MethodResolver {
 	 * @throws LogicException When method name not given if `$object` is a class instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
 	 */
-	public function bind( Closure|string $abstract, Closure $callback ): void {
+	public function define( Closure|string $abstract, Closure $callback ): void {
 		$this->bindings->set(
 			key: $abstract instanceof Closure ? Unwrap::forBinding( object: $abstract ) : $abstract,
 			value: new Binding( $callback )
@@ -43,74 +44,55 @@ class MethodResolver {
 	}
 
 	/** @return mixed The method result, or false on error. */
-	public function getBinding( string $id, mixed $instance ): mixed {
+	public function fromInstanceMethod( string $id, mixed $instance ): mixed {
 		return ( $this->bindings[ $id ]->concrete )( $instance, $this );
 	}
 
 	/**
-	 * Calls the given closure or class method and inject its dependencies.
-	 *
-	 * @param Container                $container The container instance.
-	 * @param callable|callable-string $cb        The closure or string with `{$class}@{$method}` format.
-	 * @param array<string, mixed>     $params    The method/function parameters.
-	 * @param ?string                  $default   The fallback method/function.
+	 * @param Container                $app      The container instance.
+	 * @param callable|callable-string $callback Closure, array, or string with `{$class}::{$method}` format.
+	 * @param array<string,mixed>      $params   The method/function parameters.
+	 * @param ?string                  $default  The fallback method/function.
 	 * @return mixed
 	 * @throws ReflectionException      When the class or method does not exist.
-	 *                                  If `$cb` is function, when the function does not exist.
+	 *                                  If `$callback` is function, when the function does not exist.
 	 * @throws InvalidArgumentException When method cannot be resolved and passed $default is `null`.
-	 * @since 1.0
 	 */
 	public function resolve(
-		Container $container,
-		callable|string $cb,
+		Container $app,
+		callable|string $callback,
 		array $params = array(),
 		string $default = null
 	) {
-		if ( is_string( $cb ) && ! $default && method_exists( $cb, '__invoke' ) ) {
-			$default = '__invoke';
+		if ( is_string( $callback ) ) {
+			$default = ! $default && method_exists( $callback, method: '__invoke' ) ? '__invoke' : null;
+
+			if ( static::isValid( $callback ) || $default ) {
+				return $this->fromClass( $params, $app, $callback, $default );
+			}
 		}
 
-		if ( is_string( $cb ) && ( static::with_at_sign( $cb ) || $default ) ) {
-			return $this->call_class( $container, $cb, $params, $default );
-		}
-
-		$default = static fn() => $cb(
-			...array_values( static::get_dependencies( $container, $cb, $params ) )
+		$default = static fn() => $callback(
+			...array_values( static::dependenciesFrom( $params, $app, $callback ) )
 		);
 
-		return $this->call( $cb, $default );
+		return $this->call( $callback, $default );
 	}
 
 	/**
-	 * Calls a string reference to a class using Class@method syntax.
-	 *
-	 * @param Container $container The container instance.
-	 * @param string    $target    The string in a `{$class}@{$method}` format.
-	 * @param mixed[]   $params    The method/function parameters.
-	 * @param ?string   $default   The fallback method/function.
-	 * @return mixed
-	 * @throws InvalidArgumentException When method cannot be resolved and passed $default is `null`.
-	 * @since 1.0
+	 * @param mixed[] $params The method/function parameters.
+	 * @throws BadResolverArgument When neither method nor entry is resolvable.
 	 */
-	protected function call_class(
-		Container $container,
-		string $target,
-		array $params = array(),
-		string $default = null
-	) {
-		$segments = explode( '@', $target );
+	protected function fromClass( array $params, Container $app, string $cb, ?string $default ): mixed {
+		$parts  = explode( '::', $cb );
+		$method = count( $parts ) === 2 ? $parts[1] : $default;
 
-		// We will assume an @ sign is used to delimit the class name from the method
-		// name. We will split on this @ sign and then build a callable array that
-		// we can pass right back into the "call" method for dependency binding.
-		$method = count( $segments ) === 2 ? $segments[1] : $default;
-
-		if ( is_null( $method ) ) {
-			throw new InvalidArgumentException( 'Method not provided.' );
+		if ( null === $method ) {
+			throw BadResolverArgument::noMethod( class: $parts[0] );
 		}
 
-		if ( ! is_callable( array( $container->get( $segments[0] ), $method ), false, $object ) ) {
-			throw new InvalidArgumentException( 'Non-instantiable concrete provided.' );
+		if ( ! is_callable( array( $app->get( $parts[0] ), $method ), false, $object ) ) {
+			throw BadResolverArgument::nonInstantiableEntry( id: $app->getEntryFrom( $parts[0] ) );
 		}
 
 		return $this->call( $object, $params );
@@ -157,37 +139,33 @@ class MethodResolver {
 		return $this->call( $callback, default: static fn() => $callback( ...$stack ) );
 	}
 
-	protected function call( callable $cb, mixed $default ): mixed {
-		return ! is_array( $cb ) ? Unwrap::andInvoke( $default ) : (
-			$this->hasBinding( id: $method = Unwrap::callback( $cb ) )
-				? $this->getBinding( id: $method, instance: $cb[0] )
-				: Unwrap::andInvoke( $default )
-		);
+	protected function call( callable $callback, mixed $default ): mixed {
+		if ( ! is_array( $callback ) ) {
+			return Unwrap::andInvoke( value: $default );
+		}
+
+		return is_object( $callback[0] )
+			? $this->fromInstanceMethod( id: Unwrap::callback( $callback ), instance: $callback[0] )
+			: Unwrap::andInvoke( value: $default );
 	}
 
 	/**
 	 * Gets all dependencies for a given method.
 	 *
-	 * @param Container       $container The container instance.
-	 * @param callable|string $cb        The callback either as `[$class, $method]` array or a function.
-	 * @param mixed[]         $params    The method/function parameters.
+	 * @param mixed[] $params The method/function parameters.
 	 * @return mixed[]
 	 * @throws ReflectionException When the class or method does not exist.
 	 *                             If `$cb` is function, when the function does not exist.
 	 * @since 1.0
 	 */
-	protected static function get_dependencies(
-		Container $container,
-		$cb,
-		array $params = array()
-	): array {
+	protected static function dependenciesFrom( array $params, Container $app, $cb ): array {
 		$deps = array();
 
 		foreach ( static::reflector( $cb )->getParameters() as $param ) {
-			static::walk_param( $container, $param, $params, $deps );
+			static::walk_param( $app, $param, $params, $deps );
 		}
 
-		return array_merge( $deps, array_values( $params ) );
+		return array( ...$deps, ...array_values( $params ) );
 	}
 
 	/**
@@ -254,14 +232,7 @@ class MethodResolver {
 		}//end if
 	}
 
-	/**
-	 * Determines if the given string is in Class@method syntax.
-	 *
-	 * @param mixed $cb The callback.
-	 * @return bool
-	 * @since 1.0
-	 */
-	protected static function with_at_sign( $cb ): bool {
-		return is_string( $cb ) && ( strpos( $cb, '@' ) !== false );
+	protected static function isValid( string $callback ): bool {
+		return str_contains( haystack: $callback, needle: '::' );
 	}
 }
