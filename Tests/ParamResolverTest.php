@@ -17,7 +17,7 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
 
 class ParamResolverTest extends TestCase {
-	private ?ParamResolver $resolver;
+	private ?ParamResolver $resolve;
 
 	/** @var array{0:Container&MockObject,1:Param&MockObject,2:Event&MockObject} */
 	private ?array $mockedArgs;
@@ -29,18 +29,18 @@ class ParamResolverTest extends TestCase {
 			$this->createMock( Event::class ),
 		);
 
-		$this->resolver = new ParamResolver( ...$this->mockedArgs );
+		$this->resolve = new ParamResolver( ...$this->mockedArgs );
 	}
 
 	protected function tearDown(): void {
-		$this->resolver   = null;
+		$this->resolve    = null;
 		$this->mockedArgs = null;
 	}
 
 	public function testParamResolveForUntypedParam(): void {
 		[ $app ]    = $this->mockedArgs;
-		$resolver   = $this->resolver;
-		$param      = new ReflectionParameter( static function ( $value = 'defaultVal' ) {}, param: 0 );
+		$resolve    = $this->resolve;
+		$param      = new ReflectionParameter( static function ( string $value = 'test' ) {}, param: 0 );
 		$contextual = static function ( $app ): string {
 			self::assertInstanceOf( Container::class, actual: $app );
 
@@ -54,14 +54,14 @@ class ParamResolverTest extends TestCase {
 			->with( '$value' )
 			->willReturn( 'paramVal', $contextual, null, $variadicContextual, null, null );
 
-		$this->assertSame( expected: 'paramVal', actual: $resolver->fromUntyped( $param ) );
-		$this->assertSame( expected: 'from closure', actual: $resolver->fromUntyped( $param ) );
-		$this->assertSame( expected: 'defaultVal', actual: $resolver->fromUntyped( $param ) );
+		$this->assertSame( expected: 'paramVal', actual: $resolve->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( expected: 'from closure', actual: $resolve->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( expected: 'test', actual: $resolve->fromUntypedOrBuiltin( $param ) );
 
 		$param = new ReflectionParameter( function: static function ( ...$value ) {}, param: 0 );
 
-		$this->assertSame( expected: array( 'one', 'two' ), actual: $resolver->fromUntyped( $param ) );
-		$this->assertSame( expected: array(), actual: $resolver->fromUntyped( $param ) );
+		$this->assertSame( array( 'one', 'two' ), actual: $resolve->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( expected: array(), actual: $resolve->fromUntypedOrBuiltin( $param ) );
 
 		$param = new ReflectionParameter( function: function ( $value ) {}, param: 0 );
 
@@ -70,7 +70,7 @@ class ParamResolverTest extends TestCase {
 			"Unable to resolve dependency parameter: {$param} in class: " . self::class . '.'
 		);
 
-		$resolver->fromUntyped( $param );
+		$resolve->fromUntypedOrBuiltin( $param );
 	}
 
 	/** @dataProvider provideVariousTypeHintedFunction */
@@ -118,7 +118,7 @@ class ParamResolverTest extends TestCase {
 			}
 		}//end if
 
-		$this->assertSame( $expectedValue, actual: $this->resolver->fromType( $param, $type ) );
+		$this->assertSame( $expectedValue, actual: $this->resolve->fromTyped( $param, $type ) );
 	}
 
 	/** @return array<array{0:Closure,1:?string,2:mixed}> */
@@ -140,38 +140,51 @@ class ParamResolverTest extends TestCase {
 	}
 
 	public function testResolveWithTypedOrUntyped() {
-		$testFn     = static function ( ParamResolverTest $class, ?string $text, ...$other ) {};
-		$reflection = new ReflectionFunction( $testFn );
-		$deps       = $reflection->getParameters();
-		$pool       = new Param();
-		$resolver   = new ParamResolver( new Container(), $pool, $this->createMock( Event::class ) );
+		[ $app, $p, $event ] = $this->mockedArgs;
+		$testFn              = static function ( TestCase $class, ?string $text, ...$other ) {};
+		$ref                 = new ReflectionFunction( $testFn );
+		$pool                = new Param();
 
-		$pool->push( value: array( 'text' => 'injected value' ) );
+		$pool->push(
+			value: array(
+				'text'  => 'injected value',
+				'class' => $this->createStub( self::class ),
+			)
+		);
 
-		$resolved = $resolver->resolve( $deps );
+		$app->expects( $this->exactly( 0 ) )->method( 'get' );
+		$app->expects( $this->once() )
+			->method( 'getContextualFor' )
+			->with( '$other' )
+			->willReturn( null );
 
-		[ $class, $text /* ...$other is an empty array, so not included */ ] = $resolved;
-
-		$this->assertCount( expectedCount: 2, haystack: $resolved );
-		$this->assertInstanceOf( expected: self::class, actual: $class );
-		$this->assertSame( expected: 'injected value', actual: $text );
-		$this->assertEmpty( actual: $pool->getItems() );
-
-		$reflection2 = new ReflectionFunction( static function ( bool $valid, int ...$nos ) {} );
-
-		$this->mockedArgs[2]
+		$event
 			->expects( $this->exactly( 2 ) )
 			->method( 'fireDuringBuild' )
-			->willReturn( new Binding( concrete: true ), new Binding( concrete: array( 2, 3, 4 ) ) );
+			->willReturn( new Binding( concrete: 'event' ), new Binding( concrete: array( 2, 3, 4 ) ) );
 
-		$resolved = $this->resolver->resolve( $reflection2->getParameters() );
+		$resolved = ( new ParamResolver( $app, $pool, $event ) )->resolve( $ref->getParameters() );
 
-		$reflection2->invokeArgs( $resolved );
+		[ $class, $injectedText /* ...{$other} is an empty array, so not included */ ] = $resolved;
 
-		$this->assertTrue( $resolved[0] );
+		$this->assertCount( expectedCount: 2, haystack: $resolved );
+		$this->assertEmpty( actual: $pool->getItems() );
+		$this->assertInstanceOf( expected: self::class, actual: $class );
+		$this->assertSame( expected: 'injected value', actual: $injectedText );
 
-		array_shift( $resolved );
+		$testFn2 = static function ( TestCase $class, string $text, int ...$other ) {};
+		$ref2    = new ReflectionFunction( $testFn2 );
 
-		$this->assertSame( expected: array( 2, 3, 4 ), actual: $resolved );
+		$pool->push( value: array( 'class' => $this->createStub( self::class ) ) );
+
+		$resolved2 = ( new ParamResolver( $app, $pool, $event ) )->resolve( $ref2->getParameters() );
+
+		[ $class, $eventText /* ...[2, 3, 4] => ...{$other} from event binding */ ] = $resolved2;
+
+		$this->assertCount( expectedCount: 5, haystack: $resolved2 );
+		$this->assertEmpty( actual: $pool->getItems() );
+		$this->assertInstanceOf( expected: self::class, actual: $class );
+		$this->assertSame( expected: 'event', actual: $eventText );
+		$this->assertSame( expected: array( 2, 3, 4 ), actual: array_slice( $resolved2, offset: 2 ) );
 	}
 }

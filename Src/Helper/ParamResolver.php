@@ -11,90 +11,85 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
 use ReflectionNamedType;
 use ReflectionParameter;
-use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
 use TheWebSolver\Codegarage\Lib\Container\Error\InvalidParam;
+use Psr\Container\ContainerExceptionInterface as ContainerError;
 
 readonly class ParamResolver {
 	public function __construct(
 		private Container $app,
-		private Param $dependencyInjection,
+		private Param $pool,
 		private Event $event,
 		private IndexStack $result = new IndexStack(),
 	) {}
 
 	/**
 	 * @param ReflectionParameter[] $dependencies
-	 * @throws ContainerExceptionInterface When dependencies resolving failed.
+	 * @throws ContainerError When resolving dependencies fails.
 	 */
 	public function resolve( array $dependencies ): array {
 		foreach ( $dependencies as $param ) {
-			if ( $this->dependencyInjection->has( $param->name ) ) {
-				$this->setFor( $param, result: $this->dependencyInjection->getFrom( $param->name ) );
+			$result = match ( true ) {
+				$this->pool->has( $param->name )               => $this->pool->getFrom( $param->name ),
+				null !== ( $val = $this->fromEvent( $param ) ) => $val,
+				default                                        => $param
+			};
 
-				continue;
-			}
-
-			if ( $result = $this->getResultFromEvent( $param ) ) {
-				$this->setFor( $param, $result );
-
-				continue;
-			}
-
-			$type   = Unwrap::paramTypeFrom( $param );
-			$result = ! $type ? $this->fromUntyped( $param ) : $this->fromType( $param, $type );
-
-			$this->setFor( $param, $result );
+			$this->for( $param, result: $param === $result ? $this->from( $result ) : $result );
 		}
 
-		$this->dependencyInjection->pull();
+		$this->pool->pull();
 
 		return $this->result->getItems();
 	}
 
-	public function fromUntyped( ReflectionParameter $param ): mixed {
-		$value = $this->app->getContextualFor( context: '$' . $param->getName() );
+	/** @throws ContainerError When resolving dependencies fails. */
+	public function fromUntypedOrBuiltin( ReflectionParameter $param ): mixed {
+		$value = $this->app->getContextualFor( context: "\${$param->getName()}" );
 
-		return match ( true ) {
-			null !== $value => Unwrap::andInvoke( $value, $this->app ),
-			default         => self::coerce( $param, exception: InvalidParam::for( $param ) )
-		};
+		return null === $value
+			? self::defaultFrom( $param, error: InvalidParam::for( $param ) )
+			: Unwrap::andInvoke( $value, $this->app );
 	}
 
-	public function fromType( ReflectionParameter $param, string $type ): mixed {
+	/** @throws ContainerError When resolving dependencies fails. */
+	public function fromTyped( ReflectionParameter $param, string $type ): mixed {
 		$id    = $this->app->getEntryFrom( alias: $type );
 		$value = $this->app->getContextualFor( context: $id );
 
 		try {
 			return $value ? Unwrap::andInvoke( $value, $this->app ) : $this->app->get( $id );
-		} catch ( ContainerExceptionInterface $unresolvable ) {
-			return self::coerce( $param, exception: $unresolvable );
+		} catch ( ContainerError $unresolvable ) {
+			return self::defaultFrom( $param, error: $unresolvable );
 		}
 	}
 
-	protected function setFor( ReflectionParameter $param, mixed $result ): void {
+	protected function for( ReflectionParameter $param, mixed $result ): void {
 		match ( true ) {
 			$param->isVariadic() => $this->result->restackWith( newValue: $result, mergeArray: true ),
 			default              => $this->result->set( value: $result )
 		};
 	}
 
-	protected function getResultFromEvent( ReflectionParameter $param ): mixed {
+	protected function from( ReflectionParameter $param ) {
+		$type = Unwrap::paramTypeFrom( reflection: $param );
+
+		return $type ? $this->fromTyped( $param, $type ) : $this->fromUntypedOrBuiltin( $param );
+	}
+
+	protected function fromEvent( ReflectionParameter $param ): mixed {
 		return ( $type = $param->getType() ) instanceof ReflectionNamedType
 			? $this->event->fireDuringBuild( $type->getName(), $param->getName() )?->concrete
 			: null;
 	}
 
-	protected static function coerce(
-		ReflectionParameter $param,
-		ContainerExceptionInterface $exception
-	): mixed {
+	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {
 		return match ( true ) {
 			$param->isDefaultValueAvailable() => $param->getDefaultValue(),
 			$param->isVariadic()              => array(),
-			default                           => throw $exception,
+			default                           => throw $error,
 		};
 	}
 }

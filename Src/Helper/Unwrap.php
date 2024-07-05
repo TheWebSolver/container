@@ -84,8 +84,8 @@ class Unwrap {
 		);
 	}
 
-	public static function paramTypeFrom( ReflectionParameter $parameter ): ?string {
-		$type = $parameter->getType();
+	public static function paramTypeFrom( ReflectionParameter $reflection ): ?string {
+		$type = $reflection->getType();
 
 		if ( ! $type instanceof ReflectionNamedType || $type->isBuiltin() ) {
 			return null;
@@ -93,17 +93,11 @@ class Unwrap {
 
 		$name = $type->getName();
 
-		if ( null !== ( $class = $parameter->getDeclaringClass() ) ) {
-			if ( $className = match ( $name ) {
-				'self'   => $class->getName(),
-				'parent' => $class->getParentClass()?->getName(),
-				default  => null
-			} ) {
-				return $className;
-			}
-		}
-
-		return $name;
+		return null === ( $class = $reflection->getDeclaringClass() ) ? $name : match ( $name ) {
+			'self'   => $class->getName(),
+			'parent' => $class->getParentClass()->getName(),
+			default  => $name
+		};
 	}
 
 	public static function andInvoke( mixed $value, mixed ...$args ): mixed {
