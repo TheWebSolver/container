@@ -24,9 +24,11 @@ class Unwrap {
 		return is_array( $thing ) ? $thing : array( $thing );
 	}
 
-	/** @param object $object First-class callable is preferred to make `$methodName` optional. */
-	public static function asString( object $object, string $methodName = '' ): string {
-		return $object::class . ':' . spl_object_id( $object ) . "@$methodName";
+	public static function asString( object|string $object, string $methodName = '' ): string {
+		return self::toString(
+			object: is_string( $object ) ? $object : $object::class . '.' . spl_object_id( $object ),
+			methodName: $methodName
+		);
 	}
 
 	/**
@@ -64,7 +66,11 @@ class Unwrap {
 	 * @throws LogicException When method name not given if `$object` is a class instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
 	 */
-	public static function forBinding( object $object, string $methodName = '' ): string {
+	public static function forBinding( object|string $object, string $methodName = '' ): string {
+		if ( is_string( $object ) ) {
+			return self::asString( $object, $methodName );
+		}
+
 		if ( ! $object instanceof Closure ) {
 			return method_exists( $object, $methodName )
 				? self::asString( $object, $methodName ) // An instance and it's method name.
