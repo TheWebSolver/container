@@ -14,8 +14,8 @@ use ReflectionParameter;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
-use TheWebSolver\Codegarage\Lib\Container\Error\InvalidParam;
 use Psr\Container\ContainerExceptionInterface as ContainerError;
+use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 readonly class ParamResolver {
 	public function __construct(
@@ -50,7 +50,7 @@ readonly class ParamResolver {
 		$value = $this->app->getContextualFor( context: "\${$param->getName()}" );
 
 		return null === $value
-			? self::defaultFrom( $param, error: InvalidParam::for( $param ) )
+			? self::defaultFrom( $param, error: BadResolverArgument::noParam( ref: $param ) )
 			: Unwrap::andInvoke( $value, $this->app );
 	}
 
