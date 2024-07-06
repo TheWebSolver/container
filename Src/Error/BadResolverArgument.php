@@ -31,4 +31,11 @@ class BadResolverArgument extends Exception implements ContainerExceptionInterfa
 
 		return new self( "{$msg}." );
 	}
+
+	public static function instantiatedBeforehand( string $class, string $method ): self {
+		return new self(
+			"Cannot resolve instantiated class method \"{$class}::{$method}()\". To resolve method, " .
+			"Pass [\$objectInstance, '{$method}'] as callback argument."
+		);
+	}
 }

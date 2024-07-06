@@ -45,6 +45,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	/** @var array<string,Closure[]> */
 	protected array $rebound_callbacks = array();
 	protected readonly Event $event;
+	protected readonly MethodResolver $methodResolver;
 
 	// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
 	/**
@@ -60,11 +61,11 @@ class Container implements ArrayAccess, ContainerInterface {
 		protected readonly Aliases $aliases = new Aliases(),
 		protected readonly Stack $resolved = new Stack(),
 		protected readonly Stack $contextual = new Stack(),
-		protected readonly MethodResolver $methodResolver = new MethodResolver(),
 		protected readonly Stack $extenders = new Stack(),
 		protected readonly Stack $tags = new Stack(),
 	) {
-		$this->event = new Event( $this, $bindings );
+		$this->event          = new Event( $this, $bindings );
+		$this->methodResolver = new MethodResolver( $this, $this->event, $bindings );
 
 		$this->extenders->asCollection();
 		$this->tags->asCollection();
@@ -158,8 +159,8 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	/**
-	 * @param  callable|callable-string $callback The callback.
-	 * @param  mixed[]                  $params   The callback parameters.
+	 * @param  callable|string     $callback The callback.
+	 * @param  array<string,mixed> $params   The callback parameters.
 	 * @throws InvalidArgumentException If invalid argument passed.
 	 */
 	public function call(
@@ -172,7 +173,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		if ( $this->hasContextualBinding( concrete: $value = Unwrap::callback( $callback ) ) ) {
 			$this->artefact->push( $value );
 
-			$result = $this->methodResolver->resolveContextual( $params, $this, $callback, $this->event );
+			$result = $this->methodResolver->resolveContextual( $callback, $this->event, $params );
 
 			$this->artefact->pull();
 
@@ -186,9 +187,9 @@ class Container implements ArrayAccess, ContainerInterface {
 			}
 
 			$isBuilding = true;
-		}//end if
+		}
 
-		$result = $this->methodResolver->resolve( $this, $callback, $params, $defaultMethod );
+		$result = $this->methodResolver->resolve( $callback, $defaultMethod, $params );
 
 		if ( $isBuilding ) {
 			$this->artefact->pull();
@@ -305,13 +306,13 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	/**
-	 * @param Closure|string $abstract Either a first-class callable from instantiated class method,
-	 *                                 or pre-composed `Unwrap::toString()` value (*preferred*).
+	 * @param Closure|string $entry Either a first-class callable from instantiated class method, or
+	 *                              a normalized string with `Unwrap::asString()` (*preferred*).
 	 * @throws LogicException When method name not given if `$object` is a class instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
 	 */
-	public function bindMethod( Closure|string $abstract, Closure $callback ): void {
-		$this->methodResolver->bind( $abstract, $callback );
+	public function bindMethod( Closure|string $entry, Closure $callback ): void {
+		$this->methodResolver->bind( $entry, $callback );
 	}
 
 	public function addContextual( Closure|string $with, string $for, string $id ): void {

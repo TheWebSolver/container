@@ -110,7 +110,11 @@ class Unwrap {
 		return $value instanceof Closure ? $value( ...$args ) : $value;
 	}
 
-	public static function callback( callable $callback ): string {
+	/**
+	 * @param callable|string $callback Either a valid callback or a normalized
+	 *                                  string using `Unwrap::asString()`.
+	 */
+	public static function callback( callable|string $callback ): string {
 		return match ( true ) {
 			default                      => $callback,
 			is_array( $callback )        => self::forBinding( ...$callback ),
