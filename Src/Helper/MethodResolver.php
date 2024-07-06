@@ -124,7 +124,7 @@ readonly class MethodResolver {
 
 	/** @param array<string,mixed> $params The method's injected parameters. */
 	protected function defaultFrom( callable|string $cb, array $params ): Closure {
-		return fn() => $cb( ...array_values( $this->dependenciesFrom( $cb, $params ) ) );
+		return fn() => $cb( ...$this->dependenciesFrom( $cb, $params ) );
 	}
 
 	/**
@@ -186,54 +186,5 @@ readonly class MethodResolver {
 		$parts = explode( separator: '.', string: $name, limit: 2 );
 
 		return is_numeric( value: $parts[1] ?? false ) ? $parts[0] : null;
-	}
-
-	/**
-	 * Traverses over given call parameter to get its dependencies.
-	 *
-	 * @param Container           $container The container.
-	 * @param ReflectionParameter $param     The method/function parameter.
-	 * @param mixed[]             $params    The method/function parameters.
-	 * @param mixed[]             $deps      The dependencies.
-	 * @throws ContainerExceptionInterface When cannot resolve dependency in the given class method or function.
-	 * @since 1.0
-	 */
-	private static function walk_param(
-		Container $container,
-		ReflectionParameter $param,
-		array &$params,
-		array &$deps
-	): void {
-		if ( array_key_exists( $param_name = $param->getName(), $params ) ) {
-			$deps[] = $params[ $param_name ];
-
-			unset( $params[ $param_name ] );
-		} elseif ( ! is_null( $class_name = Unwrap::paramTypeFrom( $param ) ) ) {
-			if ( array_key_exists( $class_name, $params ) ) {
-				$deps[] = $params[ $class_name ];
-
-				unset( $params[ $class_name ] );
-			} elseif ( $param->isVariadic() ) {
-				$variadic = $container->get( $class_name );
-				$deps     = array_merge( $deps, is_array( $variadic ) ? $variadic : array( $variadic ) );
-			} else {
-				$deps[] = $container->get( $class_name );
-			}
-		} elseif ( $param->isDefaultValueAvailable() ) {
-			$deps[] = $param->getDefaultValue();
-		} elseif (
-			! $param->isOptional()
-				&& ! array_key_exists( $param_name, $params )
-				&& $class = $param->getDeclaringClass()
-		) {
-			$msg = sprintf(
-				'Unable to resolve dependency parameter: %1$s in class: %2$s',
-				$param,
-				$class->getName()
-			);
-
-			// TODO: add exception class.
-			throw new class( $msg ) implements ContainerExceptionInterface{};
-		}//end if
 	}
 }
