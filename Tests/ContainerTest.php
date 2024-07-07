@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
+use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 
 class ContainerTest extends TestCase {
 	private ?Container $app;
@@ -123,12 +124,8 @@ class ContainerTest extends TestCase {
 
 		$this->app->addContextual( with: 'update', for: $class, id: '$data' );
 
-		$this->assertTrue(
-			$this->app->hasContextualBinding( concrete: $class )
-		);
-		$this->assertTrue(
-			$this->app->hasContextualBinding( concrete: $class, toBeResolved: '$data' )
-		);
+		$this->assertTrue( $this->app->hasContextualBinding( concrete: $class ) );
+		$this->assertTrue( $this->app->hasContextualBinding( concrete: $class, nestedKey: '$data' ) );
 
 		$this->assertSame( expected: 'update', actual: $this->app->get( id: $class )->data );
 
@@ -238,7 +235,45 @@ class ContainerTest extends TestCase {
 		$this->assertInstanceOf( $eventualClass::class, $secondaryClass );
 		$this->assertSame( expected: 'Using Event Builder', actual: $secondaryClass->value );
 	}
+
+	public function testMethodCallWithBinding(): void {
+		$app  = new Container();
+		$test = new class() {
+			public function test( int $arg = 3 ): int {
+				return $arg + 2;
+			}
+		};
+
+		$app->bindMethod( entry: $test->test( ... ), callback: static fn( $test ) => $test->test( 8 ) );
+
+		$this->assertSame( expected: 10, actual: $app->call( array( $test, 'test' ) ) );
+	}
+
+	public function testMethodCallWithDifferentImplementation(): void {
+		$app  = new Container();
+		$test = new class() {
+			public function test( int $arg = 3 ): int {
+				return $arg + 2;
+			}
+		};
+
+		$app->when( Unwrap::callback( $test->test( ... ) ) )->needs( '$arg' )->give( fn() => 18 );
+
+		$this->assertSame( expected: 20, actual: $app->call( array( $test, 'test' ) ) );
+		$this->assertSame( expected: 20, actual: $app->call( $test->test( ... ) ) );
+
+		$app->subscribeDuringBuild( 'int', 'arg', new Binding( 28 ) );
+
+		$this->assertSame( expected: 30, actual: $app->call( array( $test, 'test' ) ) );
+		// FIXME: make it work with first-class callable also. Currently, only contextual works.
+		$this->assertSame( expected: 20, actual: $app->call( $test->test( ... ) ) );
+		$this->assertSame(
+			actual: $app->call( array( $test, 'test' ), array( 'arg' => 38 ) ),
+			expected: 40
+		);
+	}
 }
+
 
 
 class _TestStack__Contextual_Binding_WithArrayAccess {

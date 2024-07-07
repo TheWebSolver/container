@@ -124,9 +124,9 @@ class Container implements ArrayAccess, ContainerInterface {
 		return $this->isInstance( $id ) || $this->isSingleton( $id );
 	}
 
-	public function hasContextualBinding( string $concrete, ?string $toBeResolved = null ): bool {
+	public function hasContextualBinding( string $concrete, ?string $nestedKey = null ): bool {
 		return $this->contextual->has(
-			key: $toBeResolved ? Stack::keyFrom( $concrete, $toBeResolved ) : $concrete
+			key: $nestedKey ? Stack::keyFrom( $concrete, $nestedKey ) : $concrete
 		);
 	}
 
@@ -161,43 +161,36 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	/**
-	 * @param  callable|string     $callback The callback.
+	 * @param  callable|string     $callback Possible options are:
+	 * - `string`   -> "classname::methodname"
+	 * - `callable` -> $object->methodname(...) as first-class callable
+	 * - `callable` -> array($object, 'methodname').
 	 * @param  array<string,mixed> $params   The callback parameters.
-	 * @throws InvalidArgumentException If invalid argument passed.
+	 * @throws BadResolverArgument — When method cannot be resolved or no `$default`.
 	 */
 	public function call(
 		callable|string $callback,
 		array $params = array(),
 		?string $defaultMethod = null
 	): mixed {
-		$isBuilding = false;
+		$resolving = false;
+		$artefact  = ! $this->hasContextualBinding( $normalized = Unwrap::callback( $callback ) )
+			? MethodResolver::getArtefact( from: $callback )
+			: $normalized;
 
-		if ( $this->hasContextualBinding( concrete: $value = Unwrap::callback( $callback ) ) ) {
-			$this->artefact->push( $value );
+		if ( ! $this->artefact->has( value: $artefact ) ) {
+			$this->artefact->push( value: $artefact );
 
-			$result = $this->methodResolver->resolveContextual( $callback, $this->event, $params );
-
-			$this->artefact->pull();
-
-			return $result;
-		} elseif ( is_array( $callback ) ) {
-			$class = $callback[0];
-			$name  = is_string( $class ) ? $class : $class::class;
-
-			if ( ! $this->artefact->has( value: $name ) ) {
-				$this->artefact->push( value: $name );
-			}
-
-			$isBuilding = true;
+			$resolving = true;
 		}
 
-		$result = $this->methodResolver->resolve( $callback, $defaultMethod, $params );
+		$resolved = $this->methodResolver->resolve( $callback, $defaultMethod, $params );
 
-		if ( $isBuilding ) {
+		if ( $resolving ) {
 			$this->artefact->pull();
 		}
 
-		return $result;
+		return $resolved;
 	}
 
 	/**
