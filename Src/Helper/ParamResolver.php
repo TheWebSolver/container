@@ -50,7 +50,7 @@ readonly class ParamResolver {
 		$value = $this->app->getContextualFor( context: "\${$param->getName()}" );
 
 		return null === $value
-			? self::defaultFrom( $param, error: BadResolverArgument::noParam( ref: $param ) )
+			? static::defaultFrom( $param, error: BadResolverArgument::noParam( ref: $param ) )
 			: Unwrap::andInvoke( $value, $this->app );
 	}
 
@@ -62,7 +62,7 @@ readonly class ParamResolver {
 		try {
 			return $value ? Unwrap::andInvoke( $value, $this->app ) : $this->app->get( $id );
 		} catch ( ContainerError $unresolvable ) {
-			return self::defaultFrom( $param, error: $unresolvable );
+			return static::defaultFrom( $param, error: $unresolvable );
 		}
 	}
 
