@@ -36,7 +36,7 @@ class MethodResolverTest extends TestCase {
 		$test = new Binding( 'test', instance: false );
 
 		// The return value of Unwrap::asString(object: $test, methodName: 'isInstance').
-		$entry = Binding::class . '.' . spl_object_id( $test ) . '::isInstance';
+		$entry = Binding::class . '@' . spl_object_id( $test ) . '::isInstance';
 
 		$this->resolver->bind(
 			id: $test->isInstance( ... ),
@@ -87,7 +87,7 @@ class MethodResolverTest extends TestCase {
 		$this->assertFalse( $this->resolver->hasBinding( $test->isSingleton( ... ) ) );
 
 		// The return value of Unwrap::asString(object: $test, methodName: 'isInstance').
-		$callbackAsString = Binding::class . '.' . spl_object_id( $test ) . '::isInstance';
+		$callbackAsString = Binding::class . '@' . spl_object_id( $test ) . '::isInstance';
 		$callbackAsArray  = array( $test, 'isInstance' );
 
 		$this->assertFalse( $this->resolver->hasBinding( $callbackAsString ) );

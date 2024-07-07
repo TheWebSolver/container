@@ -27,6 +27,7 @@ readonly class ParamResolver {
 
 	/**
 	 * @param ReflectionParameter[] $dependencies
+	 * @return mixed[]
 	 * @throws ContainerError When resolving dependencies fails.
 	 */
 	public function resolve( array $dependencies ): array {

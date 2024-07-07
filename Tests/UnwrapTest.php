@@ -100,7 +100,7 @@ class UnwrapTest extends TestCase {
 
 	private function _gIdSpl( ?object $object = null ): string {
 		return ( $object ? $object::class : self::class )
-			. '.' . spl_object_id( $object ?? $this ) . '::';
+			. '@' . spl_object_id( $object ?? $this ) . '::';
 	}
 
 	/**

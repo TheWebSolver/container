@@ -35,11 +35,11 @@ readonly class MethodResolver {
 	) {}
 
 	public function bind( Closure|string $id, Closure $cb ): void {
-		$this->bindings->set( key: $this->normalize( $id ), value: new Binding( concrete: $cb ) );
+		$this->bindings->set( key: static::normalize( $id ), value: new Binding( concrete: $cb ) );
 	}
 
 	public function hasBinding( Closure|string $id ): bool {
-		return $this->bindings->has( key: $this->normalize( $id ) );
+		return $this->bindings->has( key: static::normalize( $id ) );
 	}
 
 	public function fromBinding( string $id, object $resolvedObject ): mixed {
@@ -52,29 +52,16 @@ readonly class MethodResolver {
 	 */
 	public function resolve( callable|string $cb, ?string $default, array $params = array() ): mixed {
 		if ( ! is_string( $cb ) ) {
-			return $this->defaultOrBound( $cb, default: $this->defaultFrom( $cb, $params ) );
+			return $this->defaultOrBound( $cb, default: fn() => $cb( ...$this->from( $cb, $params ) ) );
 		}
 
 		$default ??= method_exists( object_or_class: $cb, method: '__invoke' ) ? '__invoke' : null;
 
-		return static::isNormalizedClassWithMethod( $cb ) || $default
+		return static::isNormalized( $cb ) || $default
 			? $this->instantiateFrom( $cb, $default, $params )
 			: throw BadResolverArgument::noMethod( class: $cb );
 	}
 
-	/**
-	 * Calls the given class method and inject its dependencies using contextual binding.
-	 *
-	 * Beware that during contextual binding, the parameter position must
-	 * be maintained and should be passed in the same order.
-	 *
-	 * Parameters that have default values must only come after required parameters.
-	 * Parameter that has default value will be skipped if cannot
-	 * be resolved from the contextual binding.
-	 *
-	 * @param array<string,mixed> $params The method's injected parameters.
-	 * @throws ContainerExceptionInterface When required param has no contextual binding value.
-	 */
 	public function resolveContextual( callable $cb, Event $event, array $params ): mixed {
 		$stack = array();
 		$pool  = new Param();
@@ -111,7 +98,7 @@ readonly class MethodResolver {
 		return $this->defaultOrBound( $cb, default: static fn() => $cb( ...$stack ) );
 	}
 
-	protected function normalize( Closure|string $id ): string {
+	protected static function normalize( Closure|string $id ): string {
 		return $id instanceof Closure ? Unwrap::forBinding( object: $id ) : $id;
 	}
 
@@ -121,19 +108,14 @@ readonly class MethodResolver {
 			: $this->fromBinding( $id, resolvedObject: $cb[0] );
 	}
 
-	/** @param array<string,mixed> $params The method's injected parameters. */
-	protected function defaultFrom( callable|string $cb, array $params ): Closure {
-		return fn() => $cb( ...$this->dependenciesFrom( $cb, $params ) );
-	}
-
 	/**
 	 * @param array<string,mixed> $params The method's injected parameters.
 	 * @throws BadResolverArgument When neither method nor entry is resolvable.
 	 */
 	protected function instantiateFrom( string $cb, ?string $method, array $params ): mixed {
-		$parts = explode( '::', $cb );
+		$parts = static::extractFrom( $cb );
 
-		// We'll reach here if either $method or $parts[1] exits. Checking just in case...
+		// We'll reach here if either $method or $parts[1] exists. Verifying just in case...
 		if ( null === ( $method ??= $parts[1] ?? null ) ) {
 			throw BadResolverArgument::noMethod( class: $parts[0] );
 		} elseif ( $ins = static::isInstantiatedClass( name: $parts[0] ) ) {
@@ -144,7 +126,7 @@ readonly class MethodResolver {
 			? throw BadResolverArgument::nonInstantiableEntry( id: $this->app->getEntryFrom( $parts[0] ) )
 			: $this->defaultOrBound(
 				cb: Unwrap::asString( object: $parts[0], methodName: $method ),
-				default: $this->defaultFrom( $cb, $params )
+				default: fn() => $cb( ...$this->from( $cb, $params ) )
 			);
 	}
 
@@ -154,8 +136,8 @@ readonly class MethodResolver {
 	 * @throws ReflectionException When the class or method does not exist. If `$cb` is
 	 *                             a function, when the function does not exist.
 	 */
-	protected function dependenciesFrom( callable|string $cb, array $params ): array {
-		$resolver  = new ParamResolver( $this->app, $pool = new Param(), $this->event );
+	protected function from( callable|string $cb, array $params ): array {
+		$resolver = new ParamResolver( $this->app, $pool = new Param(), $this->event );
 
 		$pool->push( $params );
 
@@ -168,21 +150,26 @@ readonly class MethodResolver {
 	 *                             If `$cb` is function, when the function does not exist.
 	 */
 	protected static function reflector( callable|string $cb ): ReflectionFunctionAbstract {
-		if ( is_string( $cb ) && ( strpos( $cb, '::' ) !== false ) ) {
-			$cb = explode( '::', $cb );
-		} elseif ( is_object( $cb ) && ! $cb instanceof Closure ) {
-			$cb = array( $cb, '__invoke' );
-		}
+		$args = match ( true ) {
+			is_string( $cb ) && static::isNormalized( $cb ) => static::extractFrom( string: $cb ),
+			is_object( $cb ) && ! $cb instanceof Closure    => array( $cb, '__invoke' ),
+			default                                         => $cb
+		};
 
-		return is_array( $cb ) ? new ReflectionMethod( ...$cb ) : new ReflectionFunction( $cb );
+		return is_array( $args ) ? new ReflectionMethod( ...$args ) : new ReflectionFunction( $args );
 	}
 
-	protected static function isNormalizedClassWithMethod( string $callback ): bool {
-		return str_contains( haystack: $callback, needle: '::' );
+	protected static function isNormalized( string $cb ): bool {
+		return str_contains( haystack: $cb, needle: '::' );
+	}
+
+	/** @return string[] */
+	protected static function extractFrom( string $string, string $separator = '::' ): array {
+		return explode( $separator, $string, limit: 2 );
 	}
 
 	protected static function isInstantiatedClass( string $name ): ?string {
-		$parts = explode( separator: '.', string: $name, limit: 2 );
+		$parts = static::extractFrom( string: $name, separator: '@' );
 
 		return is_numeric( value: $parts[1] ?? false ) ? $parts[0] : null;
 	}
