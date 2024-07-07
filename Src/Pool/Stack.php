@@ -40,6 +40,6 @@ class Stack implements ArrayAccess, Countable {
 	}
 
 	public static function keyFrom( string $id, string $name ): string {
-		return implode( separator: ':', array: func_get_args() );
+		return implode( separator: '||', array: func_get_args() );
 	}
 }

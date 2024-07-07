@@ -125,7 +125,9 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	public function hasContextualBinding( string $concrete, ?string $toBeResolved = null ): bool {
-		return $this->contextual->has( key: $concrete . ( $toBeResolved ? ":{$toBeResolved}" : '' ) );
+		return $this->contextual->has(
+			key: $toBeResolved ? Stack::keyFrom( $concrete, $toBeResolved ) : $concrete
+		);
 	}
 
 	/*

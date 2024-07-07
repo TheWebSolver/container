@@ -73,7 +73,7 @@ class Aliases {
 	private function removeFromEntryStack( array $aliases, string $entry, string $given ): void {
 		foreach ( $aliases as $index => $storedAlias ) {
 			if ( $storedAlias === $given ) {
-				$this->entryStack->remove( "{$entry}:{$index}" );
+				$this->entryStack->remove( Stack::keyFrom( $entry, (string) $index ) );
 			}
 		}
 	}

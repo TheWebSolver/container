@@ -68,7 +68,7 @@ class StackWithArrayAccessTest extends TestCase {
 
 		$key = Stack::keyFrom( id: 'key', name: 'john' );
 
-		$this->assertSame( expected: 'key:john', actual: $key );
+		$this->assertSame( expected: 'key||john', actual: $key );
 
 		$this->stack[ $key ] = array( 'doe' );
 
@@ -78,22 +78,22 @@ class StackWithArrayAccessTest extends TestCase {
 			actual: $this->stack->get( 'key' )
 		);
 
-		$this->assertSame( expected: array( 'doe' ), actual: $this->stack->get( item: 'key:john' ) );
-		$this->assertSame( expected: array( 'doe' ), actual: $this->stack['key:john'] );
+		$this->assertSame( expected: array( 'doe' ), actual: $this->stack->get( item: 'key||john' ) );
+		$this->assertSame( expected: array( 'doe' ), actual: $this->stack['key||john'] );
 
 		$this->assertSame( expected: 'doe', actual: $this->stack['key']['john'][0] );
 
 		$this->assertCount( expectedCount: 1, haystack: $this->stack );
-		$this->assertCount( expectedCount: 1, haystack: $this->stack->withKey( 'key:john' ) );
+		$this->assertCount( expectedCount: 1, haystack: $this->stack->withKey( 'key||john' ) );
 	}
 
 	public function testGetterSetterWithKey(): void {
-		$this->stack->set( 'primary:first', 'value' );
+		$this->stack->set( 'primary||first', 'value' );
 
-		$this->assertTrue( $this->stack->has( 'primary:first' ) );
+		$this->assertTrue( $this->stack->has( 'primary||first' ) );
 
-		$this->stack->set( key: 'primary:third', value: 'next value' );
-		$this->stack->set( key: 'primary:second', value: 'another' );
+		$this->stack->set( key: 'primary||third', value: 'next value' );
+		$this->stack->set( key: 'primary||second', value: 'another' );
 
 		$this->assertSame(
 			actual: $this->stack->get( item: 'primary' ),
@@ -104,9 +104,9 @@ class StackWithArrayAccessTest extends TestCase {
 			)
 		);
 
-		$this->assertSame( expected: 'next value', actual: $this->stack->get( 'primary:third' ) );
+		$this->assertSame( expected: 'next value', actual: $this->stack->get( 'primary||third' ) );
 
-		$this->assertTrue( condition: $this->stack->remove( 'primary:third' ) );
+		$this->assertTrue( condition: $this->stack->remove( 'primary||third' ) );
 		$this->assertArrayNotHasKey( key: 'third', array: $this->stack->get( 'primary' ) );
 		$this->assertCount( expectedCount: 2, haystack: $this->stack->withKey( 'primary' ) );
 
@@ -124,8 +124,8 @@ class StackWithArrayAccessTest extends TestCase {
 
 		$this->assertTrue( condition: $this->stack->has( 'primary' ) );
 
-		$this->stack->set( key: 'primary:2', value: 'next value' );
-		$this->stack->set( key: 'primary:1', value: 'another' );
+		$this->stack->set( key: 'primary||2', value: 'next value' );
+		$this->stack->set( key: 'primary||1', value: 'another' );
 		$this->stack->set( key: 'primary', value: 'again without index in key' );
 
 		$this->assertSame(
@@ -138,21 +138,21 @@ class StackWithArrayAccessTest extends TestCase {
 			)
 		);
 
-		$this->assertSame( expected: 'next value', actual: $this->stack->get( 'primary:2' ) );
+		$this->assertSame( expected: 'next value', actual: $this->stack->get( 'primary||2' ) );
 
-		$this->assertTrue( condition: $this->stack->remove( 'primary:0' ) );
+		$this->assertTrue( condition: $this->stack->remove( 'primary||0' ) );
 		$this->assertArrayNotHasKey( key: 0, array: $this->stack->get( 'primary' ) );
 		$this->assertCount( expectedCount: 3, haystack: $this->stack->withKey( 'primary' ) );
 
-		$this->stack->set( key: 'primary:1', value: 'update 1' );
-		$this->assertSame( expected: 'update 1', actual: $this->stack->get( item: 'primary:1' ) );
+		$this->stack->set( key: 'primary||1', value: 'update 1' );
+		$this->assertSame( expected: 'update 1', actual: $this->stack->get( item: 'primary||1' ) );
 	}
 
 	public function testGetterSetterWithIndexWithoutDeclaringAsCollection(): void {
-		$this->stack->set( key: 'primary:0', value: 'value' );
-		$this->stack->set( key: 'primary:1', value: 'another' );
+		$this->stack->set( key: 'primary||0', value: 'value' );
+		$this->stack->set( key: 'primary||1', value: 'another' );
 
-		$this->assertTrue( condition: $this->stack->has( key: 'primary:1' ) );
+		$this->assertTrue( condition: $this->stack->has( key: 'primary||1' ) );
 		$this->assertSame(
 			actual: $this->stack->get( item: 'primary' ),
 			expected: array( 'value', 'another' )

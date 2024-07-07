@@ -82,7 +82,7 @@ trait KeyStack {
 
 	/** @return array{0:string,1:?string} */
 	private function getKeys( string $from ): array {
-		$keys = explode( separator: ':', string: $from, limit: 2 );
+		$keys = explode( separator: '||', string: $from, limit: 2 );
 
 		return array( $keys[0], $keys[1] ?? null );
 	}
