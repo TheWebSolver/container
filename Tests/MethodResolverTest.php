@@ -40,9 +40,9 @@ class MethodResolverTest extends TestCase {
 
 		$this->resolver->bind(
 			id: $test->isInstance( ... ),
-			cb: static function ( $resolvedObject, $container ) {
+			cb: static function ( $resolvedObject, $app ) {
 				self::assertInstanceOf( expected: Binding::class, actual: $resolvedObject );
-				self::assertInstanceOf( expected: Container::class, actual: $container );
+				self::assertInstanceOf( expected: Container::class, actual: $app );
 
 				return $resolvedObject->isInstance();
 			}
@@ -158,30 +158,42 @@ class MethodResolverTest extends TestCase {
 		);
 	}
 
-	public function testLazyClassInstantiationAndMethodCall(): void {
+	public function testLazyClassInstantiationAndMethodCallWithParamResolver(): void {
 		$test = new class() {
 			public function test( int $base = 3 ): int {
 				return $base + 2;
 			}
 		};
 
-		$this->app->expects( $this->exactly( 2 ) )
+		$cb = $test::class . '::test';
+
+		$this->app->expects( $this->exactly( 4 ) )
 			->method( 'get' )
 			->with( $test::class )
 			->willReturn( new $test() );
 
-		$this->assertSame(
-			actual: $this->resolver->resolve( cb: $test::class . '::test', default: null ),
-			expected: 5
-		);
+		// If no contextual, eventual or injected value, default value used.
+		$this->assertSame( expected: 5, actual: $this->resolver->resolve( $cb, default: null ) );
 
-		$this->event->expects( $this->exactly( 1 ) )
+		// Contextual value will take precedence over default value.
+		$this->app->expects( $this->exactly( 1 ) )
+			->method( 'getContextualFor' )
+			->with( '$base' )
+			->willReturn( static fn() => 13 );
+
+		// Eventual value will take precedence over contextual & default value.
+		$this->event->expects( $this->exactly( 2 ) )
 			->method( 'fireDuringBuild' )
 			->with( 'int', 'base' )
-			->willReturn( new Binding( concrete: 8 ) );
+			->willReturn( new Binding( concrete: 8 ), null );
 
-		$value = $this->resolver->resolve( cb: $test::class . '::test', default: null );
+		$this->assertSame( expected: 10, actual: $this->resolver->resolve( $cb, default: null ) );
+		$this->assertSame( expected: 15, actual: $this->resolver->resolve( $cb, default: null ) );
 
-		$this->assertSame( expected: 10, actual: $value );
+		// Injected value will take precedence over all other values.
+		$this->assertSame(
+			actual: $this->resolver->resolve( $cb, default: null, params: array( 'base' => 18 ) ),
+			expected: 20
+		);
 	}
 }
