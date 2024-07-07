@@ -20,21 +20,21 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
 
 class EventTest extends TestCase {
 	/** @var Container&MockObject|null */
-	private ?Container $container;
+	private ?Container $app;
 	private ?Event $event;
 	/** @var Stack&MockObject|null */
 	private ?Stack $bindings;
 
 	protected function setUp(): void {
-		$this->container = $this->createMock( Container::class );
-		$this->bindings  = $this->createMock( Stack::class );
-		$this->event     = new Event( $this->container, $this->bindings );
+		$this->app      = $this->createMock( Container::class );
+		$this->bindings = $this->createMock( Stack::class );
+		$this->event    = new Event( $this->app, $this->bindings );
 	}
 
 	protected function tearDown(): void {
-		$this->container = null;
-		$this->event     = null;
-		$this->bindings  = null;
+		$this->app      = null;
+		$this->event    = null;
+		$this->bindings = null;
 	}
 
 	/**
@@ -48,7 +48,7 @@ class EventTest extends TestCase {
 		string $fireId,
 	): void {
 		if ( ! $id instanceof Closure ) {
-			$this->container->expects( $this->once() )
+			$this->app->expects( $this->once() )
 				->method( 'getEntryFrom' )
 				->with( $id )
 				->willReturn( $id );
@@ -63,7 +63,7 @@ class EventTest extends TestCase {
 		return array(
 			array(
 				'params'   => array( 'name' => 'test' ),
-				'callback' => static function ( string $type, array $params, Container $container ) {
+				'callback' => static function ( string $type, array $params, Container $app ) {
 					self::assertSame( expected: 'idAsAliasAndScoped', actual: $type );
 					self::assertSame( expected: 'test', actual: $params['name'] );
 				},
@@ -72,7 +72,7 @@ class EventTest extends TestCase {
 			),
 			array(
 				'params'   => array( 'name' => 'test' ),
-				'callback' => static function ( string $type, array $params, Container $container ) {
+				'callback' => static function ( string $type, array $params, Container $app ) {
 					self::assertSame( expected: self::class, actual: $type );
 					self::assertSame( expected: 'test', actual: $params['name'] );
 				},
@@ -82,7 +82,7 @@ class EventTest extends TestCase {
 			array(
 				'params'   => array( 'global' => 'Global scoped without ID' ),
 				'callback' => null, // Subscribe Type is a closure. Providing subscriber wont register event.
-				'id'       => static function ( string $type, array $params, Container $container ) {
+				'id'       => static function ( string $type, array $params, Container $app ) {
 					self::assertSame( expected: 'doesNotMatterAsItIsGlobalScoped', actual: $type );
 					self::assertSame( array( 'global' => 'Global scoped without ID' ), $params );
 				},
@@ -104,7 +104,7 @@ class EventTest extends TestCase {
 			return;
 		}
 
-		$this->container->expects( $this->exactly( 3 ) )
+		$this->app->expects( $this->exactly( 3 ) )
 			->method( 'getEntryFrom' )
 			->with( $id )
 			->willReturn( $id );
@@ -147,7 +147,7 @@ class EventTest extends TestCase {
 			instance: true
 		);
 
-		$this->container->expects( $this->exactly( 2 ) )
+		$this->app->expects( $this->exactly( 2 ) )
 			->method( 'getEntryFrom' )
 			->with( $class )
 			->willReturn( $class );
@@ -187,7 +187,7 @@ class EventTest extends TestCase {
 		object $resolved
 	): void {
 		if ( ! $id instanceof Closure ) {
-			$this->container->expects( $this->once() )
+			$this->app->expects( $this->once() )
 				->method( 'getEntryFrom' )
 				->with( $id )
 				->willReturn( $id );
@@ -203,7 +203,7 @@ class EventTest extends TestCase {
 
 		return array(
 			array(
-				'callback' => static function ( object $type, Container $container ) {
+				'callback' => static function ( object $type, Container $app ) {
 					self::assertInstanceOf( _Test_Resolved__container_object__::class, $type );
 					self::assertSame( expected: 'Resolved Object', actual: $type->data );
 				},
@@ -212,7 +212,7 @@ class EventTest extends TestCase {
 				'resolved' => $resolved,
 			),
 			array(
-				'callback' => static function ( object $type, Container $container ) {
+				'callback' => static function ( object $type, Container $app ) {
 					self::assertInstanceOf( _Test_Resolved__container_object__::class, $type );
 					self::assertSame( expected: 'Resolved Object', actual: $type->data );
 				},
@@ -222,7 +222,7 @@ class EventTest extends TestCase {
 			),
 			array(
 				'callback' => null,
-				'id'       => static function ( object $type, Container $container ) {
+				'id'       => static function ( object $type, Container $app ) {
 					self::assertSame( expected: 'closure instead if ID', actual: $type->do() );
 				},
 				'fireId'   => 'doesNotMatterAsItIsGlobalScoped',

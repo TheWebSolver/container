@@ -17,14 +17,14 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 
 class ContainerTest extends TestCase {
-	private ?Container $container;
+	private ?Container $app;
 
 	protected function setUp(): void {
-		$this->container = new Container();
+		$this->app = new Container();
 	}
 
 	protected function tearDown(): void {
-		$this->container = null;
+		$this->app = null;
 	}
 
 	public function testSingleton(): void {
@@ -32,119 +32,119 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testArrayAccessible(): void {
-		$this->container[ self::class ] = self::class;
+		$this->app[ self::class ] = self::class;
 
-		$this->assertTrue( isset( $this->container[ self::class ] ) );
-		$this->assertInstanceOf( self::class, $this->container[ self::class ] );
+		$this->assertTrue( isset( $this->app[ self::class ] ) );
+		$this->assertInstanceOf( self::class, $this->app[ self::class ] );
 
-		unset( $this->container[ self::class ] );
+		unset( $this->app[ self::class ] );
 
-		$this->assertFalse( isset( $this->container[ self::class ] ) );
+		$this->assertFalse( isset( $this->app[ self::class ] ) );
 	}
 
 	public function testBasicSetterGetterAndAssertionIntegration(): void {
-		$this->assertFalse( $this->container->has( entryOrAlias: 'testClass' ) );
-		$this->assertFalse( $this->container->has( entryOrAlias: self::class ) );
-		$this->assertFalse( $this->container->hasBinding( 'testClass' ) );
-		$this->assertFalse( $this->container->isAlias( 'testClass' ) );
-		$this->assertFalse( $this->container->resolved( id: 'testClass' ) );
+		$this->assertFalse( $this->app->has( entryOrAlias: 'testClass' ) );
+		$this->assertFalse( $this->app->has( entryOrAlias: self::class ) );
+		$this->assertFalse( $this->app->hasBinding( 'testClass' ) );
+		$this->assertFalse( $this->app->isAlias( 'testClass' ) );
+		$this->assertFalse( $this->app->resolved( id: 'testClass' ) );
 
-		$this->container->alias( entry: self::class, alias: 'testClass' );
+		$this->app->alias( entry: self::class, alias: 'testClass' );
 
-		$this->assertTrue( $this->container->isAlias( name: 'testClass' ) );
-		$this->assertSame( self::class, $this->container->getEntryFrom( alias: 'testClass' ) );
-		$this->assertInstanceOf( self::class, $this->container->get( 'testClass' ) );
+		$this->assertTrue( $this->app->isAlias( name: 'testClass' ) );
+		$this->assertSame( self::class, $this->app->getEntryFrom( alias: 'testClass' ) );
+		$this->assertInstanceOf( self::class, $this->app->get( 'testClass' ) );
 
-		$this->container->bind( id: 'testClass', concrete: self::class );
+		$this->app->bind( id: 'testClass', concrete: self::class );
 
 		// Bind will purge alias from the alias pool coz no need for storing same alias
 		// multiple places (like in alias pool as well as in binding pool).
-		$this->assertFalse( $this->container->isAlias( name: 'testClass' ) );
-		$this->assertTrue( $this->container->has( entryOrAlias: 'testClass' ) );
-		$this->assertFalse( $this->container->has( entryOrAlias: self::class ), 'Bound with alias.' );
-		$this->assertTrue( $this->container->hasBinding( id: 'testClass' ) );
-		$this->assertFalse( $this->container->hasBinding( id: self::class ), 'Bound using alias.' );
-		$this->assertSame( 'testClass', $this->container->getEntryFrom( alias: 'testClass' ) );
+		$this->assertFalse( $this->app->isAlias( name: 'testClass' ) );
+		$this->assertTrue( $this->app->has( entryOrAlias: 'testClass' ) );
+		$this->assertFalse( $this->app->has( entryOrAlias: self::class ), 'Bound with alias.' );
+		$this->assertTrue( $this->app->hasBinding( id: 'testClass' ) );
+		$this->assertFalse( $this->app->hasBinding( id: self::class ), 'Bound using alias.' );
+		$this->assertSame( 'testClass', $this->app->getEntryFrom( alias: 'testClass' ) );
 
-		$this->assertInstanceOf( self::class, $this->container->get( id: 'testClass' ) );
-		$this->assertTrue( $this->container->resolved( id: 'testClass' ) );
-		$this->assertTrue( $this->container->resolved( id: self::class ) );
+		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
+		$this->assertTrue( $this->app->resolved( id: 'testClass' ) );
+		$this->assertTrue( $this->app->resolved( id: self::class ) );
 
-		$this->assertFalse( $this->container->isSingleton( id: stdClass::class ) );
+		$this->assertFalse( $this->app->isSingleton( id: stdClass::class ) );
 
-		$this->container->singleton( id: stdClass::class, concrete: null );
+		$this->app->singleton( id: stdClass::class, concrete: null );
 
-		$this->assertTrue( $this->container->isSingleton( id: stdClass::class ) );
-		$this->assertTrue( $this->container->isShared( id: stdClass::class ) );
-		$this->assertFalse( $this->container->isInstance( stdClass::class ) );
+		$this->assertTrue( $this->app->isSingleton( id: stdClass::class ) );
+		$this->assertTrue( $this->app->isShared( id: stdClass::class ) );
+		$this->assertFalse( $this->app->isInstance( stdClass::class ) );
 
 		$this->assertSame(
-			expected: $this->container->get( id: stdClass::class ),
-			actual: $this->container->get( id: stdClass::class )
+			expected: $this->app->get( id: stdClass::class ),
+			actual: $this->app->get( id: stdClass::class )
 		);
 
 		// The singleton is resolved and bound as an instance thereafter.
-		$this->assertFalse( $this->container->isSingleton( stdClass::class ) );
-		$this->assertTrue( $this->container->isInstance( stdClass::class ) );
+		$this->assertFalse( $this->app->isSingleton( stdClass::class ) );
+		$this->assertTrue( $this->app->isInstance( stdClass::class ) );
 
-		$this->assertFalse( $this->container->isInstance( id: 'instance' ) );
-		$this->assertFalse( $this->container->resolved( id: 'instance' ) );
+		$this->assertFalse( $this->app->isInstance( id: 'instance' ) );
+		$this->assertFalse( $this->app->resolved( id: 'instance' ) );
 
-		$newClass = $this->container->instance( id: 'instance', instance: new class() {} );
+		$newClass = $this->app->instance( id: 'instance', instance: new class() {} );
 
-		$this->assertTrue( $this->container->isInstance( id: 'instance' ) );
-		$this->assertTrue( $this->container->isShared( id: 'instance' ) );
-		$this->assertSame( $newClass, $this->container->get( id: 'instance' ) );
-		$this->assertTrue( $this->container->resolved( id: 'instance' ) );
+		$this->assertTrue( $this->app->isInstance( id: 'instance' ) );
+		$this->assertTrue( $this->app->isShared( id: 'instance' ) );
+		$this->assertSame( $newClass, $this->app->get( id: 'instance' ) );
+		$this->assertTrue( $this->app->resolved( id: 'instance' ) );
 	}
 
 	public function testAliasAndGetWithoutBinding(): void {
-		$this->container->alias( entry: self::class, alias: 'testClass' );
+		$this->app->alias( entry: self::class, alias: 'testClass' );
 
-		$this->assertInstanceOf( self::class, $this->container->get( id: 'testClass' ) );
-		$this->assertInstanceOf( self::class, $this->container->get( id: self::class ) );
+		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
+		$this->assertInstanceOf( self::class, $this->app->get( id: self::class ) );
 	}
 
 	public function testKeepingBothAliasAndBinding(): void {
-		$this->container->alias( entry: self::class, alias: 'test' );
-		$this->container->bind( id: self::class, concrete: null );
+		$this->app->alias( entry: self::class, alias: 'test' );
+		$this->app->bind( id: self::class, concrete: null );
 
-		$this->assertTrue( $this->container->isAlias( name: 'test' ) );
-		$this->assertTrue( $this->container->hasBinding( id: self::class ) );
-		$this->assertSame( self::class, $this->container->getEntryFrom( alias: 'test' ) );
-		$this->assertSame( self::class, $this->container->getEntryFrom( alias: self::class ) );
+		$this->assertTrue( $this->app->isAlias( name: 'test' ) );
+		$this->assertTrue( $this->app->hasBinding( id: self::class ) );
+		$this->assertSame( self::class, $this->app->getEntryFrom( alias: 'test' ) );
+		$this->assertSame( self::class, $this->app->getEntryFrom( alias: self::class ) );
 	}
 
 	public function testContextualBinding(): void {
 		$class = _Test_Resolved__container_object__::class;
 		$this->assertFalse(
-			$this->container->hasContextualBinding( concrete: $class )
+			$this->app->hasContextualBinding( concrete: $class )
 		);
 
-		$this->container->addContextual( with: 'update', for: $class, id: '$data' );
+		$this->app->addContextual( with: 'update', for: $class, id: '$data' );
 
 		$this->assertTrue(
-			$this->container->hasContextualBinding( concrete: $class )
+			$this->app->hasContextualBinding( concrete: $class )
 		);
 		$this->assertTrue(
-			$this->container->hasContextualBinding( concrete: $class, toBeResolved: '$data' )
+			$this->app->hasContextualBinding( concrete: $class, toBeResolved: '$data' )
 		);
 
-		$this->assertSame( expected: 'update', actual: $this->container->get( id: $class )->data );
+		$this->assertSame( expected: 'update', actual: $this->app->get( id: $class )->data );
 
-		$this->assertSame( 'update', $this->container->getContextual( $class, '$data' ) );
+		$this->assertSame( 'update', $this->app->getContextual( $class, '$data' ) );
 
-		$this->container->when( concrete: $class )
+		$this->app->when( concrete: $class )
 			->needs( requirement: '$data' )
 			->give( value: 'With Builder' );
 
-		$this->assertSame( 'With Builder', $this->container->get( id: $class )->data );
+		$this->assertSame( 'With Builder', $this->app->get( id: $class )->data );
 
-		$this->container->when( concrete: $class )
+		$this->app->when( concrete: $class )
 			->needs( requirement: '$data' )
 			->give( value: static fn (): string => 'With Builder from closure' );
 
-		$this->assertSame( 'With Builder from closure', $this->container->get( id: $class )->data );
+		$this->assertSame( 'With Builder from closure', $this->app->get( id: $class )->data );
 
 		$stack = $this->createMock( Stack::class );
 		$class = _TestStack__Contextual_Binding_WithArrayAccess::class;
@@ -154,27 +154,27 @@ class ContainerTest extends TestCase {
 			->with( 'testKey' )
 			->willReturn( true );
 
-		$this->container->when( $class )
+		$this->app->when( $class )
 			->needs( requirement: ArrayAccess::class )
 			->give( value: static fn(): Stack => $stack );
 
-		$this->assertTrue( $this->container->get( $class )->has( 'testKey' ) );
+		$this->assertTrue( $this->app->get( $class )->has( 'testKey' ) );
 	}
 
 	public function testContextualBindingWithAliasing(): void {
 		$class = _Test_Resolved__container_object__::class;
 
-		$this->container->alias( entry: $class, alias: 'test' );
-		$this->container->addContextual( with: 'update', for: 'test', id: '$data' );
+		$this->app->alias( entry: $class, alias: 'test' );
+		$this->app->addContextual( with: 'update', for: 'test', id: '$data' );
 
 		$this->assertSame(
-			actual: $this->container->getContextual( for: 'test', id: '$data' ),
+			actual: $this->app->getContextual( for: 'test', id: '$data' ),
 			expected: 'update'
 		);
 	}
 
 	public function testAutoWireDependenciesRecursively(): void {
-		$this->container->get( _TestMain__EntryClass::class );
+		$this->app->get( _TestMain__EntryClass::class );
 
 		$toBeResolved = array(
 			_TestMain__EntryClass::class,
@@ -184,7 +184,7 @@ class ContainerTest extends TestCase {
 		);
 
 		foreach ( $toBeResolved as $classname ) {
-			$this->assertTrue( $this->container->resolved( id: $classname ) );
+			$this->assertTrue( $this->app->resolved( id: $classname ) );
 		}
 	}
 
@@ -193,7 +193,7 @@ class ContainerTest extends TestCase {
 			public function __construct( public readonly string $value = 'Using Event' ) {}
 		};
 
-		$this->container->subscribeDuringBuild(
+		$this->app->subscribeDuringBuild(
 			id: _TestPrimary__EntryClass::class,
 			paramName: 'primary',
 			implementation: new Binding( $subscribedClass )
@@ -201,7 +201,7 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame(
 			expected: 'Using Event',
-			actual: $this->container->get( _TestMain__EntryClass::class )->primary->value
+			actual: $this->app->get( _TestMain__EntryClass::class )->primary->value
 		);
 
 		$AutoWiredClass = new class() extends _TestPrimary__EntryClass {
@@ -211,7 +211,7 @@ class ContainerTest extends TestCase {
 		$this->assertSame(
 			message: 'The injected param value when resolving entry must override event value.',
 			expected: 'Using Injection',
-			actual: $this->container->get(
+			actual: $this->app->get(
 				id: _TestMain__EntryClass::class,
 				with: array( 'primary' => $AutoWiredClass )
 			)->primary->value
@@ -221,19 +221,19 @@ class ContainerTest extends TestCase {
 	public function testWithEventBuilder(): void {
 		$this->assertInstanceOf(
 			expected: _TestSecondary__EntryClass::class,
-			actual: $this->container->get( _TestPrimary__EntryClass::class )->secondary
+			actual: $this->app->get( _TestPrimary__EntryClass::class )->secondary
 		);
 
 		$eventualClass = new class() extends _TestSecondary__EntryClass {
 			public function __construct( public readonly string $value = 'Using Event Builder' ) {}
 		};
 
-		$this->container
+		$this->app
 			->matches( paramName: 'secondary' )
 			->for( concrete: _TestSecondary__EntryClass::class )
 			->give( implementation: new Binding( $eventualClass ) );
 
-		$secondaryClass = $this->container->get( _TestPrimary__EntryClass::class )->secondary;
+		$secondaryClass = $this->app->get( _TestPrimary__EntryClass::class )->secondary;
 
 		$this->assertInstanceOf( $eventualClass::class, $secondaryClass );
 		$this->assertSame( expected: 'Using Event Builder', actual: $secondaryClass->value );

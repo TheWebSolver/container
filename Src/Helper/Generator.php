@@ -47,9 +47,9 @@ class Generator implements Countable, IteratorAggregate {
 	}
 
 	/** @param array<string|object> $concretes The concretes to resolve or already resolved. */
-	public static function generate( array $concretes, Container $container ): \Generator {
+	public static function generate( array $concretes, Container $app ): \Generator {
 		foreach ( $concretes as $concrete ) {
-			yield ! is_object( $concrete ) ? $container->get( $concrete ) : $concrete;
+			yield ! is_object( $concrete ) ? $app->get( $concrete ) : $concrete;
 		}
 	}
 

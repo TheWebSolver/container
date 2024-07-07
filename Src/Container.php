@@ -363,7 +363,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	public function when( string|array $concrete ): ContextBuilder {
 		return new ContextBuilder(
 			for: array_map( callback: $this->getEntryFrom( ... ), array: Unwrap::asArray( $concrete ) ),
-			container: $this
+			app: $this
 		);
 	}
 

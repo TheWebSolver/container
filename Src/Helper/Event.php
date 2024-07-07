@@ -24,7 +24,7 @@ readonly class Event {
 	private Stack $building;
 
 	public function __construct(
-		private Container $container,
+		private Container $app,
 		private Stack $bindings,
 		private IndexStack $beforeBuild = new IndexStack(),
 		private Stack $beforeBuildForEntry = new Stack(),
@@ -44,7 +44,7 @@ readonly class Event {
 	 *                                 are `CallbackResolver::FIRE_*` constants.
 	 */
 	public function subscribeWith( Closure|string $id, ?Closure $callback, string $when ): void {
-		$entry = $id instanceof Closure ? $id : $this->container->getEntryFrom( alias: $id );
+		$entry = $id instanceof Closure ? $id : $this->app->getEntryFrom( alias: $id );
 
 		match ( true ) {
 			default                   => $this->addTo( $when, $callback, $entry ),
@@ -58,7 +58,7 @@ readonly class Event {
 		Binding|Closure $implementation
 	): void {
 		$this->building->set(
-			key: Stack::keyFrom( $this->container->getEntryFrom( alias: $id ), name: $dependencyName ),
+			key: Stack::keyFrom( $this->app->getEntryFrom( alias: $id ), name: $dependencyName ),
 			value: $implementation
 		);
 	}
@@ -82,14 +82,14 @@ readonly class Event {
 			return $this->bindings->get( $paramName );
 		}
 
-		$key = Stack::keyFrom( id: $this->container->getEntryFrom( $id ), name: $paramName );
+		$key = Stack::keyFrom( id: $this->app->getEntryFrom( $id ), name: $paramName );
 
 		if ( ! $this->building->has( $key ) ) {
 			return null;
 		}
 
 		$given   = $this->building[ $id ][ $paramName ];
-		$binding = $given instanceof Binding ? $given : $given( $paramName, $this->container );
+		$binding = $given instanceof Binding ? $given : $given( $paramName, $this->app );
 
 		if ( $binding?->isInstance() ) {
 			$this->bindings->set( key: $paramName, value: $binding );
@@ -142,7 +142,7 @@ readonly class Event {
 
 		foreach ( $callbacks as $callback ) {
 			if ( null !== $callback ) {
-				$callback( ...array( ...$args, $this->container ) );
+				$callback( ...array( ...$args, $this->app ) );
 			}
 		}
 	}
