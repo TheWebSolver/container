@@ -159,5 +159,10 @@ class Unwrap {
 		return "{$object}::{$methodName}";
 	}
 
+	/** @return string[] */
+	public static function partsFrom( string $string, string $separator = '::' ): array {
+		return explode( $separator, $string, limit: 2 );
+	}
+
 	private function __construct() {}
 }
