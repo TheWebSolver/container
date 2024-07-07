@@ -35,11 +35,11 @@ readonly class MethodResolver {
 	) {}
 
 	public function bind( Closure|string $id, Closure $cb ): void {
-		$this->bindings->set( key: static::normalize( $id ), value: new Binding( concrete: $cb ) );
+		$this->bindings->set( key: Unwrap::callback( $id ), value: new Binding( concrete: $cb ) );
 	}
 
 	public function hasBinding( Closure|string $id ): bool {
-		return $this->bindings->has( key: static::normalize( $id ) );
+		return $this->bindings->has( key: Unwrap::callback( $id ) );
 	}
 
 	public function fromBinding( string $id, object $resolvedObject ): mixed {
@@ -98,8 +98,10 @@ readonly class MethodResolver {
 		return $this->defaultOrBound( $cb, default: static fn() => $cb( ...$stack ) );
 	}
 
-	protected static function normalize( Closure|string $id ): string {
-		return $id instanceof Closure ? Unwrap::forBinding( object: $id ) : $id;
+	public static function getArtefact( callable|string $from ): string {
+		$string = Unwrap::callback( $from );
+
+		return static::isInstantiatedClass( $string ) ? $string : Unwrap::partsFrom( $string )[0];
 	}
 
 	protected function defaultOrBound( callable|string $cb, Closure $default ): mixed {
@@ -113,7 +115,7 @@ readonly class MethodResolver {
 	 * @throws BadResolverArgument When neither method nor entry is resolvable.
 	 */
 	protected function instantiateFrom( string $cb, ?string $method, array $params ): mixed {
-		$parts = static::extractFrom( $cb );
+		$parts = Unwrap::partsFrom( $cb );
 
 		// We'll reach here if either $method or $parts[1] exists. Verifying just in case...
 		if ( null === ( $method ??= $parts[1] ?? null ) ) {
@@ -151,7 +153,7 @@ readonly class MethodResolver {
 	 */
 	protected static function reflector( callable|string $cb ): ReflectionFunctionAbstract {
 		$args = match ( true ) {
-			is_string( $cb ) && static::isNormalized( $cb ) => static::extractFrom( string: $cb ),
+			is_string( $cb ) && static::isNormalized( $cb ) => Unwrap::partsFrom( string: $cb ),
 			is_object( $cb ) && ! $cb instanceof Closure    => array( $cb, '__invoke' ),
 			default                                         => $cb
 		};
@@ -163,14 +165,11 @@ readonly class MethodResolver {
 		return str_contains( haystack: $cb, needle: '::' );
 	}
 
-	/** @return string[] */
-	protected static function extractFrom( string $string, string $separator = '::' ): array {
-		return explode( $separator, $string, limit: 2 );
-	}
-
 	protected static function isInstantiatedClass( string $name ): ?string {
-		$parts = static::extractFrom( string: $name, separator: '@' );
+		$parts = Unwrap::partsFrom( string: $name, separator: '@' );
 
-		return is_numeric( value: $parts[1] ?? false ) ? $parts[0] : null;
+		return isset( $parts[1] ) && is_numeric( value: Unwrap::partsFrom( $parts[1] )[0] ?? false )
+			? $parts[0]
+			: null;
 	}
 }

@@ -196,4 +196,22 @@ class MethodResolverTest extends TestCase {
 			expected: 20
 		);
 	}
+
+	/** @dataProvider provideVariousArtefactGetterData */
+	public function testArtefactAndInstantiatedClass( callable|string $from, ?int $objectId ): void {
+		$expected = null === $objectId
+			? self::class
+			: self::class . "@{$objectId}::provideVariousArtefactGetterData";
+
+		$this->assertSame( $expected, actual: MethodResolver::getArtefact( $from ) );
+	}
+
+	/** @return mixed[] */
+	public function provideVariousArtefactGetterData(): array {
+		return array(
+			array( array( $this, __FUNCTION__ ), spl_object_id( $this ) ),
+			array( $this->provideVariousArtefactGetterData( ... ), spl_object_id( $this ) ),
+			array( self::class . '::' . __FUNCTION__, null ),
+		);
+	}
 }
