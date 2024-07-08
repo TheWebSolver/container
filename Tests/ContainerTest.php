@@ -262,11 +262,12 @@ class ContainerTest extends TestCase {
 		$this->assertSame( expected: 20, actual: $app->call( array( $test, 'test' ) ) );
 		$this->assertSame( expected: 20, actual: $app->call( $test->test( ... ) ) );
 
-		$app->subscribeDuringBuild( 'int', 'arg', new Binding( 28 ) );
+		// Setting instance as "true" so multiple calls resolve the event binding value.
+		$app->subscribeDuringBuild( 'int', 'arg', new Binding( 28, instance: true ) );
 
 		$this->assertSame( expected: 30, actual: $app->call( array( $test, 'test' ) ) );
-		// FIXME: make it work with first-class callable also. Currently, only contextual works.
-		$this->assertSame( expected: 20, actual: $app->call( $test->test( ... ) ) );
+		$this->assertSame( expected: 30, actual: $app->call( $test->test( ... ) ) );
+
 		$this->assertSame(
 			actual: $app->call( array( $test, 'test' ), array( 'arg' => 38 ) ),
 			expected: 40
