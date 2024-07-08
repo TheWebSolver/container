@@ -82,12 +82,12 @@ readonly class MethodResolver {
 	 * @throws BadResolverArgument When neither method nor entry is resolvable.
 	 */
 	protected function instantiateFrom( string $cb, ?string $method, array $params ): mixed {
-		$parts    = Unwrap::partsFrom( $cb );
+		$parts    = Unwrap::partsFrom( string: $cb );
 		$method ??= method_exists( $cb, method: '__invoke' ) ? '__invoke' : ( $parts[1] ?? null );
 		$callable = $this->getFrom( class: $parts[0], method: $method );
 		$id       = Unwrap::asString( object: $parts[0], methodName: $method );
 
-		return $this->resolveFrom( $id, $callable, obj: $callable[0], params: $params );
+		return $this->resolveFrom( $id, cb: $callable, obj: $callable[0], params: $params );
 	}
 
 	protected function getFrom( string $class, ?string $method ): callable {
