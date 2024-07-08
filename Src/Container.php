@@ -165,8 +165,8 @@ class Container implements ArrayAccess, ContainerInterface {
 	 * - `string`   -> "classname::methodname"
 	 * - `callable` -> $object->methodname(...) as first-class callable
 	 * - `callable` -> array($object, 'methodname').
-	 * @param  array<string,mixed> $params   The callback parameters.
-	 * @throws BadResolverArgument — When method cannot be resolved or no `$default`.
+	 * @param array<string,mixed> $params The method's injected parameters.
+	 * @throws BadResolverArgument When method cannot be resolved or no `$default`.
 	 */
 	public function call(
 		callable|string $callback,
@@ -175,7 +175,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	): mixed {
 		$resolving = false;
 		$artefact  = ! $this->hasContextualBinding( $normalized = Unwrap::callback( $callback ) )
-			? MethodResolver::getArtefact( from: $callback )
+			? MethodResolver::getArtefact( from: $normalized )
 			: $normalized;
 
 		if ( ! $this->artefact->has( value: $artefact ) ) {

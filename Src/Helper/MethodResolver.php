@@ -19,7 +19,6 @@ use ReflectionMethod;
 use ReflectionFunction;
 use ReflectionException;
 use ReflectionFunctionAbstract;
-use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
@@ -35,11 +34,11 @@ readonly class MethodResolver {
 	) {}
 
 	public function bind( Closure|string $id, Closure $cb ): void {
-		$this->bindings->set( key: Unwrap::callback( $id ), value: new Binding( concrete: $cb ) );
+		$this->bindings->set( key: static::keyFrom( $id ), value: new Binding( concrete: $cb ) );
 	}
 
 	public function hasBinding( Closure|string $id ): bool {
-		return $this->bindings->has( key: Unwrap::callback( $id ) );
+		return $this->bindings->has( key: static::keyFrom( $id ) );
 	}
 
 	public function fromBinding( string $id, object $resolvedObject ): mixed {
@@ -51,63 +50,31 @@ readonly class MethodResolver {
 	 * @throws BadResolverArgument When method cannot be resolved or no `$default`.
 	 */
 	public function resolve( callable|string $cb, ?string $default, array $params = array() ): mixed {
-		if ( ! is_string( $cb ) ) {
-			return $this->defaultOrBound( $cb, default: fn() => $cb( ...$this->from( $cb, $params ) ) );
+		if ( is_string( $cb ) ) {
+			return $this->instantiateFrom( $cb, $default, $params );
 		}
 
-		$default ??= method_exists( object_or_class: $cb, method: '__invoke' ) ? '__invoke' : null;
+		[ $class, $method ] = Unwrap::callback( $cb, asArray: true );
+		$id                 = $method ? Unwrap::asString( $class, $method ) : $class;
 
-		return static::isNormalized( $cb ) || $default
-			? $this->instantiateFrom( $cb, $default, $params )
-			: throw BadResolverArgument::noMethod( class: $cb );
-	}
-
-	public function resolveContextual( callable $cb, Event $event, array $params ): mixed {
-		$stack = array();
-		$pool  = new Param();
-
-		$pool->push( $params );
-
-		// TODO: use this.
-		$resolved = ( new ParamResolver( $this->app, $pool, $event ) )
-			->resolve( static::reflector( $cb )->getParameters() );
-
-		foreach ( static::reflector( $cb )->getParameters() as $param ) {
-			$concrete = $this->app->getContextualFor( context: '$' . $param->getName() );
-			$hasValue = null !== $concrete;
-
-			if ( ! $param->isOptional() && ! $hasValue ) {
-				// TODO: add exception class.
-				$msg = sprintf(
-					'The required "%s" during method call does not have contextual binding value.',
-					(string) $param
-				);
-
-				throw new class( $msg ) implements ContainerExceptionInterface {};
-			}
-
-			if ( $param->isDefaultValueAvailable() && ! $hasValue ) {
-				$stack[] = $param->getDefaultValue();
-
-				continue;
-			}
-
-			$stack[] = is_callable( $concrete ) ? $concrete() : $this->app->get( $concrete );
-		}//end foreach
-
-		return $this->defaultOrBound( $cb, default: static fn() => $cb( ...$stack ) );
+		return $this->resolveFrom( $id, $cb, obj: $class, params: $params );
 	}
 
 	public static function getArtefact( callable|string $from ): string {
-		$string = Unwrap::callback( $from );
-
-		return static::isInstantiatedClass( $string ) ? $string : Unwrap::partsFrom( $string )[0];
+		return ! static::isInstantiatedClass( $name = static::keyFrom( id: $from ) )
+			? Unwrap::partsFrom( string: $name )[0]
+			: $name;
 	}
 
-	protected function defaultOrBound( callable|string $cb, Closure $default ): mixed {
-		return ! $this->hasBinding( $id = Unwrap::callback( $cb ) ) || ! is_array( $cb )
-			? Unwrap::andInvoke( value: $default )
-			: $this->fromBinding( $id, resolvedObject: $cb[0] );
+	protected static function keyFrom( callable|string $id ): string {
+		return is_string( value: $id ) ? $id : Unwrap::callback( cb: $id );
+	}
+
+	/** @param array<string,mixed> $params */
+	protected function resolveFrom( string $id, callable $cb, ?object $obj, array $params ): mixed {
+		return $this->hasBinding( $id ) && null !== $obj
+			? $this->fromBinding( $id, resolvedObject: $obj )
+			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( $cb, $params ) );
 	}
 
 	/**
@@ -115,21 +82,24 @@ readonly class MethodResolver {
 	 * @throws BadResolverArgument When neither method nor entry is resolvable.
 	 */
 	protected function instantiateFrom( string $cb, ?string $method, array $params ): mixed {
-		$parts = Unwrap::partsFrom( $cb );
+		$parts    = Unwrap::partsFrom( $cb );
+		$method ??= method_exists( $cb, method: '__invoke' ) ? '__invoke' : ( $parts[1] ?? null );
+		$callable = $this->getFrom( class: $parts[0], method: $method );
+		$id       = Unwrap::asString( object: $parts[0], methodName: $method );
 
-		// We'll reach here if either $method or $parts[1] exists. Verifying just in case...
-		if ( null === ( $method ??= $parts[1] ?? null ) ) {
-			throw BadResolverArgument::noMethod( class: $parts[0] );
-		} elseif ( $ins = static::isInstantiatedClass( name: $parts[0] ) ) {
+		return $this->resolveFrom( $id, $callable, obj: $callable[0], params: $params );
+	}
+
+	protected function getFrom( string $class, ?string $method ): callable {
+		if ( null === $method ) {
+			throw BadResolverArgument::noMethod( class: $class );
+		} elseif ( $ins = static::isInstantiatedClass( name: $class ) ) {
 			throw BadResolverArgument::instantiatedBeforehand( $this->app->getEntryFrom( $ins ), $method );
+		} elseif ( ! is_callable( $value = array( $this->app->get( id: $class ), $method ) ) ) {
+			throw BadResolverArgument::nonInstantiableEntry( id: $this->app->getEntryFrom( $class ) );
 		}
 
-		return ! is_callable( value: $cb = array( $this->app->get( id: $parts[0] ), $method ) )
-			? throw BadResolverArgument::nonInstantiableEntry( id: $this->app->getEntryFrom( $parts[0] ) )
-			: $this->defaultOrBound(
-				cb: Unwrap::asString( object: $parts[0], methodName: $method ),
-				default: fn() => $cb( ...$this->from( $cb, $params ) )
-			);
+		return $value;
 	}
 
 	/**
@@ -138,12 +108,12 @@ readonly class MethodResolver {
 	 * @throws ReflectionException When the class or method does not exist. If `$cb` is
 	 *                             a function, when the function does not exist.
 	 */
-	protected function from( callable|string $cb, array $params ): array {
+	protected function dependenciesFrom( callable|string $cb, array $params ): array {
 		$resolver = new ParamResolver( $this->app, $pool = new Param(), $this->event );
 
 		$pool->push( $params );
 
-		return $resolver->resolve( dependencies: static::reflector( $cb )->getParameters() );
+		return $resolver->resolve( dependencies: static::reflectorFrom( $cb )->getParameters() );
 	}
 
 	/**
@@ -151,7 +121,7 @@ readonly class MethodResolver {
 	 * @throws ReflectionException When the class or method does not exist.
 	 *                             If `$cb` is function, when the function does not exist.
 	 */
-	protected static function reflector( callable|string $cb ): ReflectionFunctionAbstract {
+	protected static function reflectorFrom( callable|string $cb ): ReflectionFunctionAbstract {
 		$args = match ( true ) {
 			is_string( $cb ) && static::isNormalized( $cb ) => Unwrap::partsFrom( string: $cb ),
 			is_object( $cb ) && ! $cb instanceof Closure    => array( $cb, '__invoke' ),
