@@ -57,7 +57,9 @@ readonly class MethodResolver {
 		[ $class, $method ] = Unwrap::callback( $cb, asArray: true );
 		$id                 = $method ? Unwrap::asString( $class, $method ) : $class;
 
-		return $this->resolveFrom( $id, $cb, obj: $class, params: $params );
+		return ! is_string( $class ) // The $class is never expected to be a string. Just in case...
+			? $this->resolveFrom( $id, $cb, obj: $class, params: $params, args: array( $class, $method ) )
+			: $this->instantiateFrom( $class, $method, $params );
 	}
 
 	public static function getArtefact( callable|string $from ): string {
@@ -70,11 +72,20 @@ readonly class MethodResolver {
 		return is_string( value: $id ) ? $id : Unwrap::callback( cb: $id );
 	}
 
-	/** @param array<string,mixed> $params */
-	protected function resolveFrom( string $id, callable $cb, ?object $obj, array $params ): mixed {
+	/**
+	 * @param array<string,mixed>         $params
+	 * @param ?array<object|string,string $args
+	 */
+	protected function resolveFrom(
+		string $id,
+		callable $cb,
+		?object $obj,
+		array $params,
+		?array $args = null
+	): mixed {
 		return $this->hasBinding( $id ) && null !== $obj
 			? $this->fromBinding( $id, resolvedObject: $obj )
-			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( $cb, $params ) );
+			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( $params, cb: $args ?? $cb ) );
 	}
 
 	/**
@@ -84,13 +95,15 @@ readonly class MethodResolver {
 	protected function instantiateFrom( string $cb, ?string $method, array $params ): mixed {
 		$parts    = Unwrap::partsFrom( string: $cb );
 		$method ??= method_exists( $cb, method: '__invoke' ) ? '__invoke' : ( $parts[1] ?? null );
-		$callable = $this->getFrom( class: $parts[0], method: $method );
+		$callable = $this->instantiatedClassFrom( class: $parts[0], method: $method );
 		$id       = Unwrap::asString( object: $parts[0], methodName: $method );
 
 		return $this->resolveFrom( $id, cb: $callable, obj: $callable[0], params: $params );
 	}
 
-	protected function getFrom( string $class, ?string $method ): callable {
+	// phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.Missing
+	/** @return array{0:object,1:string} */
+	protected function instantiatedClassFrom( string $class, ?string $method ): array {
 		if ( null === $method ) {
 			throw BadResolverArgument::noMethod( class: $class );
 		} elseif ( $ins = static::isInstantiatedClass( name: $class ) ) {
@@ -103,12 +116,10 @@ readonly class MethodResolver {
 	}
 
 	/**
-	 * @param array<string,mixed> $params The method's injected parameters.
+	 * @param array<string,mixed> $params
 	 * @return mixed[]
-	 * @throws ReflectionException When the class or method does not exist. If `$cb` is
-	 *                             a function, when the function does not exist.
 	 */
-	protected function dependenciesFrom( callable|string $cb, array $params ): array {
+	protected function dependenciesFrom( array $params, callable $cb ): array {
 		$resolver = new ParamResolver( $this->app, $pool = new Param(), $this->event );
 
 		$pool->push( $params );
@@ -121,14 +132,8 @@ readonly class MethodResolver {
 	 * @throws ReflectionException When the class or method does not exist.
 	 *                             If `$cb` is function, when the function does not exist.
 	 */
-	protected static function reflectorFrom( callable|string $cb ): ReflectionFunctionAbstract {
-		$args = match ( true ) {
-			is_string( $cb ) && static::isNormalized( $cb ) => Unwrap::partsFrom( string: $cb ),
-			is_object( $cb ) && ! $cb instanceof Closure    => array( $cb, '__invoke' ),
-			default                                         => $cb
-		};
-
-		return is_array( $args ) ? new ReflectionMethod( ...$args ) : new ReflectionFunction( $args );
+	protected static function reflectorFrom( callable $cb ): ReflectionFunctionAbstract {
+		return is_array( $cb ) ? new ReflectionMethod( ...$cb ) : new ReflectionFunction( $cb );
 	}
 
 	protected static function isNormalized( string $cb ): bool {
