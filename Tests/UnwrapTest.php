@@ -51,7 +51,7 @@ class UnwrapTest extends TestCase {
 	 * @dataProvider provideDataForMethodBinding
 	 */
 	public function testMethodBindingId(
-		string $expected,
+		string|array $expected,
 		object|string $object,
 		string $methodName,
 		?string $exception
@@ -60,7 +60,10 @@ class UnwrapTest extends TestCase {
 			$this->expectException( $exception );
 		}
 
-		$this->assertSame( $expected, actual: Unwrap::forBinding( $object, $methodName ) );
+		$this->assertSame(
+			actual: Unwrap::forBinding( $object, $methodName, asArray: is_array( $expected ) ),
+			expected: $expected
+		);
 	}
 
 	public function provideDataForMethodBinding(): array {
@@ -68,6 +71,7 @@ class UnwrapTest extends TestCase {
 			array( self::class . '::assertTrue', self::class, 'assertTrue', null ),
 			array( 'lambda method is invalid', function () {}, '', TypeError::class ),
 			array( "{$this->_gIdSpl()}assertTrue", $this, 'assertTrue', null ),
+			array( array( $this, 'assertTrue' ), $this, 'assertTrue', null ),
 			array( 'Undefined method given', $this, 'method-does-not-exist', LogicException::class ),
 			array(
 				'first-class of static method is invalid',
@@ -77,6 +81,12 @@ class UnwrapTest extends TestCase {
 			),
 			array(
 				"{$this->_gIdSpl()}provideDataForMethodBinding",
+				$this->provideDataForMethodBinding( ... ),
+				'',
+				null,
+			),
+			array(
+				array( $this, 'provideDataForMethodBinding' ),
 				$this->provideDataForMethodBinding( ... ),
 				'',
 				null,

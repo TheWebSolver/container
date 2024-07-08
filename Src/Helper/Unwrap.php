@@ -63,24 +63,34 @@ class Unwrap {
 	}
 
 	/**
+	 * @return string|array{0:object,1:string}
 	 * @throws LogicException When method name not given if `$object` is a class instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
+	 * @phpstan-return ($asArray is true ? array{0:object,1:string}, string)
 	 */
-	public static function forBinding( object|string $object, string $methodName = '' ): string {
+	public static function forBinding(
+		object|string $object,
+		string $methodName = '',
+		bool $asArray = false
+	): string|array {
 		if ( is_string( $object ) ) {
-			return self::asString( $object, $methodName );
+			return $methodName
+				? ( $asArray ? array( $object, $methodName ) : self::asString( $object, $methodName ) )
+				: throw new LogicException(
+					sprintf( 'Method name must be provided to create ID for class "%s".', $object::class )
+				);
 		}
 
 		if ( ! $object instanceof Closure ) {
 			return method_exists( $object, $methodName )
-				? self::asString( $object, $methodName ) // An instance and it's method name.
+				? ( $asArray ? array( $object, $methodName ) : self::asString( $object, $methodName ) )
 				: throw new LogicException(
 					sprintf( 'Method name must be provided to create ID for class "%s".', $object::class )
 				);
 		}
 
 		if ( $scoped = self::asInstance( source: new ReflectionFunction( $object ), binding: true ) ) {
-			return self::asString( ...$scoped[0] );
+			return $asArray ? $scoped[0] : self::asString( ...$scoped[0] );
 		}
 
 		throw new TypeError(
@@ -107,18 +117,23 @@ class Unwrap {
 	}
 
 	public static function andInvoke( mixed $value, mixed ...$args ): mixed {
-		return $value instanceof Closure ? $value( ...$args ) : $value;
+		return is_callable( $value ) ? $value( ...$args ) : $value;
 	}
 
 	/**
-	 * @param callable|string $callback Either a valid callback or a normalized
+	 * @param callable|string $cb Either a valid callback or a normalized
 	 *                                  string using `Unwrap::asString()`.
+	 * @return string|array{0:object,1:string}
+	 * @throws LogicException When method name not given if $object is a class instance.
+	 * @throws TypeError      When first-class callable was not created using non-static method.
+	 * @phpstan-return ($asArray is true ? array{0:object,1:string}, string)
 	 */
-	public static function callback( callable|string $callback ): string {
+	public static function callback( callable|string $cb, bool $asArray = false ): string|array {
 		return match ( true ) {
-			default                      => $callback,
-			is_array( $callback )        => self::forBinding( ...$callback ),
-			$callback instanceof Closure => self::forBinding( $callback )
+			default                => $asArray ? array( $cb, '' ) : $cb,
+			$cb instanceof Closure => self::forBinding( $cb, asArray: $asArray ),
+			is_array( $cb )        => self::forBinding( ...array( ...$cb, $asArray ) ),
+			is_object( $cb )       => $asArray ? array( $cb, '__invoke' ) : $cb,
 		};
 	}
 
