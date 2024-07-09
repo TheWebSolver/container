@@ -25,8 +25,8 @@ use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 readonly class MethodResolver {
-	/** @var ?array{0:object|string,1:string} */
-	private readonly ?array $callable;
+	/** @var array{0:object|string,1:string} */
+	private array $cb;
 
 	/** @param Stack&ArrayAccess<string,Binding> $bindings */
 	public function __construct(
@@ -48,24 +48,36 @@ readonly class MethodResolver {
 		return ( $this->bindings[ $id ]->concrete )( $resolvedObject, $this->app );
 	}
 
+	public function with( object|string $classOrInstance, string $method ): static {
+		$this->cb = func_get_args();
+
+		return $this;
+	}
+
+	/** @return ?array{0:object|string,1:string} */
+	public function unwrappedCallback(): ?array {
+		return $this->cb ?? null;
+	}
+
 	/**
 	 * @param array<string,mixed> $params The method's injected parameters.
 	 * @throws BadResolverArgument When method cannot be resolved or no `$default`.
 	 */
 	public function resolve( callable|string $cb, ?string $default, array $params = array() ): mixed {
-		$this->pool->push( $params );
+		$this->pool->push( value: $params );
 
 		if ( is_string( $cb ) ) {
 			return $this->instantiateFrom( $cb, $default );
 		}
 
-		$this->callable     = Unwrap::callback( $cb, asArray: true );
-		[ $class, $method ] = $this->callable;
-		$id                 = $method ? Unwrap::asString( $class, $method ) : $class;
+		[ $cls, $method ] = $this->cb ??= Unwrap::callback( $cb, asArray: true );
+		$resolved         = ! is_string( $cls )
+			? $this->resolveFrom( id: $method ? Unwrap::asString( ...$this->cb ) : $cls, cb: $cb, obj: $cls )
+			: $this->instantiateFrom( $cls, $method );
 
-		return ! is_string( $class ) // The $class is never expected to be a string. Just in case...
-			? $this->resolveFrom( $id, $cb, obj: $class )
-			: $this->instantiateFrom( $class, $method );
+		$this->pool->pull();
+
+		return $resolved;
 	}
 
 	public static function getArtefact( callable|string $from ): string {
@@ -82,7 +94,7 @@ readonly class MethodResolver {
 	protected function resolveFrom( string $id, callable $cb, ?object $obj ): mixed {
 		return $this->hasBinding( $id ) && null !== $obj
 			? $this->fromBinding( $id, resolvedObject: $obj )
-			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $this->callable ?? $cb ) );
+			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $this->cb ?? $cb ) );
 	}
 
 	/**
@@ -97,13 +109,11 @@ readonly class MethodResolver {
 			throw BadResolverArgument::noMethod( class: $parts[0] );
 		} elseif ( $ins = static::isInstantiatedClass( name: $parts[0] ) ) {
 			throw BadResolverArgument::instantiatedBeforehand( $this->app->getEntryFrom( $ins ), $method );
-		} elseif ( ! is_callable( $callable = array( $this->app->get( id: $parts[0] ), $method ) ) ) {
+		} elseif ( ! is_callable( $om = array( $this->app->get( id: $parts[0] ), $method ) ) ) {
 			throw BadResolverArgument::nonInstantiableEntry( id: $this->app->getEntryFrom( $parts[0] ) );
 		}
 
-		$id = Unwrap::asString( object: $parts[0], methodName: $method );
-
-		return $this->resolveFrom( $id, cb: $callable, obj: $callable[0] );
+		return $this->resolveFrom( id: Unwrap::asString( $parts[0], $method ), cb: $om, obj: $om[0] );
 	}
 
 	/** @return mixed[] */
@@ -123,7 +133,7 @@ readonly class MethodResolver {
 	protected static function isInstantiatedClass( string $name ): ?string {
 		$parts = Unwrap::partsFrom( string: $name, separator: '@' );
 
-		return isset( $parts[1] ) // $parts[0] => classname, $parts[1] => spl_object_id.
+		return isset( $parts[1] ) // $parts[0] => classname?@, $parts[1] => ?spl_object_id()::methodName.
 			&& is_numeric( value: Unwrap::partsFrom( $parts[1] )[0] ) ? $parts[0] : null;
 	}
 }

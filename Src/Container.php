@@ -174,14 +174,19 @@ class Container implements ArrayAccess, ContainerInterface {
 		?string $defaultMethod = null
 	): mixed {
 		$resolving = false;
-		$artefact  = ! $this->hasContextualBinding( $normalized = Unwrap::callback( $callback ) )
-			? MethodResolver::getArtefact( from: $normalized )
-			: $normalized;
+		$unwrapped = Unwrap::callback( cb: $callback, asArray: true );
+		$artefact  = ! $this->hasContextualBinding( $concrete = Unwrap::asString( ...$unwrapped ) )
+			? MethodResolver::getArtefact( from: $concrete )
+			: $concrete;
 
 		if ( ! $this->artefact->has( value: $artefact ) ) {
 			$this->artefact->push( value: $artefact );
 
 			$resolving = true;
+		}
+
+		if ( $this->methodResolver->unwrappedCallback() === null ) {
+			$this->methodResolver->with( ...$unwrapped );
 		}
 
 		$resolved = $this->methodResolver->resolve( $callback, $defaultMethod, $params );

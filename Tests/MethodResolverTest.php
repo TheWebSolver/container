@@ -133,12 +133,12 @@ class MethodResolverTest extends TestCase {
 
 	public function testResolvingVariousMethodCalls(): void {
 		$test = new class() {
-			public function __invoke( string $prefix ): string {
+			public function __invoke( string $prefix = 'Beautiful' ): string {
 				return "{$prefix} world!";
 			}
 
 			public function alt( string $prefix ): string {
-				return "{$prefix} world!";
+				return "{$prefix} alternate world!";
 			}
 		};
 
@@ -154,8 +154,40 @@ class MethodResolverTest extends TestCase {
 
 		$this->assertSame(
 			actual: $this->resolver->resolve( $test::class, default: 'alt', params: array( 'prefix' => 'Namaste' ) ),
-			expected: 'Namaste world!'
+			expected: 'Namaste alternate world!'
 		);
+
+		$this->assertSame(
+			actual: $this->resolver->resolve( $test, default: null ),
+			expected: 'Beautiful world!'
+		);
+
+		$this->assertSame(
+			actual: $this->resolver->resolve( $test, default: null, params: array( 'prefix' => 'Amazing' ) ),
+			expected: 'Amazing world!'
+		);
+
+		$this->assertSame(
+			message: 'The "$default" method name does not matter if "$cb" is an object instance.',
+			actual: $this->resolver->resolve( cb: $test, default: 'alt' ),
+			expected: 'Beautiful world!'
+		);
+
+		$this->assertSame( expected: array( $test, '__invoke' ), actual: $this->resolver->unwrappedCallback() );
+	}
+
+	public function testMethodResolverCbSetterGetter(): void {
+		$test = new class() {
+			public function alt( string $prefix ): string {
+				return "{$prefix} alternate world!";
+			}
+		};
+
+		$this->assertNull( $this->resolver->unwrappedCallback() );
+
+		$this->resolver->with( classOrInstance: $test, method: 'alt' );
+
+		$this->assertSame( expected: array( $test, 'alt' ), actual: $this->resolver->unwrappedCallback() );
 	}
 
 	public function testLazyClassInstantiationAndMethodCallWithParamResolver(): void {
@@ -208,9 +240,11 @@ class MethodResolverTest extends TestCase {
 
 	/** @return mixed[] */
 	public function provideVariousArtefactGetterData(): array {
+		$objectId = spl_object_id( $this );
+
 		return array(
-			array( array( $this, __FUNCTION__ ), spl_object_id( $this ) ),
-			array( $this->provideVariousArtefactGetterData( ... ), spl_object_id( $this ) ),
+			array( array( $this, __FUNCTION__ ), $objectId ),
+			array( $this->provideVariousArtefactGetterData( ... ), $objectId ),
 			array( self::class . '::' . __FUNCTION__, null ),
 		);
 	}

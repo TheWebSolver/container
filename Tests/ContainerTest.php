@@ -257,7 +257,10 @@ class ContainerTest extends TestCase {
 			}
 		};
 
-		$app->when( Unwrap::callback( $test->test( ... ) ) )->needs( '$arg' )->give( fn() => 18 );
+		// Unwrapped string of "Unwrap::asString($test, 'test')".
+		$app->when( $test::class . '@' . spl_object_id( $test ) . '::test' )
+			->needs( '$arg' )
+			->give( fn() => 18 );
 
 		$this->assertSame( expected: 20, actual: $app->call( array( $test, 'test' ) ) );
 		$this->assertSame( expected: 20, actual: $app->call( $test->test( ... ) ) );
