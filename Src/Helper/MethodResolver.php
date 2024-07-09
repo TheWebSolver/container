@@ -4,7 +4,6 @@
  *
  * @package TheWebSolver\Codegarage\Container
  *
- * phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType
  * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
  * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
  */
@@ -70,17 +69,12 @@ readonly class MethodResolver {
 		return is_string( value: $id ) ? $id : Unwrap::callback( cb: $id );
 	}
 
-	/** @param ?array<object|string,string $args */
 	protected function resolveFrom( string $id, callable $cb, ?object $obj ): mixed {
 		return $this->app->hasBinding( $id ) && null !== $obj
 			? ( $this->app->getBinding( $id )->concrete )( $obj, $this->app )
 			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $this->cb ?? $cb ) );
 	}
 
-	/**
-	 * @param array<string,mixed> $params The method's injected parameters.
-	 * @throws BadResolverArgument When neither method nor entry is resolvable.
-	 */
 	protected function instantiateFrom( string $cb, ?string $method ): mixed {
 		$parts    = Unwrap::partsFrom( string: $cb );
 		$method ??= method_exists( $cb, method: '__invoke' ) ? '__invoke' : ( $parts[1] ?? null );
