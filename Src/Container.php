@@ -65,7 +65,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		protected readonly Stack $tags = new Stack(),
 	) {
 		$this->event          = new Event( $this, $bindings );
-		$this->methodResolver = new MethodResolver( $this, $this->event, $bindings );
+		$this->methodResolver = new MethodResolver( $this, $this->event );
 
 		$this->extenders->asCollection();
 		$this->tags->asCollection();
@@ -312,7 +312,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	 * @throws TypeError      When first-class callable was not created using non-static method.
 	 */
 	public function bindMethod( Closure|string $entry, Closure $callback ): void {
-		$this->methodResolver->bind( $entry, $callback );
+		$this->bind( id: MethodResolver::keyFrom( id: $entry ), concrete: $callback );
 	}
 
 	public function addContextual( Closure|string $with, string $for, string $id ): void {

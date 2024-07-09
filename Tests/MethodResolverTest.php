@@ -32,70 +32,47 @@ class MethodResolverTest extends TestCase {
 		$this->resolver = null;
 	}
 
-	public function testWithMethodBinding(): void {
-		$test = new Binding( 'test', instance: false );
+	/** @dataProvider provideVariousBindings */
+	public function testWithMethodBinding(
+		Closure $binding,
+		string $method,
+		bool $expected,
+		bool ...$args
+	): void {
+		$test = new Binding( $binding, ...$args );
+		$id   = Binding::class . '@' . spl_object_id( $test ) . "::{$method}";
 
-		// The return value of Unwrap::asString(object: $test, methodName: 'isInstance').
-		$entry = Binding::class . '@' . spl_object_id( $test ) . '::isInstance';
+		$this->app->expects( $this->once() )->method( 'hasBinding' )->with( $id )->willReturn( true );
+		$this->app->expects( $this->once() )->method( 'getBinding' )->with( $id )->willReturn( $test );
 
-		$this->resolver->bind(
-			id: $test->isInstance( ... ),
-			cb: static function ( $resolvedObject, $app ) {
-				self::assertInstanceOf( expected: Binding::class, actual: $resolvedObject );
-				self::assertInstanceOf( expected: Container::class, actual: $app );
-
-				return $resolvedObject->isInstance();
-			}
+		$this->assertSame(
+			expected: $expected,
+			actual: $this->resolver->resolve( array( $test, $method ), default: null )
 		);
+	}
 
-		$this->assertTrue( condition: $this->resolver->hasBinding( $entry ) );
-		$this->assertTrue( $this->resolver->hasBinding( id: $test->isInstance( ... ) ) );
-		$this->assertFalse( condition: $this->resolver->fromBinding( $entry, $test, $this->app ) );
-		$this->assertFalse(
-			condition: $this->resolver->resolve( cb: array( $test, 'isInstance' ), default: null )
+	public function provideVariousBindings(): array {
+		return array(
+			array( static fn( $test ) => $test->isInstance(), 'isInstance', false, true, false ),
+			array( static fn( $test ) => $test->isSingleton(), 'isSingleton', true, true, false ),
 		);
+	}
 
-		$this->resolver->bind(
-			$entry = Binding::class . '::isSingleton',
-			cb: static fn ( $resolvedObject ) => $resolvedObject->isSingleton()
-		);
-
-		$this->app->expects( $this->exactly( 2 ) )
-			->method( 'get' )
-			->with( Binding::class )
-			->willReturn( $bound = new Binding( 'test', singleton: true ), Binding::class );
+	public function testInstantiatedClassPassedToCbValueAsStringThrowsException(): void {
+		$test           = new Binding( 'test', instance: true );
+		$instantiatedId = Binding::class . '@' . spl_object_id( $test ) . '::isInstance';
 
 		$this->app->expects( $this->once() )
 			->method( 'getEntryFrom' )
 			->with( Binding::class )
-			->willReturn( 'app.binder' );
-
-		$this->assertTrue( $this->resolver->hasBinding( Binding::class . '::isSingleton' ) );
-		$this->assertTrue( $this->resolver->fromBinding( $entry, $bound ) );
-		$this->assertTrue( $this->resolver->resolve( $entry, default: null ) );
-		$this->expectException( BadResolverArgument::class );
-		$this->expectExceptionMessageMatches( '/Unable to instantiate entry: app.binder./' );
-
-		$this->resolver->resolve( $entry, default: null );
-	}
-
-	public function testInstantiatedClassPassedAsCallbackAsStringThrowsException(): void {
-		$test = new Binding( 'test', instance: true );
-
-		$this->app->expects( $this->once() )->method( 'getEntryFrom' )->with( Binding::class );
-
-		$this->assertFalse( $this->resolver->hasBinding( $test->isSingleton( ... ) ) );
-
-		// The return value of Unwrap::asString(object: $test, methodName: 'isInstance').
-		$callbackAsString = Binding::class . '@' . spl_object_id( $test ) . '::isInstance';
-		$callbackAsArray  = array( $test, 'isInstance' );
-
-		$this->assertFalse( $this->resolver->hasBinding( $callbackAsString ) );
-		$this->assertTrue( $this->resolver->resolve( $callbackAsArray, default: null ) );
+			->willReturn( Binding::class );
 
 		$this->expectException( BadResolverArgument::class );
+		$this->expectExceptionMessage(
+			message: 'Cannot resolve instantiated class method "' . Binding::class . '::isInstance()"'
+		);
 
-		$this->resolver->resolve( $callbackAsString, default: null );
+		$this->resolver->resolve( $instantiatedId, default: null );
 	}
 
 	/** @dataProvider provideInvalidClassMethod */

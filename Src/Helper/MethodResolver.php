@@ -13,45 +13,25 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
-use Closure;
-use ArrayAccess;
 use ReflectionMethod;
 use ReflectionFunction;
 use ReflectionFunctionAbstract;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 readonly class MethodResolver {
 	/** @var array{0:object|string,1:string} */
 	private array $cb;
 
-	/** @param Stack&ArrayAccess<string,Binding> $bindings */
 	public function __construct(
 		private Container $app,
 		private Event $event,
-		private Stack $bindings = new Stack(),
 		private Param $pool = new Param()
 	) {}
 
-	public function bind( Closure|string $id, Closure $cb ): void {
-		$this->bindings->set( key: static::keyFrom( $id ), value: new Binding( concrete: $cb ) );
-	}
-
-	public function hasBinding( Closure|string $id ): bool {
-		return $this->bindings->has( key: static::keyFrom( $id ) );
-	}
-
-	public function fromBinding( string $id, object $resolvedObject ): mixed {
-		return ( $this->bindings[ $id ]->concrete )( $resolvedObject, $this->app );
-	}
-
-	public function with( object|string $classOrInstance, string $method ): static {
+	public function with( object|string $classOrInstance, string $method ): void {
 		$this->cb = func_get_args();
-
-		return $this;
 	}
 
 	/** @return ?array{0:object|string,1:string} */
@@ -86,14 +66,14 @@ readonly class MethodResolver {
 			: $name;
 	}
 
-	protected static function keyFrom( callable|string $id ): string {
+	public static function keyFrom( callable|string $id ): string {
 		return is_string( value: $id ) ? $id : Unwrap::callback( cb: $id );
 	}
 
 	/** @param ?array<object|string,string $args */
 	protected function resolveFrom( string $id, callable $cb, ?object $obj ): mixed {
-		return $this->hasBinding( $id ) && null !== $obj
-			? $this->fromBinding( $id, resolvedObject: $obj )
+		return $this->app->hasBinding( $id ) && null !== $obj
+			? ( $this->app->getBinding( $id )->concrete )( $obj, $this->app )
 			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $this->cb ?? $cb ) );
 	}
 
