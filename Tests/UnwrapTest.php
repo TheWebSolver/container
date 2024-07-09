@@ -9,7 +9,10 @@
 
 declare( strict_types = 1 );
 
+use PHPUnit\Framework\Reorderable;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
+use TheWebSolver\Codegarage\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 
 class UnwrapTest extends TestCase {
@@ -50,7 +53,7 @@ class UnwrapTest extends TestCase {
 	 * @param string|string[] $expected
 	 * @dataProvider provideDataForMethodBinding
 	 */
-	public function testMethodBindingId(
+	public function testForBinding(
 		string|array $expected,
 		object|string $object,
 		string $methodName,
@@ -137,13 +140,13 @@ class UnwrapTest extends TestCase {
 
 		return array(
 			array(
-				self::class . '::testMethodBindingId',
-				$this->testMethodBindingId( ... ),
+				self::class . '::testForBinding',
+				$this->testForBinding( ... ),
 				false,
 			),
 			array(
-				array( $this, 'testMethodBindingId' ),
-				$this->testMethodBindingId( ... ),
+				array( $this, 'testForBinding' ),
+				$this->testForBinding( ... ),
 				true,
 			),
 			array( 'PHPUnit\Framework\Assert::assertTrue', self::assertTrue( ... ), false ),
@@ -179,6 +182,66 @@ class UnwrapTest extends TestCase {
 		return array_filter(
 			array: $this->provideDataForClosureUnwrap(),
 			callback: static fn( array $data ): bool => ! end( $data )
+		);
+	}
+
+	/** @dataProvider provideParamTypeFunc */
+	public function testParamTypeFrom( ?string $expected, Closure $fn ): void {
+		$reflection = new ReflectionParameter( $fn, param: 0 );
+
+		$this->assertSame( $expected, actual: Unwrap::paramTypeFrom( $reflection ) );
+	}
+
+	public function provideParamTypeFunc(): array {
+		return array(
+			array( self::class, static function ( self $self ) {} ),
+			array( TestCase::class, static function ( parent $parent ) {} ),
+			array( self::class, static function ( UnwrapTest $test ) {} ),
+			array( TestCase::class, static function ( TestCase $parent ) {} ),
+			array( null, static function ( string $name ) {} ),
+			array( null, static function ( int|float $currency ) {} ),
+			array( null, static function ( Container&ContainerInterface $app ) {} ),
+			array( Container::class, static function ( Container $app ) {} ),
+		);
+	}
+
+	public function testInvokeCallableValue(): void {
+		$this->assertSame( 'notCallable', Unwrap::andInvoke( 'notCallable', 'argsDoesNotMatter' ) );
+		$this->assertSame( 'invoked', Unwrap::andInvoke( static fn() => 'invoked' ) );
+		$this->assertSame(
+			expected: 14.5,
+			actual: Unwrap::andInvoke( static fn ( int $_5, float $_9_5 ) => $_5 + $_9_5, 5, 9.5 )
+		);
+		$this->assertCount(
+			expectedCount: count( $this->provideParamTypeFunc() ),
+			haystack: Unwrap::andInvoke( fn ( self $test ) => $test->provideParamTypeFunc(), $this )
+		);
+	}
+
+	/**
+	 * @param null|mixed[]|string $val
+	 * @dataProvider provideCallbackData
+	 */
+	public function testCallback( null|array|string $val, callable|string $cb, bool $asArray ): void {
+		$this->assertSame( expected: $val ?? $cb, actual: Unwrap::callback( $cb, $asArray ) );
+	}
+
+	/** @return mixed[] */
+	public function provideCallbackData(): array {
+		$class = new class() {
+			public function __invoke() {}
+		};
+
+		return array(
+			array( null, self::class . '::assertTrue', false ),
+			array( array( self::class . '::assertTrue', '' ), self::class . '::assertTrue', true ),
+			array( "{$this->_gIdSpl()}testCallback", $this->testCallback( ... ), false ),
+			array( array( $this, 'testCallback' ), $this->testCallback( ... ), true ),
+			array( "{$this->_gIdSpl( $class )}__invoke", $class, false ),
+			array( array( $class, '__invoke' ), $class, true ),
+			array( self::class . '::assertTrue', array( self::class, 'assertTrue' ), false ),
+			array( array( self::class, 'assertTrue' ), array( self::class, 'assertTrue' ), true ),
+
 		);
 	}
 }

@@ -63,7 +63,7 @@ class Unwrap {
 	}
 
 	/**
-	 * @return string|array{0:object,1:string}
+	 * @return string|array{0:object|string,1:string}
 	 * @throws LogicException When method name not given if `$object` is a class instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
 	 * @phpstan-return ($asArray is true ? array{0:object,1:string}, string)
@@ -123,17 +123,17 @@ class Unwrap {
 	/**
 	 * @param callable|string $cb Either a valid callback or a normalized
 	 *                                  string using `Unwrap::asString()`.
-	 * @return string|array{0:object,1:string}
+	 * @return string|array{0:object|string,1:string}
 	 * @throws LogicException When method name not given if $object is a class instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
-	 * @phpstan-return ($asArray is true ? array{0:object,1:string}, string)
+	 * @phpstan-return ($asArray is true ? array{0:object|string,1:string}, string)
 	 */
 	public static function callback( callable|string $cb, bool $asArray = false ): string|array {
 		return match ( true ) {
 			default                => $asArray ? array( $cb, '' ) : $cb,
 			$cb instanceof Closure => self::forBinding( $cb, asArray: $asArray ),
 			is_array( $cb )        => self::forBinding( ...array( ...$cb, $asArray ) ),
-			is_object( $cb )       => $asArray ? array( $cb, '__invoke' ) : $cb,
+			is_object( $cb )       => self::forBinding( $cb, '__invoke', $asArray ),
 		};
 	}
 
