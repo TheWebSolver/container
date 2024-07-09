@@ -137,6 +137,11 @@ class Unwrap {
 		};
 	}
 
+	/** @return string[] */
+	public static function partsFrom( string $string, string $separator = '::' ): array {
+		return explode( $separator, $string, limit: 2 );
+	}
+
 	/** @return ?array{0:array{0:object,1:string},1:string} */
 	private static function asInstance( ReflectionFunction $source, bool $binding = false ): ?array {
 		if ( ! $object = $source->getClosureThis() ) {
@@ -172,11 +177,6 @@ class Unwrap {
 
 	private static function toString( string $object, string $methodName ): string {
 		return "{$object}::{$methodName}";
-	}
-
-	/** @return string[] */
-	public static function partsFrom( string $string, string $separator = '::' ): array {
-		return explode( $separator, $string, limit: 2 );
 	}
 
 	private function __construct() {}

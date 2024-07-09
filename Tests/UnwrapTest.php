@@ -244,6 +244,27 @@ class UnwrapTest extends TestCase {
 
 		);
 	}
+
+	/**
+	 * @param string[] $expected
+	 * @dataProvider provideParts
+	 */
+	public function testPartsFrom( array $expected, string $string, string $separator ): void {
+		$this->assertSame( $expected, actual: Unwrap::partsFrom( $string, $separator ) );
+	}
+
+	/** @return mixed[] */
+	public function provideParts(): array {
+		return array(
+			array( array( 'one', 'two' ), 'one:two', ':' ),
+			array( array( 'one', 'two' ), 'one//two', '//' ),
+			array( array( 'one', 'two:three' ), 'one:two:three', ':' ),
+			array( array( 'one', 'two' ), 'one@two', '@' ),
+			array( array( 'one', 'two||three' ), 'one||two||three', '||' ),
+			array( array( 'One', 'TwoAndThree&Four' ), 'OneAndTwoAndThree&Four', 'And' ),
+			array( array( 'OneAndTwoAndThree', 'Four' ), 'OneAndTwoAndThree&Four', '&' ),
+		);
+	}
 }
 
 function _wrapped__Lambda() {
