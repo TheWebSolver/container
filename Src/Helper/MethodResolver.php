@@ -29,8 +29,10 @@ readonly class MethodResolver {
 		private Param $pool = new Param()
 	) {}
 
-	public function with( object|string $classOrInstance, string $method ): void {
+	public function with( object|string $classOrInstance, string $method ): static {
 		$this->cb = func_get_args();
+
+		return $this;
 	}
 
 	/** @return ?array{0:object|string,1:string} */
@@ -50,7 +52,7 @@ readonly class MethodResolver {
 		}
 
 		[ $cls, $method ] = $this->cb ??= Unwrap::callback( $cb, asArray: true );
-		$resolved         = ! is_string( $cls )
+		$resolved         = ! is_string( $cls ) // The "$cls" is string at this point. Checking just in case...
 			? $this->resolveFrom( id: $method ? Unwrap::asString( ...$this->cb ) : $cls, cb: $cb, obj: $cls )
 			: $this->instantiateFrom( $cls, $method );
 
@@ -69,15 +71,15 @@ readonly class MethodResolver {
 		return is_string( value: $id ) ? $id : Unwrap::callback( cb: $id );
 	}
 
-	protected function resolveFrom( string $id, callable $cb, ?object $obj ): mixed {
-		return $this->app->hasBinding( $id ) && null !== $obj
-			? ( $this->app->getBinding( $id )->concrete )( $obj, $this->app )
+	protected function resolveFrom( string $id, callable $cb, ?object $obj = null ): mixed {
+		return $this->app->hasBinding( $id )
+			? ( $this->app->getBinding( $id )->concrete )( $obj ?? $cb[0], $this->app )
 			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $this->cb ?? $cb ) );
 	}
 
 	protected function instantiateFrom( string $cb, ?string $method ): mixed {
-		$parts    = Unwrap::partsFrom( string: $cb );
-		$method ??= method_exists( $cb, method: '__invoke' ) ? '__invoke' : ( $parts[1] ?? null );
+		$parts  = Unwrap::partsFrom( string: $cb );
+		$method = $parts[1] ?? $method ?? ( method_exists( $cb, '__invoke' ) ? '__invoke' : null );
 
 		if ( null === $method ) {
 			throw BadResolverArgument::noMethod( class: $parts[0] );
@@ -87,7 +89,7 @@ readonly class MethodResolver {
 			throw BadResolverArgument::nonInstantiableEntry( id: $parts[0] );
 		}
 
-		return $this->resolveFrom( id: Unwrap::asString( $parts[0], $method ), cb: $om, obj: $om[0] );
+		return $this->resolveFrom( id: Unwrap::asString( $parts[0], $method ), cb: $om );
 	}
 
 	/** @return mixed[] */

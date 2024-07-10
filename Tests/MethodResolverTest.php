@@ -38,6 +38,14 @@ class MethodResolverTest extends TestCase {
 			public function get( string $name = 'Default' ): string {
 				return "Name: {$name}";
 			}
+
+			public function alt( string $name = 'Alternate' ): string {
+				return $this->get( $name );
+			}
+
+			public function __invoke( string $name = 'Invocable' ): string {
+				return $this->get( $name );
+			}
 		};
 
 		$normalId   = $test::class . '::get';
@@ -47,7 +55,7 @@ class MethodResolverTest extends TestCase {
 	}
 
 	public function testMethodBindingWithInstantiatedClassAsCb(): void {
-		[ $test, $normalId, $instanceId ] = $this->getTestClassInstanceStub();
+		[ $test,, $instanceId ] = $this->getTestClassInstanceStub();
 
 		$this->app->expects( $this->exactly( 2 ) )
 			->method( 'hasBinding' )
@@ -62,17 +70,17 @@ class MethodResolverTest extends TestCase {
 
 		$this->assertSame(
 			expected: 'Name: John Doe!',
-			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: null )
+			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: 'no effect' )
 		);
 
 		$this->assertSame(
 			expected: 'Name: Default',
-			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: null )
+			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: 'no effect' )
 		);
 	}
 
 	public function testMethodBindingWithInstantiatedClosureAsCb(): void {
-		[ $test, $normalId, $instanceId ] = $this->getTestClassInstanceStub();
+		[ $test,, $instanceId ] = $this->getTestClassInstanceStub();
 
 		$this->app->expects( $this->exactly( 2 ) )
 			->method( 'hasBinding' )
@@ -116,12 +124,12 @@ class MethodResolverTest extends TestCase {
 
 		$this->assertSame(
 			expected: 'Name: From Binding',
-			actual: $this->resolver->resolve( cb: $normalId, default: null )
+			actual: $this->resolver->resolve( cb: $normalId, default: 'no effect if null or valid method' )
 		);
 
 		$this->assertSame(
 			expected: 'Name: Default',
-			actual: $this->resolver->resolve( cb: $normalId, default: null )
+			actual: $this->resolver->resolve( cb: $normalId, default: 'no effect if null or valid method' )
 		);
 	}
 
@@ -167,101 +175,132 @@ class MethodResolverTest extends TestCase {
 		);
 	}
 
-	public function testResolvingVariousMethodCalls(): void {
-		$test = new class() {
-			public function __invoke( string $prefix = 'Beautiful' ): string {
-				return "{$prefix} world!";
-			}
+	public function testResolvingVariousMethodCallsWithInvocableClass(): void {
+		[ $test ] = $this->getTestClassInstanceStub();
 
-			public function alt( string $prefix ): string {
-				return "{$prefix} alternate world!";
-			}
-		};
-
-		$this->app->expects( $this->exactly( 2 ) )
+		$this->app->expects( $this->exactly( 3 ) )
 			->method( 'get' )
 			->with( $test::class )
 			->willReturn( new $test() );
 
 		$this->assertSame(
-			actual: $this->resolver->resolve( $test::class, default: null, params: array( 'prefix' => 'Hello' ) ),
-			expected: 'Hello world!'
+			actual: $this->resolver->resolve( cb: $test::class, default: null /* defaults to "__invoke */ ),
+			expected: 'Name: Invocable'
 		);
 
 		$this->assertSame(
-			actual: $this->resolver->resolve( $test::class, default: 'alt', params: array( 'prefix' => 'Namaste' ) ),
-			expected: 'Namaste alternate world!'
+			actual: $this->resolver->resolve( cb: $test::class, default: 'alt' ),
+			expected: 'Name: Alternate'
 		);
 
 		$this->assertSame(
-			actual: $this->resolver->resolve( $test, default: null ),
-			expected: 'Beautiful world!'
+			actual: $this->resolver->resolve( cb: $test::class, default: 'get' ),
+			expected: 'Name: Default'
 		);
 
 		$this->assertSame(
-			actual: $this->resolver->resolve( $test, default: null, params: array( 'prefix' => 'Amazing' ) ),
-			expected: 'Amazing world!'
+			actual: $this->resolver->resolve( cb: $test, default: 'ignored when $cb is invocable object' ),
+			expected: 'Name: Invocable'
 		);
 
 		$this->assertSame(
-			message: 'The "$default" method name does not matter if "$cb" is an object instance.',
-			actual: $this->resolver->resolve( cb: $test, default: 'alt' ),
-			expected: 'Beautiful world!'
+			actual: $this->resolver->resolve( cb: $test, default: 'ignored', params: array( 'name' => 'Inject' ) ),
+			expected: 'Name: Inject'
 		);
 
-		$this->assertSame( expected: array( $test, '__invoke' ), actual: $this->resolver->unwrappedCallback() );
+		$this->assertSame(
+			actual: $this->resolver->unwrappedCallback(),
+			expected: array( $test, '__invoke' )
+		);
 	}
 
-	public function testMethodResolverCbSetterGetter(): void {
-		$test = new class() {
-			public function alt( string $prefix ): string {
-				return "{$prefix} alternate world!";
-			}
-		};
-
+	/** @dataProvider provideCbSetterGetter */
+	public function testMethodResolverCbSetterGetter(
+		object|string $objectOrInstance,
+		string $method
+	): void {
 		$this->assertNull( $this->resolver->unwrappedCallback() );
 
-		$this->resolver->with( classOrInstance: $test, method: 'alt' );
-
-		$this->assertSame( expected: array( $test, 'alt' ), actual: $this->resolver->unwrappedCallback() );
+		$this->assertSame(
+			expected: array( $objectOrInstance, $method ),
+			actual: $this->resolver->with( $objectOrInstance, $method )->unwrappedCallback()
+		);
 	}
 
-	public function testLazyClassInstantiationAndMethodCallWithParamResolver(): void {
-		$test = new class() {
-			public function test( int $base = 3 ): int {
-				return $base + 2;
-			}
-		};
+	/** @return array<array{0:object|string,1:string}> */
+	public function provideCbSetterGetter(): array {
+		[ $test ] = $this->getTestClassInstanceStub();
 
-		$cb = $test::class . '::test';
+		return array(
+			array( $test, 'alt' ),
+			array( $test::class, 'alt' ),
+			array( $test::class, 'get' ),
+			array( $test, 'get' ),
+			array( $test::class, '__invoke' ),
+			array( $test, '__invoke' ),
+		);
+	}
 
-		$this->app->expects( $this->exactly( 4 ) )
+	public function testLazyClassInstantiationAndMethodCallWithVariousParamResolver(): void {
+		[ $test, $withGetMethod ] = $this->getTestClassInstanceStub();
+
+		$this->app->expects( $this->exactly( 5 ) )
+			->method( 'hasBinding' )
+			->with( $withGetMethod )
+			->willReturn( false, false, false, false, true );
+
+		$this->app->expects( $this->once() )
+			->method( 'getBinding' )
+			->with( $withGetMethod )
+			->willReturn( new Binding( static fn( $test ) => $test( 'Binding' ) ) );
+
+		$this->app->expects( $this->exactly( 5 ) )
 			->method( 'get' )
 			->with( $test::class )
 			->willReturn( new $test() );
 
 		// If no contextual, eventual or injected value, default value used.
-		$this->assertSame( expected: 5, actual: $this->resolver->resolve( $cb, default: null ) );
+		$this->assertSame(
+			expected: 'Name: Default',
+			actual: $this->resolver->resolve( cb: $withGetMethod, default: null )
+		);
 
 		// Contextual value will take precedence over default value.
 		$this->app->expects( $this->exactly( 1 ) )
 			->method( 'getContextualFor' )
-			->with( '$base' )
-			->willReturn( static fn() => 13 );
+			->with( '$name' )
+			->willReturn( static fn() => 'Contextual' );
 
 		// Eventual value will take precedence over contextual & default value.
 		$this->event->expects( $this->exactly( 2 ) )
 			->method( 'fireDuringBuild' )
-			->with( 'int', 'base' )
-			->willReturn( new Binding( concrete: 8 ), null );
+			->with( 'string', 'name' )
+			->willReturn( new Binding( concrete: 'Eventual' ), null );
 
-		$this->assertSame( expected: 10, actual: $this->resolver->resolve( $cb, default: null ) );
-		$this->assertSame( expected: 15, actual: $this->resolver->resolve( $cb, default: null ) );
+		$this->assertSame(
+			expected: 'Name: Eventual',
+			actual: $this->resolver->resolve( cb: $withGetMethod, default: null )
+		);
+
+		// Falling back to contextual value when eventual value is "null".
+		$this->assertSame(
+			expected: 'Name: Contextual',
+			actual: $this->resolver->resolve( cb: $withGetMethod, default: null )
+		);
 
 		// Injected value will take precedence over all other values.
 		$this->assertSame(
-			actual: $this->resolver->resolve( $cb, default: null, params: array( 'base' => 18 ) ),
-			expected: 20
+			expected: 'Name: Injected',
+			actual: $this->resolver
+				->resolve( cb: $withGetMethod, default: null, params: array( 'name' => 'Injected' ) ),
+		);
+
+		// Binding will take precedence over everything else.
+		$this->assertSame(
+			expected: 'Name: Binding',
+			actual: $this->resolver->resolve( cb: $withGetMethod, default: 'ignored', params: array( 'ignored' ) ),
+			message: 'Even though cb string is passed with ::get() method, binding value is '
+							. ' resolved by directly invoking class (has __invoke() method).',
 		);
 	}
 
