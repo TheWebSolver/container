@@ -258,7 +258,7 @@ class ContainerTest extends TestCase {
 		};
 
 		// Unwrapped string of "Unwrap::asString($test, 'test')".
-		$app->when( $test::class . '@' . spl_object_id( $test ) . '::test' )
+		$app->when( $test::class . '#' . spl_object_id( $test ) . '::test' )
 			->needs( '$arg' )
 			->give( fn() => 18 );
 

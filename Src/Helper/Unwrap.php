@@ -26,7 +26,7 @@ class Unwrap {
 
 	public static function asString( object|string $object, string $methodName = '' ): string {
 		return self::toString(
-			object: is_string( $object ) ? $object : $object::class . '@' . spl_object_id( $object ),
+			object: is_string( $object ) ? $object : $object::class . '#' . spl_object_id( $object ),
 			methodName: $methodName
 		);
 	}

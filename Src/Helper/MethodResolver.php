@@ -81,10 +81,10 @@ readonly class MethodResolver {
 
 		if ( null === $method ) {
 			throw BadResolverArgument::noMethod( class: $parts[0] );
-		} elseif ( $ins = static::isInstantiatedClass( name: $parts[0] ) ) {
-			throw BadResolverArgument::instantiatedBeforehand( $this->app->getEntryFrom( $ins ), $method );
+		} elseif ( $class = static::isInstantiatedClass( name: $parts[0] ) ) {
+			throw BadResolverArgument::instantiatedBeforehand( $class, $method );
 		} elseif ( ! is_callable( $om = array( $this->app->get( id: $parts[0] ), $method ) ) ) {
-			throw BadResolverArgument::nonInstantiableEntry( id: $this->app->getEntryFrom( $parts[0] ) );
+			throw BadResolverArgument::nonInstantiableEntry( id: $parts[0] );
 		}
 
 		return $this->resolveFrom( id: Unwrap::asString( $parts[0], $method ), cb: $om, obj: $om[0] );
@@ -105,9 +105,9 @@ readonly class MethodResolver {
 	}
 
 	protected static function isInstantiatedClass( string $name ): ?string {
-		$parts = Unwrap::partsFrom( string: $name, separator: '@' );
+		$parts = Unwrap::partsFrom( string: $name, separator: '#' );
 
-		return isset( $parts[1] ) // $parts[0] => classname?@, $parts[1] => ?spl_object_id()::methodName.
+		return isset( $parts[1] ) // $parts[0] => classname, $parts[1] => ?spl_object_id()::methodName.
 			&& is_numeric( value: Unwrap::partsFrom( $parts[1] )[0] ) ? $parts[0] : null;
 	}
 }

@@ -32,47 +32,108 @@ class MethodResolverTest extends TestCase {
 		$this->resolver = null;
 	}
 
-	/** @dataProvider provideVariousBindings */
-	public function testWithMethodBinding(
-		Closure $binding,
-		string $method,
-		bool $expected,
-		bool ...$args
-	): void {
-		$test = new Binding( $binding, ...$args );
-		$id   = Binding::class . '@' . spl_object_id( $test ) . "::{$method}";
+	/** @return array{0:object,1:string,2:string} */
+	private function getTestClassInstanceStub(): array {
+		$test = new class() {
+			public function get( string $name = 'Default' ): string {
+				return "Name: {$name}";
+			}
+		};
 
-		$this->app->expects( $this->once() )->method( 'hasBinding' )->with( $id )->willReturn( true );
-		$this->app->expects( $this->once() )->method( 'getBinding' )->with( $id )->willReturn( $test );
+		$normalId   = $test::class . '::get';
+		$instanceId = $test::class . '#' . spl_object_id( $test ) . '::get';
+
+		return array( $test, $normalId, $instanceId );
+	}
+
+	public function testMethodBindingWithInstantiatedClassAsCb(): void {
+		[ $test, $normalId, $instanceId ] = $this->getTestClassInstanceStub();
+
+		$this->app->expects( $this->exactly( 2 ) )
+			->method( 'hasBinding' )
+			->with( $instanceId )
+			->willReturn( true, false );
+
+		$this->app
+			->expects( $this->once() )
+			->method( 'getBinding' )
+			->with( $instanceId )
+			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John Doe!' ) ) );
 
 		$this->assertSame(
-			expected: $expected,
-			actual: $this->resolver->resolve( array( $test, $method ), default: null )
+			expected: 'Name: John Doe!',
+			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: null )
+		);
+
+		$this->assertSame(
+			expected: 'Name: Default',
+			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: null )
 		);
 	}
 
-	public function provideVariousBindings(): array {
-		return array(
-			array( static fn( $test ) => $test->isInstance(), 'isInstance', false, true, false ),
-			array( static fn( $test ) => $test->isSingleton(), 'isSingleton', true, true, false ),
+	public function testMethodBindingWithInstantiatedClosureAsCb(): void {
+		[ $test, $normalId, $instanceId ] = $this->getTestClassInstanceStub();
+
+		$this->app->expects( $this->exactly( 2 ) )
+			->method( 'hasBinding' )
+			->with( $instanceId )
+			->willReturn( true, false );
+
+		$this->app
+			->expects( $this->once() )
+			->method( 'getBinding' )
+			->with( $instanceId )
+			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John Doe!' ) ) );
+
+		$this->assertSame(
+			expected: 'Name: John Doe!',
+			actual: $this->resolver->resolve( cb: $test->get( ... ), default: null )
+		);
+
+		$this->assertSame(
+			expected: 'Name: Default',
+			actual: $this->resolver->resolve( cb: $test->get( ... ), default: null )
 		);
 	}
 
-	public function testInstantiatedClassPassedToCbValueAsStringThrowsException(): void {
-		$test           = new Binding( 'test', instance: true );
-		$instantiatedId = Binding::class . '@' . spl_object_id( $test ) . '::isInstance';
+	public function testMethodBindingWithLazyInstantiatedClassWithCbAsString(): void {
+		[ $test, $normalId ] = $this->getTestClassInstanceStub();
+
+		$this->app->expects( $this->exactly( 2 ) )
+			->method( 'get' )
+			->with( $test::class )
+			->willReturn( new $test() );
+
+		$this->app->expects( $this->exactly( 2 ) )
+			->method( 'hasBinding' )
+			->with( $normalId )
+			->willReturn( true, false );
 
 		$this->app->expects( $this->once() )
-			->method( 'getEntryFrom' )
-			->with( Binding::class )
-			->willReturn( Binding::class );
+			->method( 'getBinding' )
+			->with( $normalId )
+			->willReturn( new Binding( static fn( $class ) => $class->get( 'From Binding' ) ) );
+
+		$this->assertSame(
+			expected: 'Name: From Binding',
+			actual: $this->resolver->resolve( cb: $normalId, default: null )
+		);
+
+		$this->assertSame(
+			expected: 'Name: Default',
+			actual: $this->resolver->resolve( cb: $normalId, default: null )
+		);
+	}
+
+	public function testInstantiatedClassPassedToCbAsStringThrowsException(): void {
+		[ $test, $normalId, $instanceId ] = $this->getTestClassInstanceStub();
 
 		$this->expectException( BadResolverArgument::class );
 		$this->expectExceptionMessage(
-			message: 'Cannot resolve instantiated class method "' . Binding::class . '::isInstance()"'
+			message: 'Cannot resolve instantiated class method "' . $normalId . '()".'
 		);
 
-		$this->resolver->resolve( $instantiatedId, default: null );
+		$this->resolver->resolve( $instanceId, default: null );
 	}
 
 	/** @dataProvider provideInvalidClassMethod */
@@ -83,9 +144,7 @@ class MethodResolverTest extends TestCase {
 		if ( $method || $validNonResolvable ) {
 			$pre = $validNonResolvable ? explode( '::', $cls, 2 )[0] : $cls;
 
-			foreach ( array( 'get', 'getEntryFrom' ) as $name ) {
-				$this->app->expects( $this->once() )->method( $name )->with( $pre )->willReturn( $pre );
-			}
+			$this->app->expects( $this->once() )->method( 'get' )->with( $pre );
 
 			$msg = "/Unable to instantiate entry: {$pre}./";
 		}
@@ -210,7 +269,7 @@ class MethodResolverTest extends TestCase {
 	public function testArtefactAndInstantiatedClass( callable|string $from, ?int $objectId ): void {
 		$expected = null === $objectId
 			? self::class
-			: self::class . "@{$objectId}::provideVariousArtefactGetterData";
+			: self::class . "#{$objectId}::provideVariousArtefactGetterData";
 
 		$this->assertSame( $expected, actual: MethodResolver::getArtefact( $from ) );
 	}

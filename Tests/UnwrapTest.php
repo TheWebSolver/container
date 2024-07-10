@@ -113,7 +113,7 @@ class UnwrapTest extends TestCase {
 
 	private function _gIdSpl( ?object $object = null ): string {
 		return ( $object ? $object::class : self::class )
-			. '@' . spl_object_id( $object ?? $this ) . '::';
+			. '#' . spl_object_id( $object ?? $this ) . '::';
 	}
 
 	/**
@@ -260,6 +260,7 @@ class UnwrapTest extends TestCase {
 			array( array( 'one', 'two' ), 'one//two', '//' ),
 			array( array( 'one', 'two:three' ), 'one:two:three', ':' ),
 			array( array( 'one', 'two' ), 'one@two', '@' ),
+			array( array( 'one', '2' ), 'one#2', '#' ),
 			array( array( 'one', 'two||three' ), 'one||two||three', '||' ),
 			array( array( 'One', 'TwoAndThree&Four' ), 'OneAndTwoAndThree&Four', 'And' ),
 			array( array( 'OneAndTwoAndThree', 'Four' ), 'OneAndTwoAndThree&Four', '&' ),
