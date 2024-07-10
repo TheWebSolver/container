@@ -1,6 +1,6 @@
 <?php
 /**
- * Parameter Resolver.
+ * Parameter Resolver for either class or method during auto-wiring.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -17,12 +17,12 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
 use Psr\Container\ContainerExceptionInterface as ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
-readonly class ParamResolver {
+class ParamResolver {
 	public function __construct(
-		private Container $app,
-		private Param $pool,
-		private Event $event,
-		private IndexStack $result = new IndexStack(),
+		private readonly Container $app,
+		private readonly Param $pool,
+		private readonly Event $event,
+		private readonly IndexStack $result = new IndexStack(),
 	) {}
 
 	/**

@@ -3,6 +3,10 @@
  * Event handler for the container.
  *
  * @package TheWebSolver\Codegarage\Container
+ *
+ * @phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType
+ * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
+ * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
  */
 
 declare( strict_types = 1 );
@@ -16,25 +20,22 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
 
-readonly class Event {
+class Event {
 	public const FIRE_BEFORE_BUILD = 'beforeBuild';
 	public const FIRE_BUILT        = 'built';
 
-	/** @var Stack&ArrayAccess<string,array<string,Binding|Closure(string $param, Container $app): Binding> */
-	private Stack $building;
-
+	/** @param Stack&ArrayAccess<string,array<string,Binding|Closure(string $param, Container $app): Binding> $building */
 	public function __construct(
-		private Container $app,
-		private Stack $bindings,
-		private IndexStack $beforeBuild = new IndexStack(),
-		private Stack $beforeBuildForEntry = new Stack(),
-		private IndexStack $built = new IndexStack(),
-		private Stack $builtForEntry = new Stack(),
+		private readonly Container $app,
+		private readonly Stack $bindings,
+		private readonly IndexStack $beforeBuild = new IndexStack(),
+		private readonly Stack $beforeBuildForEntry = new Stack(),
+		private readonly IndexStack $built = new IndexStack(),
+		private readonly Stack $builtForEntry = new Stack(),
+		private readonly Stack $building = new Stack()
 	) {
 		$this->beforeBuildForEntry->asCollection();
 		$this->builtForEntry->asCollection();
-
-		$this->building = new Stack();
 	}
 
 	/**
