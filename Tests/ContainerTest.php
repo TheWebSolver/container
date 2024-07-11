@@ -236,17 +236,99 @@ class ContainerTest extends TestCase {
 		$this->assertSame( expected: 'Using Event Builder', actual: $secondaryClass->value );
 	}
 
-	public function testMethodCallWithBinding(): void {
-		$app  = new Container();
+	/** @return array{0:object,1:string,2:string} */
+	private function getTestClassInstanceStub(): array {
 		$test = new class() {
-			public function test( int $arg = 3 ): int {
-				return $arg + 2;
+			public function get( int $val ): int {
+				return $val + 2;
+				;
+			}
+
+			public function alt( int $val = 7 ): int {
+				return $val + 10;
+			}
+
+			public function __invoke( int $val ): int {
+				return $val + 5;
+			}
+
+			public static function getStatic( int $val ): int {
+				return $val + 3;
 			}
 		};
 
-		$app->bindMethod( entry: $test->test( ... ), callback: static fn( $test ) => $test->test( 8 ) );
+		$normalId   = $test::class . '::get';
+		$instanceId = $test::class . '#' . spl_object_id( $test ) . '::get';
 
-		$this->assertSame( expected: 10, actual: $app->call( array( $test, 'test' ) ) );
+		return array( $test, $normalId, $instanceId );
+	}
+
+	public function testMethodCallForInvocableClassInstance(): void {
+		$app                      = new Container();
+		[ $test, $testGetString ] = $this->getTestClassInstanceStub();
+		$testInvokeInstance       = Unwrap::callback( cb: $test );
+		$testInvokeString         = Unwrap::asString( object: $test::class, methodName: '__invoke' );
+
+		$app->when( concrete: $testInvokeInstance )
+			->needs( '$val' )
+			->give( value: static fn(): int => 95 );
+
+		$this->assertSame( expected: 100, actual: $app->call( $test ) );
+
+		$app->when( concrete: $testInvokeString )
+			->needs( '$val' )
+			->give( value: static fn(): int => 195 );
+
+		$this->assertSame( expected: 200, actual: $app->call( $testInvokeString ) );
+
+		$app->when( concrete: $testGetString )
+			->needs( '$val' )
+			->give( value: static fn(): int => 298 );
+
+		$this->assertSame( expected: 300, actual: $app->call( $testGetString ) );
+
+		$app->matches( paramName: 'val' )
+			->for( concrete: 'int' )
+			->give( implementation: new Binding( concrete: 85 ) );
+
+		$this->assertSame( expected: 90, actual: $app->call( $test ) );
+
+		$app->matches( paramName: 'val' )
+			->for( concrete: 'int' )
+			->give( implementation: new Binding( concrete: 185 ) );
+
+		$this->assertSame( expected: 190, actual: $app->call( $test::class ) );
+
+		$app->matches( paramName: 'val' )
+			->for( concrete: 'int' )
+			->give( implementation: new Binding( concrete: 188 ) );
+
+		$this->assertSame( expected: 190, actual: $app->call( $testGetString ) );
+
+		$this->assertSame( expected: 30, actual: $app->call( $test, params: array( 'val' => 25 ) ) );
+
+		$this->assertSame(
+			expected: 130,
+			actual: $app->call( $test::class, params: array( 'val' => 125 ) )
+		);
+
+		$this->assertSame(
+			expected: 140,
+			actual: $app->call( $testGetString, params: array( 'val' => 138 ) )
+		);
+
+		$app->bindMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
+
+		$this->assertSame( expected: 20, actual: $app->call( $test ) );
+
+		$app->bindMethod( entry: $testInvokeString, callback: static fn( $test ) => $test( 115 ) );
+
+		$this->assertSame( expected: 120, actual: $app->call( $test::class ) );
+
+		// Actually not with "get" method. Instead bound with "alt" method.
+		$app->bindMethod( entry: $testGetString, callback: static fn( $test ) => $test->alt( 140 ) );
+
+		$this->assertSame( expected: 150, actual: $app->call( $testGetString ) );
 	}
 
 	public function testMethodCallWithDifferentImplementation(): void {

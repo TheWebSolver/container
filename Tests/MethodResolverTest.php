@@ -46,6 +46,10 @@ class MethodResolverTest extends TestCase {
 			public function __invoke( string $name = 'Invocable' ): string {
 				return $this->get( $name );
 			}
+
+			public static function getStatic( string $name = 'Static' ): string {
+				return "Name: {$name}";
+			}
 		};
 
 		$normalId   = $test::class . '::get';
@@ -207,38 +211,6 @@ class MethodResolverTest extends TestCase {
 			actual: $this->resolver->resolve( cb: $test, default: 'ignored', params: array( 'name' => 'Inject' ) ),
 			expected: 'Name: Inject'
 		);
-
-		$this->assertSame(
-			actual: $this->resolver->unwrappedCallback(),
-			expected: array( $test, '__invoke' )
-		);
-	}
-
-	/** @dataProvider provideCbSetterGetter */
-	public function testMethodResolverCbSetterGetter(
-		object|string $objectOrInstance,
-		string $method
-	): void {
-		$this->assertNull( $this->resolver->unwrappedCallback() );
-
-		$this->assertSame(
-			expected: array( $objectOrInstance, $method ),
-			actual: $this->resolver->with( $objectOrInstance, $method )->unwrappedCallback()
-		);
-	}
-
-	/** @return array<array{0:object|string,1:string}> */
-	public function provideCbSetterGetter(): array {
-		[ $test ] = $this->getTestClassInstanceStub();
-
-		return array(
-			array( $test, 'alt' ),
-			array( $test::class, 'alt' ),
-			array( $test::class, 'get' ),
-			array( $test, 'get' ),
-			array( $test::class, '__invoke' ),
-			array( $test, '__invoke' ),
-		);
 	}
 
 	public function testLazyClassInstantiationAndMethodCallWithVariousParamResolver(): void {
@@ -301,26 +273,6 @@ class MethodResolverTest extends TestCase {
 			actual: $this->resolver->resolve( cb: $withGetMethod, default: 'ignored', params: array( 'ignored' ) ),
 			message: 'Even though cb string is passed with ::get() method, binding value is '
 							. ' resolved by directly invoking class (has __invoke() method).',
-		);
-	}
-
-	/** @dataProvider provideVariousArtefactGetterData */
-	public function testArtefactAndInstantiatedClass( callable|string $from, ?int $objectId ): void {
-		$expected = null === $objectId
-			? self::class
-			: self::class . "#{$objectId}::provideVariousArtefactGetterData";
-
-		$this->assertSame( $expected, actual: MethodResolver::getArtefact( $from ) );
-	}
-
-	/** @return mixed[] */
-	public function provideVariousArtefactGetterData(): array {
-		$objectId = spl_object_id( $this );
-
-		return array(
-			array( array( $this, __FUNCTION__ ), $objectId ),
-			array( $this->provideVariousArtefactGetterData( ... ), $objectId ),
-			array( self::class . '::' . __FUNCTION__, null ),
 		);
 	}
 }

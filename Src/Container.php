@@ -65,7 +65,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		protected readonly Stack $tags = new Stack(),
 	) {
 		$this->event          = new Event( $this, $bindings );
-		$this->methodResolver = new MethodResolver( $this, $this->event );
+		$this->methodResolver = new MethodResolver( $this, $this->event, artefact: $this->artefact );
 
 		$this->extenders->asCollection();
 		$this->tags->asCollection();
@@ -173,29 +173,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		array $params = array(),
 		?string $defaultMethod = null
 	): mixed {
-		$resolving = false;
-		$unwrapped = Unwrap::callback( cb: $callback, asArray: true );
-		$artefact  = ! $this->hasContextualBinding( $concrete = Unwrap::asString( ...$unwrapped ) )
-			? MethodResolver::getArtefact( from: $concrete )
-			: $concrete;
-
-		if ( ! $this->artefact->has( value: $artefact ) ) {
-			$this->artefact->push( value: $artefact );
-
-			$resolving = true;
-		}
-
-		if ( $this->methodResolver->unwrappedCallback() === null ) {
-			$this->methodResolver->with( ...$unwrapped );
-		}
-
-		$resolved = $this->methodResolver->resolve( $callback, $defaultMethod, $params );
-
-		if ( $resolving ) {
-			$this->artefact->pull();
-		}
-
-		return $resolved;
+		return $this->methodResolver->resolve( $callback, $defaultMethod, $params );
 	}
 
 	/**
