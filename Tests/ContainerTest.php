@@ -280,12 +280,25 @@ class ContainerTest extends TestCase {
 			->give( value: static fn(): int => 195 );
 
 		$this->assertSame( expected: 200, actual: $app->call( $testInvokeString ) );
+		$this->assertSame( expected: 200, actual: $app->call( $test::class ) );
 
 		$app->when( concrete: $testGetString )
 			->needs( '$val' )
 			->give( value: static fn(): int => 298 );
 
 		$this->assertSame( expected: 300, actual: $app->call( $testGetString ) );
+
+		$app->when( concrete: $test->alt( ... ) )
+			->needs( '$val' )
+			->give( value: static fn(): int => 380 );
+
+		$this->assertSame( expected: 390, actual: $app->call( $test->alt( ... ) ) );
+
+		$app->when( concrete: $test::class . '::alt' )
+			->needs( '$val' )
+			->give( value: static fn (): int => 2990 );
+
+		$this->assertSame( expected: 3000, actual: $app->call( $test::class . '::alt' ) );
 
 		$app->matches( paramName: 'val' )
 			->for( concrete: 'int' )
@@ -305,6 +318,12 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 190, actual: $app->call( $testGetString ) );
 
+		$app->matches( paramName: 'val' )
+			->for( concrete: 'int' )
+			->give( implementation: new Binding( concrete: 0 ) );
+
+		$this->assertSame( expected: 10, actual: $app->call( $test->alt( ... ) ) );
+
 		$this->assertSame( expected: 30, actual: $app->call( $test, params: array( 'val' => 25 ) ) );
 
 		$this->assertSame(
@@ -317,6 +336,11 @@ class ContainerTest extends TestCase {
 			actual: $app->call( $testGetString, params: array( 'val' => 138 ) )
 		);
 
+		$this->assertSame(
+			expected: 40,
+			actual: $app->call( $test->alt( ... ), params: array( 'val' => 30 ) )
+		);
+
 		$app->bindMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
 
 		$this->assertSame( expected: 20, actual: $app->call( $test ) );
@@ -325,10 +349,24 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 120, actual: $app->call( $test::class ) );
 
-		// Actually not with "get" method. Instead bound with "alt" method.
+		// Does not return "get" method value. Bound with "alt" method. Returns its value.
 		$app->bindMethod( entry: $testGetString, callback: static fn( $test ) => $test->alt( 140 ) );
 
 		$this->assertSame( expected: 150, actual: $app->call( $testGetString ) );
+		$this->assertSame(
+			expected: 150,
+			actual: $app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'get' ),
+			message: 'Coz "$test::get" is already bound ($testGetString), we get binding result instead.'
+		);
+
+		$app->bindMethod( entry: $test->alt( ... ), callback: static fn() => 23 );
+
+		$this->assertSame( expected: 23, actual: $app->call( $test->alt( ... ) ) );
+
+		$this->assertSame(
+			expected: 500,
+			actual: $app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'alt' )
+		);
 	}
 
 	public function testMethodCallWithDifferentImplementation(): void {

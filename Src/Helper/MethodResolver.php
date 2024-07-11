@@ -43,8 +43,7 @@ class MethodResolver {
 			return $this->instantiateFrom( $cb, $default );
 		}
 
-		$unwrapped        = Unwrap::callback( $cb, asArray: true );
-		$this->context    = static::artefactFrom( $unwrapped );
+		$this->context    = static::artefactFrom( $unwrapped = Unwrap::callback( $cb, asArray: true ) );
 		[ $cls, $method ] = $unwrapped;
 		$resolved         = is_string( $cls ) // The $cls is obj: at this point. Ensure just in case...
 			? $this->instantiateFrom( $cls, $method )

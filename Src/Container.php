@@ -337,8 +337,10 @@ class Container implements ArrayAccess, ContainerInterface {
 	 |================================================================================================
 	 */
 
-	/** @param string|string[] $concrete */
-	public function when( string|array $concrete ): ContextBuilder {
+	/** @param string|string[]|Closure $concrete */
+	public function when( string|array|Closure $concrete ): ContextBuilder {
+		$concrete = $concrete instanceof Closure ? Unwrap::callback( cb: $concrete ) : $concrete;
+
 		return new ContextBuilder(
 			for: array_map( callback: $this->getEntryFrom( ... ), array: Unwrap::asArray( $concrete ) ),
 			app: $this
