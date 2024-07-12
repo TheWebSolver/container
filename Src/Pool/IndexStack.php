@@ -19,15 +19,16 @@ class IndexStack {
 		$this->stack[] = $value;
 	}
 
-	public function restackWith( mixed $newValue, bool $mergeArray = true ): void {
+	public function restackWith( mixed $newValue, bool $mergeArray = true, bool $shift = false ): void {
 		$previous = $this->getItems();
 
 		$this->flush();
 
-		if ( $mergeArray ) {
-			$this->stack = array( ...$previous, ...Unwrap::asArray( $newValue ) );
-		} else {
-			$this->stack = array( ...$previous, $newValue );
-		}
+		$this->stack = match ( $mergeArray ) {
+			false => $shift ? array( $newValue, ...$previous ) : array( ...$previous, $newValue ),
+			true  => $shift
+				? array( ...Unwrap::asArray( $newValue ), ...$previous )
+				: array( ...$previous, ...Unwrap::asArray( $newValue ) )
+		};
 	}
 }
