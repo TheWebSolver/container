@@ -6,6 +6,8 @@
  *
  * @phpcs:disable Squiz.Commenting.FunctionCommentThrowTag.Missing
  * @phpcs:disable Squiz.Commenting.FunctionComment.WrongStyle
+ * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
+ * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
  */
 
 declare( strict_types = 1 );
@@ -33,6 +35,7 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Exceptions\Container_Exception;
+use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
@@ -41,19 +44,17 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 
 class Container implements ArrayAccess, ContainerInterface {
 	protected static Container $instance;
-
-	/** @var array<string,Closure[]> */
-	protected array $rebound_callbacks = array();
 	protected readonly Event $event;
 	protected readonly MethodResolver $methodResolver;
 
-	// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
+	// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	/**
 	 * @param Stack&ArrayAccess<string,Binding>                           $bindings
 	 * @param Stack&ArrayAccess<string,array<string,Closure|string|null>> $contextual
 	 * @param Stack&ArrayAccess<string,array<int,string>>                 $tags
+	 * @param Stack&ArrayAccess<string,Closure[]>                         $rebounds
 	 */
-	// phpcs:enable Squiz.Commenting.FunctionComment.SpacingAfterParamType, Squiz.Commenting.FunctionComment.ParamNameNoMatch
+	// phpcs:enable Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	final public function __construct(
 		protected readonly Stack $bindings = new Stack(),
 		protected readonly Param $paramPool = new Param(),
@@ -63,11 +64,13 @@ class Container implements ArrayAccess, ContainerInterface {
 		protected readonly Stack $contextual = new Stack(),
 		protected readonly Stack $extenders = new Stack(),
 		protected readonly Stack $tags = new Stack(),
+		protected readonly Stack $rebounds = new Stack(),
 	) {
 		$this->event          = new Event( $this, $bindings );
 		$this->methodResolver = new MethodResolver( $this, $this->event, artefact: $this->artefact );
 
 		$this->extenders->asCollection();
+		$this->rebounds->asCollection();
 		$this->tags->asCollection();
 	}
 
@@ -92,17 +95,6 @@ class Container implements ArrayAccess, ContainerInterface {
 
 	public function isAlias( string $name ): bool {
 		return $this->aliases->has( $name, asEntry: false );
-	}
-
-	/**
-	 * @access private
-	 * @internal This should never be used as an API to assert whether entry with given $id resolved
-	 *           as a singleton instance coz as soon as entry is resolved, the binding gets updated
-	 *           as an instance and this will never assert the resolved concrete as as a singleton
-	 *           on subsequent calls. `Container::isInstance()` method must be used once resolved.
-	 */
-	public function isSingleton( string $id ): bool {
-		return ( $binding = $this->getBinding( $id ) ) && $binding->isSingleton();
 	}
 
 	public function isInstance( string $id ): bool {
@@ -300,7 +292,6 @@ class Container implements ArrayAccess, ContainerInterface {
 		);
 	}
 
-	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch, Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
 	/**
 	 * @param string|(Closure(Closure|string $id, mixed[] $params, Container $app): void) $id
 	 * @param ?Closure(Closure|string        $id, mixed[] $params, Container $app): void $callback
@@ -329,7 +320,6 @@ class Container implements ArrayAccess, ContainerInterface {
 	public function subscribeAfterBuild( Closure|string $id, ?Closure $callback = null ): void {
 		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_BUILT );
 	}
-	// phpcs:enable Squiz.Commenting.FunctionComment.ParamNameNoMatch, Squiz.Commenting.FunctionComment.IncorrectTypeHint
 
 	/*
 	 |================================================================================================
@@ -442,20 +432,17 @@ class Container implements ArrayAccess, ContainerInterface {
 		}
 	}
 
-	public function rebinding( string $id, Closure $callback ) {
-		$this->rebound_callbacks[ $id = $this->getEntryFrom( $id ) ][] = $callback;
+	/**
+	 * @param Closure(object $obj, Container $app): ?obj $with Will be invoked when binding with the
+	 *                                                         given `$id` is updated again using
+	 *                                                         `Container::bind()` method.
+	 * @return mixed The resolved data, `null` if nothing was bound before.
+	 * @throws NotFoundExceptionInterface When given `$id` was not already bound.
+	 */
+	public function useReboundOf( string $id, Closure $with ): mixed {
+		$this->rebounds->set( key: $id = $this->getEntryFrom( $id ), value: $with );
 
-		// TODO: check why nothing is returned if not bound.
-		if ( $this->has( $id ) ) {
-			return $this->get( $id );
-		}
-	}
-
-	public function refresh( string $id, mixed $target, string $method ) {
-		return $this->rebinding(
-			id: $id,
-			callback: static fn ( $app, $instance ) => $target->{$method}( $instance )
-		);
+		return $this->has( $id ) ? $this->get( $id ) : throw EntryNotFound::forRebound( $id );
 	}
 
 	/*
@@ -494,6 +481,10 @@ class Container implements ArrayAccess, ContainerInterface {
 	 |================================================================================================
 	 */
 
+	protected function isSingleton( string $id ): bool {
+		return ( $binding = $this->getBinding( $id ) ) && $binding->isSingleton();
+	}
+
 	protected function register( string $id, Closure|string|null $concrete, bool $singleton ): void {
 		$this->maybePurgeIfAliasOrInstance( $id );
 
@@ -511,14 +502,9 @@ class Container implements ArrayAccess, ContainerInterface {
 	protected function rebound( string $id ): void {
 		$instance = $this->get( $id );
 
-		foreach ( $this->getRebounds( $id ) as $callback ) {
-			$callback( $this, $instance );
+		foreach ( ( $this->rebounds[ $id ] ?? array() ) as $callback ) {
+			$callback( $instance, $this );
 		}
-	}
-
-	/** @return Closure[] */
-	protected function getRebounds( string $id ): array {
-		return $this->rebound_callbacks[ $id ] ?? array();
 	}
 
 	/**

@@ -12,8 +12,10 @@
 declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
+use Psr\Container\NotFoundExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 
@@ -71,11 +73,8 @@ class ContainerTest extends TestCase {
 		$this->assertTrue( $this->app->resolved( id: 'testClass' ) );
 		$this->assertTrue( $this->app->resolved( id: self::class ) );
 
-		$this->assertFalse( $this->app->isSingleton( id: stdClass::class ) );
-
 		$this->app->singleton( id: stdClass::class, concrete: null );
 
-		$this->assertTrue( $this->app->isSingleton( id: stdClass::class ) );
 		$this->assertTrue( $this->app->isShared( id: stdClass::class ) );
 		$this->assertFalse( $this->app->isInstance( stdClass::class ) );
 
@@ -85,7 +84,6 @@ class ContainerTest extends TestCase {
 		);
 
 		// The singleton is resolved and bound as an instance thereafter.
-		$this->assertFalse( $this->app->isSingleton( stdClass::class ) );
 		$this->assertTrue( $this->app->isInstance( stdClass::class ) );
 
 		$this->assertFalse( $this->app->isInstance( id: 'instance' ) );
@@ -269,136 +267,221 @@ class ContainerTest extends TestCase {
 		$testInvokeInstance       = Unwrap::callback( cb: $test );
 		$testInvokeString         = Unwrap::asString( object: $test::class, methodName: '__invoke' );
 
-		$app->when( concrete: $testInvokeInstance )
+		$this->app->when( concrete: $testInvokeInstance )
 			->needs( '$val' )
 			->give( value: static fn(): int => 95 );
 
-		$this->assertSame( expected: 100, actual: $app->call( $test ) );
+		$this->assertSame( expected: 100, actual: $this->app->call( $test ) );
+		$this->assertSame( expected: 100, actual: $this->app->call( array( $test, '__invoke' ) ) );
 
-		$app->when( concrete: $testInvokeString )
+		$this->app->when( concrete: $testInvokeString )
 			->needs( '$val' )
 			->give( value: static fn(): int => 195 );
 
-		$this->assertSame( expected: 200, actual: $app->call( $testInvokeString ) );
-		$this->assertSame( expected: 200, actual: $app->call( $test::class ) );
+		$this->assertSame( expected: 200, actual: $this->app->call( $testInvokeString ) );
+		$this->assertSame( expected: 200, actual: $this->app->call( $test::class ) );
 
-		$app->when( concrete: $testGetString )
+		$this->app->when( concrete: $testGetString )
 			->needs( '$val' )
 			->give( value: static fn(): int => 298 );
 
-		$this->assertSame( expected: 300, actual: $app->call( $testGetString ) );
+		$this->assertSame( expected: 300, actual: $this->app->call( $testGetString ) );
 
-		$app->when( concrete: $test->alt( ... ) )
+		$this->app->when( concrete: $test->alt( ... ) )
 			->needs( '$val' )
 			->give( value: static fn(): int => 380 );
 
-		$this->assertSame( expected: 390, actual: $app->call( $test->alt( ... ) ) );
+		$this->assertSame( expected: 390, actual: $this->app->call( $test->alt( ... ) ) );
+		$this->assertSame( expected: 390, actual: $this->app->call( array( $test, 'alt' ) ) );
 
-		$app->when( concrete: $test::class . '::alt' )
+		$this->app->when( concrete: $test::class . '::alt' )
 			->needs( '$val' )
 			->give( value: static fn (): int => 2990 );
 
-		$this->assertSame( expected: 3000, actual: $app->call( $test::class . '::alt' ) );
+		$this->assertSame( expected: 3000, actual: $this->app->call( $test::class . '::alt' ) );
 
-		$app->matches( paramName: 'val' )
+		$this->app->matches( paramName: 'val' )
 			->for( concrete: 'int' )
 			->give( implementation: new Binding( concrete: 85 ) );
 
-		$this->assertSame( expected: 90, actual: $app->call( $test ) );
+		$this->assertSame( expected: 90, actual: $this->app->call( $test ) );
 
-		$app->matches( paramName: 'val' )
+		$this->app->matches( paramName: 'val' )
+			->for( concrete: 'int' )
+			->give( implementation: new Binding( concrete: 85 ) );
+
+		$this->assertSame( expected: 90, actual: $this->app->call( array( $test, '__invoke' ) ) );
+
+		$this->app->matches( paramName: 'val' )
 			->for( concrete: 'int' )
 			->give( implementation: new Binding( concrete: 185 ) );
 
-		$this->assertSame( expected: 190, actual: $app->call( $test::class ) );
+		$this->assertSame( expected: 190, actual: $this->app->call( $test::class ) );
 
-		$app->matches( paramName: 'val' )
+		$this->app->matches( paramName: 'val' )
 			->for( concrete: 'int' )
 			->give( implementation: new Binding( concrete: 188 ) );
 
-		$this->assertSame( expected: 190, actual: $app->call( $testGetString ) );
+		$this->assertSame( expected: 190, actual: $this->app->call( $testGetString ) );
 
-		$app->matches( paramName: 'val' )
+		$this->app->matches( paramName: 'val' )
 			->for( concrete: 'int' )
 			->give( implementation: new Binding( concrete: 0 ) );
 
-		$this->assertSame( expected: 10, actual: $app->call( $test->alt( ... ) ) );
+		$this->assertSame( expected: 10, actual: $this->app->call( $test->alt( ... ) ) );
 
-		$this->assertSame( expected: 30, actual: $app->call( $test, params: array( 'val' => 25 ) ) );
+		$this->app->matches( paramName: 'val' )
+			->for( concrete: 'int' )
+			->give( implementation: new Binding( concrete: 0 ) );
 
+		$this->assertSame( expected: 10, actual: $this->app->call( array( $test, 'alt' ) ) );
+
+		$this->assertSame( expected: 30, actual: $this->app->call( $test, params: array( 'val' => 25 ) ) );
 		$this->assertSame(
-			expected: 130,
-			actual: $app->call( $test::class, params: array( 'val' => 125 ) )
+			expected: 30,
+			actual: $this->app->call( $test, params: array( 'val' => 25 ), defaultMethod: 'no effect' )
 		);
 
 		$this->assertSame(
+			expected: 130,
+			actual: $this->app->call( $test::class, params: array( 'val' => 125 ), defaultMethod: '__invoke' )
+		);
+		$this->assertSame(
+			expected: 127,
+			actual: $this->app->call( $test::class, params: array( 'val' => 125 ), defaultMethod: 'get' )
+		);
+		$this->assertSame(
 			expected: 140,
-			actual: $app->call( $testGetString, params: array( 'val' => 138 ) )
+			actual: $this->app->call( $testGetString, params: array( 'val' => 138 ) )
 		);
 
 		$this->assertSame(
 			expected: 40,
-			actual: $app->call( $test->alt( ... ), params: array( 'val' => 30 ) )
+			actual: $this->app->call( $test->alt( ... ), params: array( 'val' => 30 ), defaultMethod: 'no effect' )
 		);
 
-		$app->bindMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
+		$this->app->bindMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
 
-		$this->assertSame( expected: 20, actual: $app->call( $test ) );
+		$this->assertSame( expected: 20, actual: $this->app->call( $test ) );
 
-		$app->bindMethod( entry: $testInvokeString, callback: static fn( $test ) => $test( 115 ) );
+		$this->app->bindMethod( entry: $testInvokeString, callback: static fn( $test ) => $test( 115 ) );
 
-		$this->assertSame( expected: 120, actual: $app->call( $test::class ) );
+		$this->assertSame( expected: 120, actual: $this->app->call( $test::class ) );
 
-		// Does not return "get" method value. Bound with "alt" method. Returns its value.
-		$app->bindMethod( entry: $testGetString, callback: static fn( $test ) => $test->alt( 140 ) );
+		$this->app->bindMethod( entry: $testGetString, callback: static fn( $test ) => $test->alt( 140 ) );
 
-		$this->assertSame( expected: 150, actual: $app->call( $testGetString ) );
+		$this->assertSame( expected: 150, actual: $this->app->call( $testGetString ) );
 		$this->assertSame(
 			expected: 150,
-			actual: $app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'get' ),
+			actual: $this->app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'get' ),
 			message: 'Coz "$test::get" is already bound ($testGetString), we get binding result instead.'
 		);
 
-		$app->bindMethod( entry: $test->alt( ... ), callback: static fn() => 23 );
+		$this->app->bindMethod( entry: $test->alt( ... ), callback: static fn() => 23 );
 
-		$this->assertSame( expected: 23, actual: $app->call( $test->alt( ... ) ) );
+		$this->assertSame( expected: 23, actual: $this->app->call( $test->alt( ... ) ) );
+		$this->assertSame( expected: 23, actual: $this->app->call( array( $test, 'alt' ) ) );
 
 		$this->assertSame(
 			expected: 500,
-			actual: $app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'alt' )
+			actual: $this->app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'alt' )
 		);
 	}
 
-	public function testMethodCallWithDifferentImplementation(): void {
-		$app  = new Container();
-		$test = new class() {
-			public function test( int $arg = 3 ): int {
-				return $arg + 2;
+	public function testReboundValueOfDependencyBindingUpdatedAtLaterTime(): void {
+		$this->app->bind(
+			id: Stack::class,
+			concrete: function () {
+				$stack = new Stack();
+
+				$stack->asCollection();
+
+				$stack->set( key: 'john', value: 'doe' );
+
+				return $stack;
+			}
+		);
+
+		$this->app->bind(
+			id: 'aliases',
+			concrete: fn ( Container $app ) => new Aliases(
+				entryStack: $app->useReboundOf( id: Stack::class, with: static fn ( Stack $obj ) => $obj )
+			)
+		);
+
+		/** @var Aliases */
+		$aliases = $this->app->get( id: 'aliases' );
+
+		$this->assertSame( expected: 'doe', actual: $aliases->get( id: 'john', asEntry: true )[0] );
+
+		$this->app->bind(
+			id: Stack::class,
+			concrete: function () {
+				$stack = new Stack();
+
+				$stack->set( key: 'PHP', value: 'Developer' );
+
+				return $stack;
+			}
+		);
+
+		/** @var Aliases */
+		$aliasWithReboundEntries = $this->app->get( id: 'aliases' );
+
+		$this->assertSame(
+			expected: 'Developer',
+			actual: $aliasWithReboundEntries->get( id: 'PHP', asEntry: true )
+		);
+
+		$object = new class() {
+			private Binding $binding;
+
+			public function set( Binding $binding ): self {
+				$this->binding = $binding;
+
+				return $this;
+			}
+
+			public function get(): Binding {
+				return $this->binding;
 			}
 		};
 
-		// Unwrapped string of "Unwrap::asString($test, 'test')".
-		$app->when( $test::class . '#' . spl_object_id( $test ) . '::test' )
-			->needs( '$arg' )
-			->give( fn() => 18 );
+		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
 
-		$this->assertSame( expected: 20, actual: $app->call( array( $test, 'test' ) ) );
-		$this->assertSame( expected: 20, actual: $app->call( $test->test( ... ) ) );
+		$class = $object::class;
 
-		// Setting instance as "true" so multiple calls resolve the event binding value.
-		$app->subscribeDuringBuild( 'int', 'arg', new Binding( 28, instance: true ) );
-
-		$this->assertSame( expected: 30, actual: $app->call( array( $test, 'test' ) ) );
-		$this->assertSame( expected: 30, actual: $app->call( $test->test( ... ) ) );
-
-		$this->assertSame(
-			actual: $app->call( array( $test, 'test' ), array( 'arg' => 38 ) ),
-			expected: 40
+		$this->app->singleton(
+			id: 'test',
+			concrete: fn ( $app ) => ( new $class() )->set(
+				binding: $app->useReboundOf(
+					id: Binding::class,
+					// Get the "test" singleton class & update it with rebounded Binding instance.
+					with: fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
+				)
+			)
 		);
+
+		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->concrete );
+
+		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'mutated' ) );
+
+		$this->assertSame( expected: 'mutated', actual: $this->app->get( 'test' )->get()->concrete );
+
+		$this->expectException( exception: NotFoundExceptionInterface::class );
+		$this->expectExceptionMessage(
+			message: 'Unable to find entry for the given id: "notBoundYet" when possible rebinding was expected.'
+		);
+
+		$this->app->bind(
+			id: 'noDependencyBound',
+			concrete: fn( Container $app ) => ( new $class() )
+				->set( binding: $app->useReboundOf( id: 'notBoundYet', with: function () {} ) )
+		);
+
+		$this->app->get( id: 'noDependencyBound' );
 	}
 }
-
-
 
 class _TestStack__Contextual_Binding_WithArrayAccess {
 	public function __construct( public readonly ArrayAccess $array ) {}
