@@ -20,7 +20,7 @@ class Aliases {
 
 	// phpcs:ignore Squiz.Commenting.FunctionComment.ParamNameNoMatch, Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	/** @param Stack&ArrayAccess<string,array<int,string>> $entryStack */
-	public function __construct( private Stack $entryStack = new Stack() ) {
+	public function __construct( private readonly Stack $entryStack = new Stack() ) {
 		$this->entryStack->asCollection();
 	}
 
