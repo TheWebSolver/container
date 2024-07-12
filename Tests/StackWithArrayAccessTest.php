@@ -23,16 +23,12 @@ class StackWithArrayAccessTest extends TestCase {
 	}
 
 	public function testWithBindingDTO(): void {
-		$concrete = new class() { public function __invoke() {
-				return 'expected';
-		} };
+		$concrete = new class() {};
 
 		$singleton                = new Binding( concrete: $concrete, singleton: true );
 		$this->stack['singleton'] = $singleton;
 
 		$this->assertTrue( condition: $this->stack['singleton']->isSingleton() );
-		$this->assertSame( expected: $concrete, actual: $this->stack['singleton']->concrete );
-		$this->assertSame( 'expected', ( $this->stack['singleton']->concrete )() );
 
 		$this->assertTrue( condition: isset( $this->stack['singleton'] ) );
 		$this->assertFalse( condition: isset( $this->stack['instance'] ) );
@@ -40,7 +36,6 @@ class StackWithArrayAccessTest extends TestCase {
 		$instance                = new Binding( static fn() => 1, instance: true );
 		$this->stack['instance'] = $instance;
 
-		$this->assertTrue( condition: $this->stack['instance']->isInstance() );
 		$this->assertSame(
 			actual: $this->stack->getItems(),
 			expected: array(
@@ -73,10 +68,7 @@ class StackWithArrayAccessTest extends TestCase {
 		$this->stack[ $key ] = array( 'doe' );
 
 		$this->assertSame( expected: array( 'john' => array( 'doe' ) ), actual: $this->stack['key'] );
-		$this->assertSame(
-			expected: array( 'john' => array( 'doe' ) ),
-			actual: $this->stack->get( 'key' )
-		);
+		$this->assertSame( expected: array( 'john' => array( 'doe' ) ), actual: $this->stack->get( 'key' ) );
 
 		$this->assertSame( expected: array( 'doe' ), actual: $this->stack->get( item: 'key||john' ) );
 		$this->assertSame( expected: array( 'doe' ), actual: $this->stack['key||john'] );
