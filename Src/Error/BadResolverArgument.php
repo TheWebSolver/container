@@ -9,11 +9,10 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Error;
 
-use Exception;
 use ReflectionParameter;
 use Psr\Container\ContainerExceptionInterface;
 
-class BadResolverArgument extends Exception implements ContainerExceptionInterface {
+class BadResolverArgument extends ContainerError implements ContainerExceptionInterface {
 	public static function noMethod( string $class ): self {
 		return new self( "Unable to find method for class: {$class}." );
 	}
@@ -23,11 +22,9 @@ class BadResolverArgument extends Exception implements ContainerExceptionInterfa
 	}
 
 	public static function noParam( ReflectionParameter $ref ) {
-		$msg = "Unable to resolve dependency parameter: {$ref}";
-
-		if ( $class = $ref->getDeclaringClass() ) {
-			$msg .= " in class: {$class->getName()}";
-		}
+		$msg = "Unable to resolve dependency parameter: {$ref}" . (
+			( $class = $ref->getDeclaringClass() ) ? " in class: {$class->getName()}" : ''
+		);
 
 		return new self( "{$msg}." );
 	}
