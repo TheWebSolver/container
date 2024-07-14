@@ -9,9 +9,10 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Pool;
 
+use Stringable;
 use TheWebSolver\Codegarage\Lib\Container\Traits\PushPullStack;
 
-class Artefact {
+class Artefact implements Stringable {
 	use PushPullStack;
 
 	public function __toString(): string {
