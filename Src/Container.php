@@ -23,7 +23,6 @@ use LogicException;
 use ReflectionClass;
 use ReflectionException;
 use InvalidArgumentException;
-use Container_Entry_Exception;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Container\ContainerExceptionInterface;
@@ -37,6 +36,7 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Exceptions\Container_Exception;
 use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
+use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
@@ -98,12 +98,12 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	public function isInstance( string $id ): bool {
-		return ( $binding = $this->getBinding( $id ) ) && $binding->isInstance();
+		return true === $this->getBinding( $id )?->isInstance();
 	}
 
 	/** @return bool `true` if has binding or given ID is an alias, `false` otherwise. */
-	public function has( string $entryOrAlias ): bool {
-		return $this->hasBinding( $entryOrAlias ) || $this->isAlias( $entryOrAlias );
+	public function has( string $id ): bool {
+		return $this->hasBinding( $id ) || $this->isAlias( $id );
 	}
 
 	public function resolved( string $id ): bool {
@@ -143,11 +143,6 @@ class Container implements ArrayAccess, ContainerInterface {
 		return $this->bindings[ $id ] ?? null;
 	}
 
-	/** @return array<string,Binding>*/
-	public function getBindings(): array {
-		return $this->bindings->getItems();
-	}
-
 	public function withoutEvents( string $id, array|ArrayAccess $params = array() ): mixed {
 		return $this->resolve( $id, $params, dispatch: false );
 	}
@@ -155,6 +150,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	/**
 	 * @param  callable|string     $callback Possible options are:
 	 * - `string`   -> "classname::methodname"
+	 * - `string`   -> 'classname#' . spl_object_id($classInstance) . '::methodname'
 	 * - `callable` -> $object->methodname(...) as first-class callable
 	 * - `callable` -> array($object, 'methodname').
 	 * @param array<string,mixed> $params The method's injected parameters.
@@ -171,7 +167,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	/**
 	 * @param  string              $id   The entry ID or its alias.
 	 * @param  mixed[]|ArrayAccess $with The callback parameters.
-	 * @throws NotFoundExceptionInterface  When entry with given $id was not bound to the container.
+	 * @throws NotFoundExceptionInterface  When entry with given $id was not found in the container.
 	 * @throws ContainerExceptionInterface When cannot resolve concrete from the given $id.
 	 * @since  1.0
 	 */
@@ -179,11 +175,9 @@ class Container implements ArrayAccess, ContainerInterface {
 		try {
 			return $this->resolve( $id, $with, dispatch: true );
 		} catch ( Exception $e ) {
-			if ( $this->has( $id ) || $e instanceof ContainerExceptionInterface ) {
-				throw $e;
-			}
-
-			throw new Container_Entry_Exception( $id, Container_Entry_Exception::code( $e->getCode() ), $e );
+			throw $this->has( $id ) || $e instanceof ContainerExceptionInterface
+				? $e
+				: EntryNotFound::for( $id, previous: $e );
 		}
 	}
 
@@ -278,8 +272,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	/**
 	 * @param Closure|string $entry Either a first-class callable from instantiated class method, or
 	 *                              a normalized string with `Unwrap::asString()` (*preferred*).
-	 * @throws LogicException When method name not given if `$object` is a class instance.
-	 * @throws TypeError      When first-class callable was not created using non-static method.
+	 * @throws TypeError When first-class callable was not created using non-static method.
 	 */
 	public function bindMethod( Closure|string $entry, Closure $callback ): void {
 		$this->bind( id: MethodResolver::keyFrom( id: $entry ), concrete: $callback );
@@ -348,15 +341,12 @@ class Container implements ArrayAccess, ContainerInterface {
 
 		try {
 			$reflector = new ReflectionClass( $concrete );
-		} catch ( ReflectionException $e ) {
-			// TODO: Add appropriate exception handler.
-			$msg = sprintf( 'Target class: "%s" does not exist', $concrete );
-
-			throw new class( $msg ) extends Exception implements ContainerExceptionInterface {};
+		} catch ( ReflectionException $error ) {
+			throw ContainerError::unResolvableEntry( id: $concrete, previous: $error );
 		}
 
 		if ( ! $reflector->isInstantiable() ) {
-			$this->notInstantiable( $concrete );
+			throw ContainerError::unInstantiableEntry( id: $concrete, artefact: $this->artefact );
 		}
 
 		if ( null === ( $constructor = $reflector->getConstructor() ) ) {
@@ -365,11 +355,9 @@ class Container implements ArrayAccess, ContainerInterface {
 
 		$this->artefact->push( value: $concrete );
 
-		$dependencies = $constructor->getParameters();
-
 		try {
-			$autoWired = ( new ParamResolver( $this, $this->paramPool, $this->event ) )
-				->resolve( $dependencies );
+			$resolved = ( new ParamResolver( $this, $this->paramPool, $this->event ) )
+				->resolve( dependencies: $constructor->getParameters() );
 		} catch ( ContainerExceptionInterface $e ) {
 			$this->artefact->pull();
 
@@ -378,7 +366,7 @@ class Container implements ArrayAccess, ContainerInterface {
 
 		$this->artefact->pull();
 
-		return $reflector->newInstanceArgs( $autoWired );
+		return $reflector->newInstanceArgs( $resolved );
 	}
 
 	/**
@@ -433,9 +421,10 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	/**
-	 * @param Closure(object $obj, Container $app): ?obj $with Will be invoked when binding with the
-	 *                                                         given `$id` is updated again using
-	 *                                                         `Container::bind()` method.
+	 * Invokes `$with` callback when bound `$id` is updated again using any of the binding methods
+	 * such as `Container::bind()`, `Container::singleton()` & `Container::instance()`.
+	 *
+	 * @param Closure(object $obj, Container $app): ?obj $with
 	 * @return mixed The resolved data, `null` if nothing was bound before.
 	 * @throws NotFoundExceptionInterface When given `$id` was not already bound.
 	 */
@@ -482,7 +471,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	 */
 
 	protected function isSingleton( string $id ): bool {
-		return ( $binding = $this->getBinding( $id ) ) && $binding->isSingleton();
+		return true === $this->getBinding( $id )?->isSingleton();
 	}
 
 	protected function register( string $id, Closure|string|null $concrete, bool $singleton ): void {

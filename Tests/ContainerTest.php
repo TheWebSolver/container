@@ -18,6 +18,7 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
+use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 
 class ContainerTest extends TestCase {
 	private ?Container $app;
@@ -46,8 +47,8 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testBasicSetterGetterAndAssertionIntegration(): void {
-		$this->assertFalse( $this->app->has( entryOrAlias: 'testClass' ) );
-		$this->assertFalse( $this->app->has( entryOrAlias: self::class ) );
+		$this->assertFalse( $this->app->has( id: 'testClass' ) );
+		$this->assertFalse( $this->app->has( id: self::class ) );
 		$this->assertFalse( $this->app->hasBinding( 'testClass' ) );
 		$this->assertFalse( $this->app->isAlias( 'testClass' ) );
 		$this->assertFalse( $this->app->resolved( id: 'testClass' ) );
@@ -63,11 +64,12 @@ class ContainerTest extends TestCase {
 		// Bind will purge alias from the alias pool coz no need for storing same alias
 		// multiple places (like in alias pool as well as in binding pool).
 		$this->assertFalse( $this->app->isAlias( name: 'testClass' ) );
-		$this->assertTrue( $this->app->has( entryOrAlias: 'testClass' ) );
-		$this->assertFalse( $this->app->has( entryOrAlias: self::class ), 'Bound with alias.' );
+		$this->assertTrue( $this->app->has( id: 'testClass' ) );
+		$this->assertFalse( $this->app->has( id: self::class ), 'Bound with alias.' );
 		$this->assertTrue( $this->app->hasBinding( id: 'testClass' ) );
 		$this->assertFalse( $this->app->hasBinding( id: self::class ), 'Bound using alias.' );
 		$this->assertSame( 'testClass', $this->app->getEntryFrom( alias: 'testClass' ) );
+		$this->assertInstanceOf( Closure::class, actual: $this->app->getBinding( 'testClass' )->concrete );
 
 		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
 		$this->assertTrue( $this->app->resolved( id: 'testClass' ) );
@@ -114,32 +116,59 @@ class ContainerTest extends TestCase {
 		$this->assertSame( self::class, $this->app->getEntryFrom( alias: self::class ) );
 	}
 
-	public function testContextualBinding(): void {
-		$class = _Test_Resolved__container_object__::class;
-		$this->assertFalse(
-			$this->app->hasContextualBinding( concrete: $class )
+	public function testPurgeAliasWhenInstanceIsBoundAndPerformRebound(): void {
+		$this->app->alias( entry: _TestReboundEligible__SetterGetter::class, alias: 'test' );
+
+		$this->assertTrue( $this->app->isAlias( name: 'test' ) );
+
+		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
+
+		$this->app->instance(
+			id: 'test',
+			instance: ( new _TestReboundEligible__SetterGetter() )->set(
+				binding: $this->app->useReboundOf(
+					id: Binding::class,
+					// Get the "test" instantiated class & update it with rebounded Binding instance.
+					with: fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
+				)
+			)
 		);
 
-		$this->app->addContextual( with: 'update', for: $class, id: '$data' );
+		$this->assertFalse( condition: $this->app->isAlias( name: 'test' ) );
 
-		$this->assertTrue( $this->app->hasContextualBinding( concrete: $class ) );
-		$this->assertTrue( $this->app->hasContextualBinding( concrete: $class, nestedKey: '$data' ) );
+		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->concrete );
 
-		$this->assertSame( expected: 'update', actual: $this->app->get( id: $class )->data );
+		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'updated' ) );
 
-		$this->assertSame( 'update', $this->app->getContextual( $class, '$data' ) );
+		$this->assertSame( expected: 'updated', actual: $this->app->get( 'test' )->get()->concrete );
+	}
 
-		$this->app->when( concrete: $class )
-			->needs( requirement: '$data' )
+	public function testContextualBinding(): void {
+		$this->assertFalse(
+			$this->app->hasContextualBinding( concrete: Binding::class )
+		);
+
+		$this->app->addContextual( with: 'update', for: Binding::class, id: '$concrete' );
+
+		$this->assertTrue( $this->app->hasContextualBinding( concrete: Binding::class ) );
+		$this->assertTrue(
+			$this->app->hasContextualBinding( concrete: Binding::class, nestedKey: '$concrete' )
+		);
+
+		$this->assertSame( expected: 'update', actual: $this->app->get( id: Binding::class )->concrete );
+		$this->assertSame( 'update', $this->app->getContextual( for: Binding::class, id: '$concrete' ) );
+
+		$this->app->when( concrete: Binding::class )
+			->needs( requirement: '$concrete' )
 			->give( value: 'With Builder' );
 
-		$this->assertSame( 'With Builder', $this->app->get( id: $class )->data );
+		$this->assertSame( 'With Builder', $this->app->get( id: Binding::class )->concrete );
 
-		$this->app->when( concrete: $class )
-			->needs( requirement: '$data' )
+		$this->app->when( concrete: Binding::class )
+			->needs( requirement: '$concrete' )
 			->give( value: static fn (): string => 'With Builder from closure' );
 
-		$this->assertSame( 'With Builder from closure', $this->app->get( id: $class )->data );
+		$this->assertSame( 'With Builder from closure', $this->app->get( id: Binding::class )->concrete );
 
 		$stack = $this->createMock( Stack::class );
 		$class = _TestStack__Contextual_Binding_WithArrayAccess::class;
@@ -157,13 +186,11 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testContextualBindingWithAliasing(): void {
-		$class = _Test_Resolved__container_object__::class;
-
-		$this->app->alias( entry: $class, alias: 'test' );
-		$this->app->addContextual( with: 'update', for: 'test', id: '$data' );
+		$this->app->alias( entry: Binding::class, alias: 'test' );
+		$this->app->addContextual( with: 'update', for: 'test', id: '$concrete' );
 
 		$this->assertSame(
-			actual: $this->app->getContextual( for: 'test', id: '$data' ),
+			actual: $this->app->getContextual( for: 'test', id: '$concrete' ),
 			expected: 'update'
 		);
 	}
@@ -211,6 +238,28 @@ class ContainerTest extends TestCase {
 				with: array( 'primary' => $AutoWiredClass )
 			)->primary->value
 		);
+	}
+
+	public function testUnresolvableClass(): void {
+		$this->expectException( ContainerError::class );
+		$this->expectExceptionMessage( 'Unable to find the target class: "\\Invalid\\ClassName".' );
+
+		$this->app->get( id: '\\Invalid\\ClassName' );
+	}
+
+	public function testUnInstantiableClass(): void {
+		$previous = array(
+			_TestPassesFirstBuild__EntryClass::class,
+			_TestUnResolvable__EntryClass::class,
+		);
+
+		$this->expectException( ContainerError::class );
+		$this->expectExceptionMessage(
+			'Unable to instantiate the target class: "' . _TestStaticOnly__Class::class . '"'
+			. ' while building [' . implode( separator: ', ', array: $previous ) . '].'
+		);
+
+		$this->app->get( id: _TestPassesFirstBuild__EntryClass::class );
 	}
 
 	public function testWithEventBuilder(): void {
@@ -433,27 +482,11 @@ class ContainerTest extends TestCase {
 			actual: $aliasWithReboundEntries->get( id: 'PHP', asEntry: true )
 		);
 
-		$object = new class() {
-			private Binding $binding;
-
-			public function set( Binding $binding ): self {
-				$this->binding = $binding;
-
-				return $this;
-			}
-
-			public function get(): Binding {
-				return $this->binding;
-			}
-		};
-
 		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
-
-		$class = $object::class;
 
 		$this->app->singleton(
 			id: 'test',
-			concrete: fn ( $app ) => ( new $class() )->set(
+			concrete: fn ( $app ) => ( new _TestReboundEligible__SetterGetter() )->set(
 				binding: $app->useReboundOf(
 					id: Binding::class,
 					// Get the "test" singleton class & update it with rebounded Binding instance.
@@ -475,7 +508,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->bind(
 			id: 'noDependencyBound',
-			concrete: fn( Container $app ) => ( new $class() )
+			concrete: fn( Container $app ) => ( new _TestReboundEligible__SetterGetter() )
 				->set( binding: $app->useReboundOf( id: 'notBoundYet', with: function () {} ) )
 		);
 
@@ -501,4 +534,30 @@ class _TestPrimary__EntryClass {
 
 class _TestSecondary__EntryClass {
 	public function __construct( public readonly stdClass $opt ) {}
+}
+
+class _TestUnResolvable__EntryClass {
+	public function __construct( private readonly _TestStaticOnly__Class $primary ) {}
+}
+
+class _TestPassesFirstBuild__EntryClass {
+	public function __construct( private readonly _TestUnResolvable__EntryClass $triggersError ) {}
+}
+
+class _TestStaticOnly__Class {
+	private function __construct() {}
+}
+
+class _TestReboundEligible__SetterGetter {
+	private Binding $binding;
+
+	public function set( Binding $binding ): self {
+		$this->binding = $binding;
+
+		return $this;
+	}
+
+	public function get(): Binding {
+		return $this->binding;
+	}
 }
