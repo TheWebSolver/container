@@ -10,12 +10,10 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Pool;
 
 use TheWebSolver\Codegarage\Lib\Container\Traits\PushPullStack;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
-class Param {
+class Param implements Resettable {
 	use PushPullStack;
-
-	/** @var array<mixed[]> */
-	private array $stack = array();
 
 	public function has( string $paramName ): bool {
 		return isset( $this->latest()[ $paramName ] );

@@ -11,8 +11,9 @@ namespace TheWebSolver\Codegarage\Lib\Container\Pool;
 
 use Stringable;
 use TheWebSolver\Codegarage\Lib\Container\Traits\PushPullStack;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
-class Artefact implements Stringable {
+class Artefact implements Stringable, Resettable {
 	use PushPullStack;
 
 	public function __toString(): string {

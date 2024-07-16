@@ -37,6 +37,7 @@ use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
 class Container implements ArrayAccess, ContainerInterface {
 	protected static Container $instance;
@@ -399,12 +400,9 @@ class Container implements ArrayAccess, ContainerInterface {
 	}
 
 	public function flush(): void {
-		$this->aliases->flush();
-		$this->bindings->flush();
-		$this->paramPool->flush();
-		$this->artefact->flush();
-		$this->contextual->flush();
-		$this->resolved->flush();
+		$props = get_object_vars( $this );
+
+		array_walk( $props, static fn( mixed $pool ) => $pool instanceof Resettable && $pool->reset() );
 	}
 
 	/*

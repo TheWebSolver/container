@@ -67,7 +67,7 @@ class AliasesTest extends TestCase {
 			$this->assertTrue( condition: $aliases->has( $entry, asEntry: true ) );
 		}
 
-		$aliases->flush();
+		$aliases->reset();
 
 		foreach ( $existing as $entry => $alias ) {
 			$this->assertFalse( condition: $aliases->has( $alias ) );

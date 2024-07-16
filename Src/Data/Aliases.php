@@ -12,8 +12,9 @@ namespace TheWebSolver\Codegarage\Lib\Container\Data;
 use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
-class Aliases {
+class Aliases implements Resettable {
 	use KeyStack {
 		KeyStack::remove as remover;
 	}
@@ -53,10 +54,10 @@ class Aliases {
 		return $this->remover( $id );
 	}
 
-	public function flush(): void {
+	public function reset(): void {
 		$this->stack = array();
 
-		$this->entryStack->flush();
+		$this->entryStack->reset();
 	}
 
 	private function removeEntryAlias( string $id ): void {

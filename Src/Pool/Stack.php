@@ -12,8 +12,9 @@ namespace TheWebSolver\Codegarage\Lib\Container\Pool;
 use Countable;
 use ArrayAccess;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
-class Stack implements ArrayAccess, Countable {
+class Stack implements ArrayAccess, Countable, Resettable {
 	use KeyStack;
 
 	public function offsetExists( $key ): bool {
