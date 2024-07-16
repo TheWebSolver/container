@@ -87,11 +87,6 @@ class ParamResolverTest extends TestCase {
 			: null;
 
 		$app->expects( $this->once() )
-			->method( 'getEntryFrom' )
-			->with( $type )
-			->willReturn( $type );
-
-		$app->expects( $this->once() )
 			->method( 'getContextualFor' )
 			->with( $type )
 			->willReturn( $contextual );

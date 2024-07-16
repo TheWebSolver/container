@@ -57,11 +57,10 @@ class ParamResolver {
 
 	/** @throws ContainerError When resolving dependencies fails. */
 	public function fromTyped( ReflectionParameter $param, string $type ): mixed {
-		$id    = $this->app->getEntryFrom( alias: $type );
-		$value = $this->app->getContextualFor( context: $id );
+		$value = $this->app->getContextualFor( context: $type );
 
 		try {
-			return $value ? Unwrap::andInvoke( $value, $this->app ) : $this->app->get( $id );
+			return $value ? Unwrap::andInvoke( $value, $this->app ) : $this->app->get( id: $type );
 		} catch ( ContainerError $unresolvable ) {
 			return static::defaultFrom( $param, error: $unresolvable );
 		}
@@ -74,7 +73,7 @@ class ParamResolver {
 		};
 	}
 
-	protected function from( ReflectionParameter $param ) {
+	protected function from( ReflectionParameter $param ): mixed {
 		$type = Unwrap::paramTypeFrom( reflection: $param );
 
 		return $type ? $this->fromTyped( $param, $type ) : $this->fromUntypedOrBuiltin( $param );
