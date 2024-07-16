@@ -121,9 +121,9 @@ class ParamResolverTest extends TestCase {
 		$test = new self();
 
 		return array(
-			array( static function ( string $context ) {}, 'from context', 'from context', null ),
+			array( static function ( string $context ) {}, static fn() => 'from context', 'from context', null ),
 			array( static function ( int $number ) {}, static fn () => 2 + 3, 5, null ),
-			array( static function ( ParamResolverTest $typeHinted ) {}, null, $test, null ),
+			array( static function ( ParamResolverTest $typeHinted ) {}, null, $test ),
 			array( static function ( string $defaultStr = 'val' ) {}, null, null ),
 			array( static function ( array $defaultArr = array() ) {}, null, null ),
 			array( static function ( string $noDefaultStr ) {}, null, null ),

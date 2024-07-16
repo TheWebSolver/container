@@ -9,6 +9,7 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
+use Closure;
 use ReflectionNamedType;
 use ReflectionParameter;
 use TheWebSolver\Codegarage\Lib\Container\Container;
@@ -60,7 +61,11 @@ class ParamResolver {
 		$value = $this->app->getContextualFor( context: $type );
 
 		try {
-			return $value ? Unwrap::andInvoke( $value, $this->app ) : $this->app->get( id: $type );
+			return match ( true ) {
+				is_string( $value )       => $this->app->get( id: $value ),
+				$value instanceof Closure => Unwrap::andInvoke( $value, $this->app ),
+				default                   => $this->app->get( id: $type )
+			};
 		} catch ( ContainerError $unresolvable ) {
 			return static::defaultFrom( $param, error: $unresolvable );
 		}

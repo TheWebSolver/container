@@ -154,19 +154,26 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( 'With Builder from closure', $this->app->get( id: Binding::class )->concrete );
 
-		$stack = $this->createMock( Stack::class );
-		$class = _Stack__ContextualBindingWithArrayAccess__Stub::class;
+		$class          = _Stack__ContextualBindingWithArrayAccess__Stub::class;
+		$implementation = static function ( Container $app ) {
+			$stack = $app->get( Stack::class );
 
-		$stack->expects( $this->once() )
-			->method( 'offsetExists' )
-			->with( 'testKey' )
-			->willReturn( true );
+			$stack['key'] = 'value';
 
-		$this->app->when( $class )
+			return $stack;
+		};
+
+		$this->app->when( concrete: $class )
 			->needs( requirement: ArrayAccess::class )
-			->give( value: static fn(): Stack => $stack );
+			->give( value: $implementation );
 
-		$this->assertTrue( $this->app->get( $class )->has( 'testKey' ) );
+		$this->assertSame( expected: 'value', actual: $this->app->get( $class )->getStack()->get( 'key' ) );
+
+		$this->app->when( concrete: $class )
+			->needs( requirement: ArrayAccess::class )
+			->give( value: Stack::class );
+
+		$this->assertInstanceOf( expected: Stack::class, actual: $this->app->get( $class )->getStack() );
 	}
 
 	public function testContextualBindingWithAliasing(): void {
@@ -503,6 +510,10 @@ class _Stack__ContextualBindingWithArrayAccess__Stub {
 
 	public function has( string $key ) {
 		return $this->array->offsetExists( $key );
+	}
+
+	public function getStack(): ArrayAccess {
+		return $this->array;
 	}
 }
 
