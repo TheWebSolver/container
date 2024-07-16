@@ -55,7 +55,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->alias( entry: self::class, alias: 'testClass' );
 
-		$this->assertTrue( $this->app->isAlias( name: 'testClass' ) );
+		$this->assertTrue( $this->app->isAlias( id: 'testClass' ) );
 		$this->assertSame( self::class, $this->app->getEntryFrom( alias: 'testClass' ) );
 		$this->assertInstanceOf( self::class, $this->app->get( 'testClass' ) );
 
@@ -63,7 +63,7 @@ class ContainerTest extends TestCase {
 
 		// Bind will purge alias from the alias pool coz no need for storing same alias
 		// multiple places (like in alias pool as well as in binding pool).
-		$this->assertFalse( $this->app->isAlias( name: 'testClass' ) );
+		$this->assertFalse( $this->app->isAlias( id: 'testClass' ) );
 		$this->assertTrue( $this->app->has( id: 'testClass' ) );
 		$this->assertFalse( $this->app->has( id: self::class ), 'Bound with alias.' );
 		$this->assertTrue( $this->app->hasBinding( id: 'testClass' ) );
@@ -77,7 +77,6 @@ class ContainerTest extends TestCase {
 
 		$this->app->singleton( id: stdClass::class, concrete: null );
 
-		$this->assertTrue( $this->app->isShared( id: stdClass::class ) );
 		$this->assertFalse( $this->app->isInstance( stdClass::class ) );
 
 		$this->assertSame(
@@ -94,7 +93,6 @@ class ContainerTest extends TestCase {
 		$newClass = $this->app->instance( id: 'instance', instance: new class() {} );
 
 		$this->assertTrue( $this->app->isInstance( id: 'instance' ) );
-		$this->assertTrue( $this->app->isShared( id: 'instance' ) );
 		$this->assertSame( $newClass, $this->app->get( id: 'instance' ) );
 		$this->assertTrue( $this->app->resolved( id: 'instance' ) );
 	}
@@ -110,7 +108,7 @@ class ContainerTest extends TestCase {
 		$this->app->alias( entry: self::class, alias: 'test' );
 		$this->app->bind( id: self::class, concrete: null );
 
-		$this->assertTrue( $this->app->isAlias( name: 'test' ) );
+		$this->assertTrue( $this->app->isAlias( id: 'test' ) );
 		$this->assertTrue( $this->app->hasBinding( id: self::class ) );
 		$this->assertSame( self::class, $this->app->getEntryFrom( alias: 'test' ) );
 		$this->assertSame( self::class, $this->app->getEntryFrom( alias: self::class ) );
@@ -119,22 +117,22 @@ class ContainerTest extends TestCase {
 	public function testPurgeAliasWhenInstanceIsBoundAndPerformRebound(): void {
 		$this->app->alias( entry: _TestReboundEligible__SetterGetter::class, alias: 'test' );
 
-		$this->assertTrue( $this->app->isAlias( name: 'test' ) );
+		$this->assertTrue( $this->app->isAlias( id: 'test' ) );
 
 		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
 
 		$this->app->instance(
 			id: 'test',
 			instance: ( new _TestReboundEligible__SetterGetter() )->set(
-				binding: $this->app->useReboundOf(
-					id: Binding::class,
+				binding: $this->app->useRebound(
+					of: Binding::class,
 					// Get the "test" instantiated class & update it with rebounded Binding instance.
 					with: fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
 				)
 			)
 		);
 
-		$this->assertFalse( condition: $this->app->isAlias( name: 'test' ) );
+		$this->assertFalse( condition: $this->app->isAlias( id: 'test' ) );
 
 		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->concrete );
 
@@ -144,20 +142,6 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testContextualBinding(): void {
-		$this->assertFalse(
-			$this->app->hasContextualBinding( concrete: Binding::class )
-		);
-
-		$this->app->addContextual( with: 'update', for: Binding::class, id: '$concrete' );
-
-		$this->assertTrue( $this->app->hasContextualBinding( concrete: Binding::class ) );
-		$this->assertTrue(
-			$this->app->hasContextualBinding( concrete: Binding::class, nestedKey: '$concrete' )
-		);
-
-		$this->assertSame( expected: 'update', actual: $this->app->get( id: Binding::class )->concrete );
-		$this->assertSame( 'update', $this->app->getContextual( for: Binding::class, id: '$concrete' ) );
-
 		$this->app->when( concrete: Binding::class )
 			->needs( requirement: '$concrete' )
 			->give( value: 'With Builder' );
@@ -187,10 +171,10 @@ class ContainerTest extends TestCase {
 
 	public function testContextualBindingWithAliasing(): void {
 		$this->app->alias( entry: Binding::class, alias: 'test' );
-		$this->app->addContextual( with: 'update', for: 'test', id: '$concrete' );
+		$this->app->when( concrete: 'test' )->needs( requirement: '$concrete' )->give( value: 'update' );
 
 		$this->assertSame(
-			actual: $this->app->getContextual( for: 'test', id: '$concrete' ),
+			actual: $this->app->getContextual( for: 'test', context: '$concrete' ),
 			expected: 'update'
 		);
 	}
@@ -215,11 +199,10 @@ class ContainerTest extends TestCase {
 			public function __construct( public readonly string $value = 'Using Event' ) {}
 		};
 
-		$this->app->subscribeDuringBuild(
-			id: _TestPrimary__EntryClass::class,
-			paramName: 'primary',
-			implementation: new Binding( $subscribedClass )
-		);
+		$this->app
+			->matches( paramName: 'primary' )
+			->for( concrete: _TestPrimary__EntryClass::class )
+			->give( implementation: new Binding( $subscribedClass ) );
 
 		$this->assertSame(
 			expected: 'Using Event',
@@ -454,7 +437,7 @@ class ContainerTest extends TestCase {
 		$this->app->bind(
 			id: 'aliases',
 			concrete: fn ( Container $app ) => new Aliases(
-				entryStack: $app->useReboundOf( id: Stack::class, with: static fn ( Stack $obj ) => $obj )
+				entryStack: $app->useRebound( of: Stack::class, with: static fn ( Stack $obj ) => $obj )
 			)
 		);
 
@@ -486,10 +469,9 @@ class ContainerTest extends TestCase {
 
 		$this->app->singleton(
 			id: 'test',
-			concrete: fn ( $app ) => ( new _TestReboundEligible__SetterGetter() )->set(
-				binding: $app->useReboundOf(
-					id: Binding::class,
-					// Get the "test" singleton class & update it with rebounded Binding instance.
+			concrete: fn ( Container $app ) => ( new _TestReboundEligible__SetterGetter() )->set(
+				binding: $app->useRebound(
+					of: Binding::class,
 					with: fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
 				)
 			)
@@ -509,7 +491,7 @@ class ContainerTest extends TestCase {
 		$this->app->bind(
 			id: 'noDependencyBound',
 			concrete: fn( Container $app ) => ( new _TestReboundEligible__SetterGetter() )
-				->set( binding: $app->useReboundOf( id: 'notBoundYet', with: function () {} ) )
+				->set( binding: $app->useRebound( of: 'notBoundYet', with: function () {} ) )
 		);
 
 		$this->app->get( id: 'noDependencyBound' );

@@ -53,9 +53,13 @@ class Generator implements Countable, IteratorAggregate {
 		}
 	}
 
-	public static function generateClosure( string $id, string $concrete ): Closure {
-		return static fn( Container $app, $params = array() ): mixed => $id === $concrete
-			? $app->build( $concrete )
-			: $app->withoutEvents( id: $concrete, params: $params );
+	public static function generateClosure( string $id, Closure|string $concrete ): Closure {
+		if ( $concrete instanceof Closure ) {
+			return $concrete;
+		}
+
+		return static fn( Container $app, array $params = array() ): mixed => $id !== $concrete
+			? $app->withoutEvents( id: $concrete, params: $params )
+			: $app->build( $id );
 	}
 }

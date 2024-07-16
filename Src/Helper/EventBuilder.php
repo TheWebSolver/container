@@ -18,7 +18,7 @@ use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 readonly class EventBuilder {
 	private string $concrete;
 
-	public function __construct( private Container $app, private string $paramName ) {}
+	public function __construct( private Event $event, private string $paramName ) {}
 
 	public function for( string $concrete ): self {
 		$this->concrete = $concrete;
@@ -28,9 +28,9 @@ readonly class EventBuilder {
 
 	/** @param Binding|Closure(string $paramName, Container $app):Binding $implementation */
 	public function give( Binding|Closure $implementation ): void {
-		$this->app->subscribeDuringBuild(
+		$this->event->subscribeDuringBuild(
 			id: $this->concrete,
-			paramName: $this->paramName,
+			dependencyName: $this->paramName,
 			implementation: $implementation
 		);
 	}

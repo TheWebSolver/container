@@ -10,13 +10,20 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
 use Closure;
+use Generator;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 
 readonly class ContextBuilder {
 	protected string $toBeResolved;
 
 	/** @param string[] $for */
-	public function __construct( private array $for, private Container $app ) {}
+	public function __construct(
+		private array $for,
+		private Container $app,
+		private Stack $contextual
+	) {}
 
 	public function needs( string $requirement ): self {
 		$this->toBeResolved = $requirement;
@@ -25,8 +32,11 @@ readonly class ContextBuilder {
 	}
 
 	public function give( Closure|string $value ): void {
-		foreach ( $this->for as $entry ) {
-			$this->app->addContextual( with: $value, for: $entry, id: $this->toBeResolved );
+		foreach ( $this->for as $id ) {
+			$this->contextual->set(
+				key: Stack::keyFrom( id: $this->app->getEntryFrom( alias: $id ), name: $this->toBeResolved ),
+				value: $value
+			);
 		}
 	}
 
@@ -38,8 +48,19 @@ readonly class ContextBuilder {
 		);
 	}
 
-	/** @param array<class-string|object> $entries The concretes to resolve or already resolved. */
-	public function resolve( array $entries ): void {
-		$this->give( static fn( Container $app ) => $app->resolveOnce( $entries ) );
+	/**
+	 * Resolves the given concretes without registering to the container.
+	 *
+	 * @param array<class-string|object> $entries The concretes to resolve or already resolved.
+	 */
+	public function giveOnce( array $entries ): void {
+		$this->give(
+			static fn () => iterator_to_array(
+				new AppGenerator(
+					generator: static fn(): Generator => AppGenerator::generate( $entries, $this->app ),
+					count: count( $entries )
+				)
+			)
+		);
 	}
 }
