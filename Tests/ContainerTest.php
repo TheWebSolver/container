@@ -115,7 +115,7 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testPurgeAliasWhenInstanceIsBoundAndPerformRebound(): void {
-		$this->app->alias( entry: _TestReboundEligible__SetterGetter::class, alias: 'test' );
+		$this->app->alias( entry: _Rebound__SetterGetter__Stub::class, alias: 'test' );
 
 		$this->assertTrue( $this->app->isAlias( id: 'test' ) );
 
@@ -123,7 +123,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->instance(
 			id: 'test',
-			instance: ( new _TestReboundEligible__SetterGetter() )->set(
+			instance: ( new _Rebound__SetterGetter__Stub() )->set(
 				binding: $this->app->useRebound(
 					of: Binding::class,
 					// Get the "test" instantiated class & update it with rebounded Binding instance.
@@ -155,7 +155,7 @@ class ContainerTest extends TestCase {
 		$this->assertSame( 'With Builder from closure', $this->app->get( id: Binding::class )->concrete );
 
 		$stack = $this->createMock( Stack::class );
-		$class = _TestStack__Contextual_Binding_WithArrayAccess::class;
+		$class = _Stack__ContextualBindingWithArrayAccess__Stub::class;
 
 		$stack->expects( $this->once() )
 			->method( 'offsetExists' )
@@ -180,12 +180,12 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testAutoWireDependenciesRecursively(): void {
-		$this->app->get( _TestMain__EntryClass::class );
+		$this->app->get( _Main__EntryClass__Stub::class );
 
 		$toBeResolved = array(
-			_TestMain__EntryClass::class,
-			_TestPrimary__EntryClass::class,
-			_TestSecondary__EntryClass::class,
+			_Main__EntryClass__Stub::class,
+			_Primary__EntryClass__Stub::class,
+			_Secondary__EntryClass__Stub::class,
 			stdClass::class,
 		);
 
@@ -195,21 +195,21 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testResolvingParamDuringBuildEventIntegration(): void {
-		$subscribedClass = new class() extends _TestPrimary__EntryClass {
+		$subscribedClass = new class() extends _Primary__EntryClass__Stub {
 			public function __construct( public readonly string $value = 'Using Event' ) {}
 		};
 
 		$this->app
 			->matches( paramName: 'primary' )
-			->for( concrete: _TestPrimary__EntryClass::class )
+			->for( concrete: _Primary__EntryClass__Stub::class )
 			->give( implementation: new Binding( $subscribedClass ) );
 
 		$this->assertSame(
 			expected: 'Using Event',
-			actual: $this->app->get( _TestMain__EntryClass::class )->primary->value
+			actual: $this->app->get( _Main__EntryClass__Stub::class )->primary->value
 		);
 
-		$AutoWiredClass = new class() extends _TestPrimary__EntryClass {
+		$AutoWiredClass = new class() extends _Primary__EntryClass__Stub {
 			public function __construct( public readonly string $value = 'Using Injection' ) {}
 		};
 
@@ -217,7 +217,7 @@ class ContainerTest extends TestCase {
 			message: 'The injected param value when resolving entry must override event value.',
 			expected: 'Using Injection',
 			actual: $this->app->get(
-				id: _TestMain__EntryClass::class,
+				id: _Main__EntryClass__Stub::class,
 				with: array( 'primary' => $AutoWiredClass )
 			)->primary->value
 		);
@@ -232,35 +232,35 @@ class ContainerTest extends TestCase {
 
 	public function testUnInstantiableClass(): void {
 		$previous = array(
-			_TestPassesFirstBuild__EntryClass::class,
-			_TestUnResolvable__EntryClass::class,
+			_PassesFirstBuild__EntryClass__Stub::class,
+			_UnResolvable__EntryClass__Stub::class,
 		);
 
 		$this->expectException( ContainerError::class );
 		$this->expectExceptionMessage(
-			'Unable to instantiate the target class: "' . _TestStaticOnly__Class::class . '"'
+			'Unable to instantiate the target class: "' . _StaticOnly__Class__Stub::class . '"'
 			. ' while building [' . implode( separator: ', ', array: $previous ) . '].'
 		);
 
-		$this->app->get( id: _TestPassesFirstBuild__EntryClass::class );
+		$this->app->get( id: _PassesFirstBuild__EntryClass__Stub::class );
 	}
 
 	public function testWithEventBuilder(): void {
 		$this->assertInstanceOf(
-			expected: _TestSecondary__EntryClass::class,
-			actual: $this->app->get( _TestPrimary__EntryClass::class )->secondary
+			expected: _Secondary__EntryClass__Stub::class,
+			actual: $this->app->get( _Primary__EntryClass__Stub::class )->secondary
 		);
 
-		$eventualClass = new class() extends _TestSecondary__EntryClass {
+		$eventualClass = new class() extends _Secondary__EntryClass__Stub {
 			public function __construct( public readonly string $value = 'Using Event Builder' ) {}
 		};
 
 		$this->app
 			->matches( paramName: 'secondary' )
-			->for( concrete: _TestSecondary__EntryClass::class )
+			->for( concrete: _Secondary__EntryClass__Stub::class )
 			->give( implementation: new Binding( $eventualClass ) );
 
-		$secondaryClass = $this->app->get( _TestPrimary__EntryClass::class )->secondary;
+		$secondaryClass = $this->app->get( _Primary__EntryClass__Stub::class )->secondary;
 
 		$this->assertInstanceOf( $eventualClass::class, $secondaryClass );
 		$this->assertSame( expected: 'Using Event Builder', actual: $secondaryClass->value );
@@ -469,7 +469,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->singleton(
 			id: 'test',
-			concrete: fn ( Container $app ) => ( new _TestReboundEligible__SetterGetter() )->set(
+			concrete: fn ( Container $app ) => ( new _Rebound__SetterGetter__Stub() )->set(
 				binding: $app->useRebound(
 					of: Binding::class,
 					with: fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
@@ -490,7 +490,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->bind(
 			id: 'noDependencyBound',
-			concrete: fn( Container $app ) => ( new _TestReboundEligible__SetterGetter() )
+			concrete: fn( Container $app ) => ( new _Rebound__SetterGetter__Stub() )
 				->set( binding: $app->useRebound( of: 'notBoundYet', with: function () {} ) )
 		);
 
@@ -498,7 +498,7 @@ class ContainerTest extends TestCase {
 	}
 }
 
-class _TestStack__Contextual_Binding_WithArrayAccess {
+class _Stack__ContextualBindingWithArrayAccess__Stub {
 	public function __construct( public readonly ArrayAccess $array ) {}
 
 	public function has( string $key ) {
@@ -506,31 +506,31 @@ class _TestStack__Contextual_Binding_WithArrayAccess {
 	}
 }
 
-class _TestMain__EntryClass {
-	public function __construct( public readonly _TestPrimary__EntryClass $primary ) {}
+class _Main__EntryClass__Stub {
+	public function __construct( public readonly _Primary__EntryClass__Stub $primary ) {}
 }
 
-class _TestPrimary__EntryClass {
-	public function __construct( public readonly _TestSecondary__EntryClass $secondary ) {}
+class _Primary__EntryClass__Stub {
+	public function __construct( public readonly _Secondary__EntryClass__Stub $secondary ) {}
 }
 
-class _TestSecondary__EntryClass {
+class _Secondary__EntryClass__Stub {
 	public function __construct( public readonly stdClass $opt ) {}
 }
 
-class _TestUnResolvable__EntryClass {
-	public function __construct( private readonly _TestStaticOnly__Class $primary ) {}
+class _UnResolvable__EntryClass__Stub {
+	public function __construct( private readonly _StaticOnly__Class__Stub $primary ) {}
 }
 
-class _TestPassesFirstBuild__EntryClass {
-	public function __construct( private readonly _TestUnResolvable__EntryClass $triggersError ) {}
+class _PassesFirstBuild__EntryClass__Stub {
+	public function __construct( private readonly _UnResolvable__EntryClass__Stub $triggersError ) {}
 }
 
-class _TestStaticOnly__Class {
+class _StaticOnly__Class__Stub {
 	private function __construct() {}
 }
 
-class _TestReboundEligible__SetterGetter {
+class _Rebound__SetterGetter__Stub {
 	private Binding $binding;
 
 	public function set( Binding $binding ): self {
