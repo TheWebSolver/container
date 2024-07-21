@@ -53,13 +53,13 @@ class ContainerTest extends TestCase {
 		$this->assertFalse( $this->app->isAlias( 'testClass' ) );
 		$this->assertFalse( $this->app->resolved( id: 'testClass' ) );
 
-		$this->app->alias( entry: self::class, alias: 'testClass' );
+		$this->app->setAlias( entry: self::class, alias: 'testClass' );
 
 		$this->assertTrue( $this->app->isAlias( id: 'testClass' ) );
 		$this->assertSame( self::class, $this->app->getEntryFrom( alias: 'testClass' ) );
 		$this->assertInstanceOf( self::class, $this->app->get( 'testClass' ) );
 
-		$this->app->bind( id: 'testClass', concrete: self::class );
+		$this->app->set( id: 'testClass', concrete: self::class );
 
 		// Bind will purge alias from the alias pool coz no need for storing same alias
 		// multiple places (like in alias pool as well as in binding pool).
@@ -75,7 +75,7 @@ class ContainerTest extends TestCase {
 		$this->assertTrue( $this->app->resolved( id: 'testClass' ) );
 		$this->assertTrue( $this->app->resolved( id: self::class ) );
 
-		$this->app->singleton( id: stdClass::class, concrete: null );
+		$this->app->setShared( id: stdClass::class, concrete: null );
 
 		$this->assertFalse( $this->app->isInstance( stdClass::class ) );
 
@@ -90,7 +90,7 @@ class ContainerTest extends TestCase {
 		$this->assertFalse( $this->app->isInstance( id: 'instance' ) );
 		$this->assertFalse( $this->app->resolved( id: 'instance' ) );
 
-		$newClass = $this->app->instance( id: 'instance', instance: new class() {} );
+		$newClass = $this->app->setInstance( id: 'instance', instance: new class() {} );
 
 		$this->assertTrue( $this->app->isInstance( id: 'instance' ) );
 		$this->assertSame( $newClass, $this->app->get( id: 'instance' ) );
@@ -98,15 +98,15 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testAliasAndGetWithoutBinding(): void {
-		$this->app->alias( entry: self::class, alias: 'testClass' );
+		$this->app->setAlias( entry: self::class, alias: 'testClass' );
 
 		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
 		$this->assertInstanceOf( self::class, $this->app->get( id: self::class ) );
 	}
 
 	public function testKeepingBothAliasAndBinding(): void {
-		$this->app->alias( entry: self::class, alias: 'test' );
-		$this->app->bind( id: self::class, concrete: null );
+		$this->app->setAlias( entry: self::class, alias: 'test' );
+		$this->app->set( id: self::class, concrete: null );
 
 		$this->assertTrue( $this->app->isAlias( id: 'test' ) );
 		$this->assertTrue( $this->app->hasBinding( id: self::class ) );
@@ -115,13 +115,13 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testPurgeAliasWhenInstanceIsBoundAndPerformRebound(): void {
-		$this->app->alias( entry: _Rebound__SetterGetter__Stub::class, alias: 'test' );
+		$this->app->setAlias( entry: _Rebound__SetterGetter__Stub::class, alias: 'test' );
 
 		$this->assertTrue( $this->app->isAlias( id: 'test' ) );
 
-		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
+		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
 
-		$this->app->instance(
+		$this->app->setInstance(
 			id: 'test',
 			instance: ( new _Rebound__SetterGetter__Stub() )->set(
 				binding: $this->app->useRebound(
@@ -136,7 +136,7 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->concrete );
 
-		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'updated' ) );
+		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'updated' ) );
 
 		$this->assertSame( expected: 'updated', actual: $this->app->get( 'test' )->get()->concrete );
 	}
@@ -177,7 +177,7 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testContextualBindingWithAliasing(): void {
-		$this->app->alias( entry: Binding::class, alias: 'test' );
+		$this->app->setAlias( entry: Binding::class, alias: 'test' );
 		$this->app->when( concrete: 'test' )->needs( requirement: '$concrete' )->give( value: 'update' );
 
 		$this->assertSame(
@@ -399,15 +399,15 @@ class ContainerTest extends TestCase {
 			actual: $this->app->call( $test->alt( ... ), params: array( 'val' => 30 ), defaultMethod: 'no effect' )
 		);
 
-		$this->app->bindMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
+		$this->app->setMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
 
 		$this->assertSame( expected: 20, actual: $this->app->call( $test ) );
 
-		$this->app->bindMethod( entry: $testInvokeString, callback: static fn( $test ) => $test( 115 ) );
+		$this->app->setMethod( entry: $testInvokeString, callback: static fn( $test ) => $test( 115 ) );
 
 		$this->assertSame( expected: 120, actual: $this->app->call( $test::class ) );
 
-		$this->app->bindMethod( entry: $testGetString, callback: static fn( $test ) => $test->alt( 140 ) );
+		$this->app->setMethod( entry: $testGetString, callback: static fn( $test ) => $test->alt( 140 ) );
 
 		$this->assertSame( expected: 150, actual: $this->app->call( $testGetString ) );
 		$this->assertSame(
@@ -416,7 +416,7 @@ class ContainerTest extends TestCase {
 			message: 'Coz "$test::get" is already bound ($testGetString), we get binding result instead.'
 		);
 
-		$this->app->bindMethod( entry: $test->alt( ... ), callback: static fn() => 23 );
+		$this->app->setMethod( entry: $test->alt( ... ), callback: static fn() => 23 );
 
 		$this->assertSame( expected: 23, actual: $this->app->call( $test->alt( ... ) ) );
 		$this->assertSame( expected: 23, actual: $this->app->call( array( $test, 'alt' ) ) );
@@ -428,7 +428,7 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testReboundValueOfDependencyBindingUpdatedAtLaterTime(): void {
-		$this->app->bind(
+		$this->app->set(
 			id: Stack::class,
 			concrete: function () {
 				$stack = new Stack();
@@ -441,7 +441,7 @@ class ContainerTest extends TestCase {
 			}
 		);
 
-		$this->app->bind(
+		$this->app->set(
 			id: 'aliases',
 			concrete: fn ( Container $app ) => new Aliases(
 				entryStack: $app->useRebound( of: Stack::class, with: static fn ( Stack $obj ) => $obj )
@@ -453,7 +453,7 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 'doe', actual: $aliases->get( id: 'john', asEntry: true )[0] );
 
-		$this->app->bind(
+		$this->app->set(
 			id: Stack::class,
 			concrete: function () {
 				$stack = new Stack();
@@ -472,9 +472,9 @@ class ContainerTest extends TestCase {
 			actual: $aliasWithReboundEntries->get( id: 'PHP', asEntry: true )
 		);
 
-		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
+		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
 
-		$this->app->singleton(
+		$this->app->setShared(
 			id: 'test',
 			concrete: fn ( Container $app ) => ( new _Rebound__SetterGetter__Stub() )->set(
 				binding: $app->useRebound(
@@ -486,7 +486,7 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->concrete );
 
-		$this->app->bind( id: Binding::class, concrete: fn() => new Binding( concrete: 'mutated' ) );
+		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'mutated' ) );
 
 		$this->assertSame( expected: 'mutated', actual: $this->app->get( 'test' )->get()->concrete );
 
@@ -495,7 +495,7 @@ class ContainerTest extends TestCase {
 			message: 'Unable to find entry for the given id: "notBoundYet" when possible rebinding was expected.'
 		);
 
-		$this->app->bind(
+		$this->app->set(
 			id: 'noDependencyBound',
 			concrete: fn( Container $app ) => ( new _Rebound__SetterGetter__Stub() )
 				->set( binding: $app->useRebound( of: 'notBoundYet', with: function () {} ) )

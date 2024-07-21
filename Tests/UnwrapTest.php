@@ -162,29 +162,6 @@ class UnwrapTest extends TestCase {
 		);
 	}
 
-	/**
-	 * @param string|string[] $expected
-	 * @dataProvider provideClosureToBeConvertedAsString
-	 */
-	public function testClosureConvertedAsString(
-		string|array|null $expected,
-		Closure $firstClass
-	): void {
-		if ( null === $expected ) {
-			$this->expectException( TypeError::class );
-		}
-
-		$this->assertSame( $expected, actual: Unwrap::closureAsString( $firstClass ) );
-	}
-
-	/** @return mixed[] */
-	public function provideClosureToBeConvertedAsString(): array {
-		return array_filter(
-			array: $this->provideDataForClosureUnwrap(),
-			callback: static fn( array $data ): bool => ! end( $data )
-		);
-	}
-
 	/** @dataProvider provideParamTypeFunc */
 	public function testParamTypeFrom( ?string $expected, Closure $fn ): void {
 		$reflection = new ReflectionParameter( $fn, param: 0 );

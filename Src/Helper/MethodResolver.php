@@ -21,13 +21,13 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 class MethodResolver {
-	private string $context;
+	protected string $context;
 
 	public function __construct(
-		private readonly Container $app,
-		private readonly Event $event,
-		private readonly Artefact $artefact = new Artefact(),
-		private readonly Param $pool = new Param(),
+		protected readonly Container $app,
+		protected readonly Event $event,
+		protected readonly Artefact $artefact = new Artefact(),
+		protected readonly Param $pool = new Param(),
 	) {}
 
 	/**
@@ -40,7 +40,7 @@ class MethodResolver {
 		if ( is_string( $cb ) ) {
 			$this->context = static::artefactFrom( $cb );
 
-			return $this->instantiateFrom( $cb, $default );
+			return $this->instantiateFrom( $cb, method: $default );
 		}
 
 		$this->context    = static::artefactFrom( $unwrapped = Unwrap::callback( $cb, asArray: true ) );

@@ -20,10 +20,10 @@ use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 class ParamResolver {
 	public function __construct(
-		private readonly Container $app,
-		private readonly Param $pool,
-		private readonly Event $event,
-		private readonly IndexStack $result = new IndexStack(),
+		protected readonly Container $app,
+		protected readonly Param $pool,
+		protected readonly Event $event,
+		protected readonly IndexStack $result = new IndexStack(),
 	) {}
 
 	/**

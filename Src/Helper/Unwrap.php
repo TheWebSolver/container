@@ -38,28 +38,17 @@ class Unwrap {
 	 */
 	public static function closure( Closure $closure, bool $asArray = false ) {
 		$source = new ReflectionFunction( $closure );
+		$result = match ( true ) {
+			( $o = self::asInstance( $source ) ) !== null                 => $o,
+			( $s = self::asStatic( $source, $closure ) ) !== null         => $s,
+			( $c = self::asFirstClassFunc( $source, $closure ) ) !== null => $c,
+			default                                                       => throw new TypeError(
+				'Cannot unwrap closure. Currently, only supports non-static class members/'
+				. 'functions/methods and named functions.'
+			)
+		};
 
-		if ( $result = self::asInstance( $source ) ) {
-			return $asArray ? $result[0] : $result[1];
-		}
-
-		if ( $result = self::asStatic( $source, $closure ) ) {
-			return $asArray ? $result[0] : $result[1];
-		}
-
-		if ( $result = self::asFirstClassFunc( $source, $closure ) ) {
-			return $asArray ? $result[0] : $result[1];
-		}
-
-		throw new TypeError(
-			'Cannot unwrap closure. Currently, only supports non-static class members/'
-			. 'functions/methods and named functions.'
-		);
-	}
-
-	/** @throws TypeError When static class member or a lambda function given as closure. */
-	public static function closureAsString( Closure $closure ): string {
-		return self::closure( $closure, asArray: false );
+		return $asArray ? $result[0] : $result[1];
 	}
 
 	/**
@@ -77,7 +66,7 @@ class Unwrap {
 			return $methodName
 				? ( $asArray ? array( $object, $methodName ) : self::asString( $object, $methodName ) )
 				: throw new LogicException(
-					sprintf( 'Method name must be provided to create ID for class "%s".', $object::class )
+					sprintf( 'Method name must be provided to create ID for class "%s".', $object )
 				);
 		}
 
