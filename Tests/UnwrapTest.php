@@ -72,6 +72,7 @@ class UnwrapTest extends TestCase {
 	public function provideDataForMethodBinding(): array {
 		return array(
 			array( self::class . '::assertTrue', self::class, 'assertTrue', null ),
+			array( self::class, self::class, '', LogicException::class ),
 			array( 'lambda method is invalid', function () {}, '', TypeError::class ),
 			array( "{$this->_gIdSpl()}assertTrue", $this, 'assertTrue', null ),
 			array( array( $this, 'assertTrue' ), $this, 'assertTrue', null ),

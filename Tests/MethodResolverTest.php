@@ -61,19 +61,14 @@ class MethodResolverTest extends TestCase {
 	public function testMethodBindingWithInstantiatedClassAsCb(): void {
 		[ $test,, $instanceId ] = $this->getTestClassInstanceStub();
 
-		$this->app->expects( $this->exactly( 2 ) )
-			->method( 'hasBinding' )
-			->with( $instanceId )
-			->willReturn( true, false );
-
 		$this->app
-			->expects( $this->once() )
+			->expects( $this->exactly( 2 ) )
 			->method( 'getBinding' )
 			->with( $instanceId )
-			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John Doe!' ) ) );
+			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John' ) ), null );
 
 		$this->assertSame(
-			expected: 'Name: John Doe!',
+			expected: 'Name: John',
 			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: 'no effect' )
 		);
 
@@ -86,19 +81,14 @@ class MethodResolverTest extends TestCase {
 	public function testMethodBindingWithInstantiatedClosureAsCb(): void {
 		[ $test,, $instanceId ] = $this->getTestClassInstanceStub();
 
-		$this->app->expects( $this->exactly( 2 ) )
-			->method( 'hasBinding' )
-			->with( $instanceId )
-			->willReturn( true, false );
-
 		$this->app
-			->expects( $this->once() )
+			->expects( $this->exactly( 2 ) )
 			->method( 'getBinding' )
 			->with( $instanceId )
-			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John Doe!' ) ) );
+			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John' ) ), null );
 
 		$this->assertSame(
-			expected: 'Name: John Doe!',
+			expected: 'Name: John',
 			actual: $this->resolver->resolve( cb: $test->get( ... ), default: null )
 		);
 
@@ -117,14 +107,9 @@ class MethodResolverTest extends TestCase {
 			->willReturn( new $test() );
 
 		$this->app->expects( $this->exactly( 2 ) )
-			->method( 'hasBinding' )
-			->with( $normalId )
-			->willReturn( true, false );
-
-		$this->app->expects( $this->once() )
 			->method( 'getBinding' )
 			->with( $normalId )
-			->willReturn( new Binding( static fn( $class ) => $class->get( 'From Binding' ) ) );
+			->willReturn( new Binding( static fn( $class ) => $class->get( 'From Binding' ) ), null );
 
 		$this->assertSame(
 			expected: 'Name: From Binding',
@@ -217,14 +202,9 @@ class MethodResolverTest extends TestCase {
 		[ $test, $withGetMethod ] = $this->getTestClassInstanceStub();
 
 		$this->app->expects( $this->exactly( 5 ) )
-			->method( 'hasBinding' )
-			->with( $withGetMethod )
-			->willReturn( false, false, false, false, true );
-
-		$this->app->expects( $this->once() )
 			->method( 'getBinding' )
 			->with( $withGetMethod )
-			->willReturn( new Binding( static fn( $test ) => $test( 'Binding' ) ) );
+			->willReturn( null, null, null, null, new Binding( static fn( $test ) => $test( 'Binding' ) ) );
 
 		$this->app->expects( $this->exactly( 5 ) )
 			->method( 'get' )

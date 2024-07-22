@@ -19,12 +19,14 @@ use ReflectionNamedType;
 use ReflectionParameter;
 
 class Unwrap {
+	private const NO_METHOD = 'Method name must be provided to create binding ID for class: "%s".';
+
 	/** @return mixed[] */
 	public static function asArray( mixed $thing ): array {
 		return is_array( $thing ) ? $thing : array( $thing );
 	}
 
-	public static function asString( object|string $object, string $methodName = '' ): string {
+	public static function asString( object|string $object, string $methodName ): string {
 		return self::toString(
 			object: is_string( $object ) ? $object : $object::class . '#' . spl_object_id( $object ),
 			methodName: $methodName
@@ -39,10 +41,10 @@ class Unwrap {
 	public static function closure( Closure $closure, bool $asArray = false ) {
 		$source = new ReflectionFunction( $closure );
 		$result = match ( true ) {
-			( $o = self::asInstance( $source ) ) !== null                 => $o,
-			( $s = self::asStatic( $source, $closure ) ) !== null         => $s,
-			( $c = self::asFirstClassFunc( $source, $closure ) ) !== null => $c,
-			default                                                       => throw new TypeError(
+			! is_null( $instance = self::asInstance( $source ) )       => $instance,
+			! is_null( $class = self::asStatic( $source, $closure ) )  => $class,
+			! is_null( $callable = self::asFirstClassFunc( $source ) ) => $callable,
+			default                                                    => throw new TypeError(
 				'Cannot unwrap closure. Currently, only supports non-static class members/'
 				. 'functions/methods and named functions.'
 			)
@@ -53,7 +55,7 @@ class Unwrap {
 
 	/**
 	 * @return string|array{0:object|string,1:string}
-	 * @throws LogicException When method name not given if `$object` is a class instance.
+	 * @throws LogicException When method name not given if `$object` is a classname or an instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
 	 * @phpstan-return ($asArray is true ? array{0:object,1:string}, string)
 	 */
@@ -65,17 +67,13 @@ class Unwrap {
 		if ( is_string( $object ) ) {
 			return $methodName
 				? ( $asArray ? array( $object, $methodName ) : self::asString( $object, $methodName ) )
-				: throw new LogicException(
-					sprintf( 'Method name must be provided to create ID for class "%s".', $object )
-				);
+				: throw new LogicException( sprintf( self::NO_METHOD, $object ) );
 		}
 
 		if ( ! $object instanceof Closure ) {
 			return method_exists( $object, $methodName )
 				? ( $asArray ? array( $object, $methodName ) : self::asString( $object, $methodName ) )
-				: throw new LogicException(
-					sprintf( 'Method name must be provided to create ID for class "%s".', $object::class )
-				);
+				: throw new LogicException( sprintf( self::NO_METHOD, $object::class ) );
 		}
 
 		if ( $scoped = self::asInstance( source: new ReflectionFunction( $object ), binding: true ) ) {
@@ -113,8 +111,7 @@ class Unwrap {
 	 * @param callable|string $cb Either a valid callback or a normalized
 	 *                                  string using `Unwrap::asString()`.
 	 * @return string|array{0:object|string,1:string}
-	 * @throws LogicException When method name not given if $object is a class instance.
-	 * @throws TypeError      When first-class callable was not created using non-static method.
+	 * @throws TypeError When `$cb` is a first-class callable of a static method.
 	 * @phpstan-return ($asArray is true ? array{0:object|string,1:string}, string)
 	 */
 	public static function callback( callable|string $cb, bool $asArray = false ): string|array {
@@ -126,7 +123,7 @@ class Unwrap {
 		};
 	}
 
-	/** @return string[] */
+	/** @return array{0:string,1?:string} */
 	public static function partsFrom( string $string, string $separator = '::' ): array {
 		return explode( $separator, $string, limit: 2 );
 	}
@@ -139,13 +136,12 @@ class Unwrap {
 
 		$name = $source->getName();
 
-		if ( $binding && str_contains( haystack: $name, needle: '{closure}' ) ) {
-			return null;
-		}
-
-		return array( array( $object, $name ), self::toString( $object::class, $name ) );
+		return $binding && str_contains( haystack: $name, needle: '{closure}' )
+			? null
+			: array( array( $object, $name ), self::toString( $object::class, $name ) );
 	}
 
+	/** @return ?array{0:array{0:Closure,1:string},1:string} */
 	private static function asStatic( ReflectionFunction $source, Closure $closure ): ?array {
 		if ( ! $class = $source->getClosureScopeClass() ) {
 			return null;
@@ -156,12 +152,11 @@ class Unwrap {
 		return array( array( $closure, $method ), self::toString( $class->getName(), $method ) );
 	}
 
-	private static function asFirstClassFunc( ReflectionFunction $source, Closure $closure ): ?array {
-		if ( '{closure}' === ( $name = $source->getShortName() ) ) {
-			return null;
-		}
-
-		return array( array( $name ), $name );
+	/** @return ?array{0:array{0:string},1:string} */
+	private static function asFirstClassFunc( ReflectionFunction $source ): ?array {
+		return '{closure}' !== ( $name = $source->getShortName() )
+			? array( array( $name ), $name )
+			: null;
 	}
 
 	private static function toString( string $object, string $methodName ): string {

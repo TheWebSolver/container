@@ -59,7 +59,7 @@ class Event {
 		Binding|Closure $implementation
 	): void {
 		$this->building->set(
-			key: Stack::keyFrom( $this->app->getEntryFrom( alias: $id ), name: $dependencyName ),
+			key: Stack::keyFrom( id: $this->app->getEntryFrom( alias: $id ), name: $dependencyName ),
 			value: $implementation
 		);
 	}
@@ -69,7 +69,7 @@ class Event {
 	 * @param mixed[]|ArrayAccess $params The dependency parameter values.
 	 */
 	public function fireBeforeBuild( string $id, array|ArrayAccess|null $params = array() ): void {
-		$this->resolve( $id, $params, callbacks: $this->beforeBuild->getItems() );
+		$this->resolve( $id, $params, cbs: $this->beforeBuild->getItems() );
 
 		foreach ( $this->beforeBuildForEntry->getItems() as $entry => $callbacks ) {
 			if ( $entry === $id || is_subclass_of( $id, class: $entry, allow_string: true ) ) {
@@ -89,8 +89,7 @@ class Event {
 			return null;
 		}
 
-		$given   = $this->building[ $id ][ $paramName ];
-		$binding = $given instanceof Binding ? $given : $given( $paramName, $this->app );
+		$binding = Unwrap::andInvoke( $this->building[ $id ][ $paramName ], $paramName, $this->app );
 
 		if ( $binding?->isInstance() ) {
 			$this->bindings->set( key: $paramName, value: $binding );
@@ -101,20 +100,16 @@ class Event {
 		return $binding;
 	}
 
-	/**
-	 * @param string $id       The entry ID.
-	 * @param object $resolved The resolved instance.
-	 */
 	public function fireAfterBuild( string $id, object $resolved ): void {
 		$this->fireBuilt( $id, $resolved );
 	}
 
 	private function fireBuilt( string $id, object $resolved ): void {
-		$this->resolve( type: $resolved, params: null, callbacks: $this->built->getItems() );
+		$this->resolve( type: $resolved, params: null, cbs: $this->built->getItems() );
 
 		$scopedCallbacks = $this->merge( $this->builtForEntry->getItems(), $id, $resolved );
 
-		$this->resolve( type: $resolved, params: null, callbacks: $scopedCallbacks );
+		$this->resolve( type: $resolved, params: null, cbs: $scopedCallbacks );
 	}
 
 	private function addTo( string $when, ?Closure $callback, Closure|string|null $entry ): void {
@@ -130,22 +125,14 @@ class Event {
 	}
 
 	/**
-	 * @param object|string            $type      The entry ID, or a callback. If built, an object instance.
-	 * @param ArrayAccess|mixed[]|null $params    The use provided params (only when building).
-	 * @param array<?Closure>          $callbacks Registered callbacks to be fired.
+	 * @param object|string            $type   The entry ID, or a callback. If built, an object instance.
+	 * @param ArrayAccess|mixed[]|null $params The use provided params (only when building).
+	 * @param array<?Closure>          $cbs    Registered callbacks to be fired.
 	 */
-	private function resolve(
-		object|string $type,
-		ArrayAccess|array|null $params,
-		array $callbacks
-	): void {
-		$args = null === $params ? array( $type ) : array( $type, $params );
+	private function resolve( object|string $type, ArrayAccess|array|null $params, array $cbs ): void {
+		$args = null === $params ? array( $type, $this->app ) : array( $type, $params, $this->app );
 
-		foreach ( $callbacks as $callback ) {
-			if ( null !== $callback ) {
-				$callback( ...array( ...$args, $this->app ) );
-			}
-		}
+		array_walk( $cbs, static fn( ?Closure $cb ) => Unwrap::andInvoke( $cb, ...$args ) );
 	}
 
 	/**

@@ -58,9 +58,9 @@ class MethodResolver {
 		return is_string( value: $id ) ? $id : Unwrap::callback( cb: $id );
 	}
 
-	protected function resolveFrom( string $id, callable $cb, ?object $obj = null ): mixed {
-		return $this->app->hasBinding( $id )
-			? ( $this->app->getBinding( $id )->concrete )( $obj ?? $cb[0], $this->app )
+	protected function resolveFrom( string $id, callable $cb, object $obj ): mixed {
+		return ( $bound = $this->app->getBinding( $id )?->concrete )
+			? Unwrap::andInvoke( $bound, $obj, $this->app )
 			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $cb ) );
 	}
 
@@ -76,7 +76,7 @@ class MethodResolver {
 			throw BadResolverArgument::nonInstantiableEntry( id: $parts[0] );
 		}
 
-		return $this->resolveFrom( id: Unwrap::asString( $parts[0], $method ), cb: $om );
+		return $this->resolveFrom( id: Unwrap::asString( $parts[0], $method ), cb: $om, obj: $om[0] );
 	}
 
 	/** @return mixed[] */
@@ -86,7 +86,7 @@ class MethodResolver {
 		}
 
 		$resolved = ( new ParamResolver( app: $this->app, pool: $this->pool, event: $this->event ) )
-			->resolve( dependencies: static::reflectorFrom( $cb )->getParameters() );
+			->resolve( dependencies: static::reflector( of: $cb )->getParameters() );
 
 		if ( $this->artefact->has( value: $this->context ) ) {
 			$this->artefact->pull();
@@ -95,8 +95,8 @@ class MethodResolver {
 		return $resolved;
 	}
 
-	protected static function reflectorFrom( callable $cb ): ReflectionFunctionAbstract {
-		return is_array( $cb ) ? new ReflectionMethod( ...$cb ) : new ReflectionFunction( $cb );
+	protected static function reflector( callable $of ): ReflectionFunctionAbstract {
+		return is_array( $of ) ? new ReflectionMethod( ...$of ) : new ReflectionFunction( $of );
 	}
 
 	/** @param string|array{0:object|string,1:string} $cb */

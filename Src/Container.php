@@ -40,7 +40,7 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
-class Container implements ArrayAccess, ContainerInterface {
+class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected static Container $instance;
 	protected readonly Event $event;
 	protected readonly MethodResolver $methodResolver;
@@ -132,7 +132,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		return $this->bindings[ $id ] ?? null;
 	}
 
-	public function withoutEvents( string $id, array|ArrayAccess $params = array() ): mixed {
+	public function resolveWithoutEvents( string $id, array|ArrayAccess $params = array() ): mixed {
 		return $this->resolve( $id, $params, dispatch: false );
 	}
 
@@ -235,7 +235,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		$this->register( $id, $concrete, singleton: false );
 	}
 
-	public function setShared( string $id, null|Closure|string $concrete = null ): void {
+	public function setShared( string $id, Closure|string|null $concrete = null ): void {
 		$this->register( $id, $concrete, singleton: true );
 	}
 
@@ -256,7 +256,7 @@ class Container implements ArrayAccess, ContainerInterface {
 	/**
 	 * @param Closure|string $entry Either a first-class callable from instantiated class method, or
 	 *                              a normalized string with `Unwrap::asString()` (*preferred*).
-	 * @throws TypeError When first-class callable was not created using non-static method.
+	 * @throws TypeError When `$entry` first-class callable was created using static method.
 	 */
 	public function setMethod( Closure|string $entry, Closure $callback ): void {
 		$this->set( id: MethodResolver::keyFrom( id: $entry ), concrete: $callback );
@@ -397,7 +397,7 @@ class Container implements ArrayAccess, ContainerInterface {
 		return $this->isInstance( $id ) && $this->bindings->remove( key: $id );
 	}
 
-	public function flush(): void {
+	public function reset(): void {
 		$props = get_object_vars( $this );
 
 		array_walk( $props, static fn( mixed $pool ) => $pool instanceof Resettable && $pool->reset() );
@@ -420,9 +420,8 @@ class Container implements ArrayAccess, ContainerInterface {
 	protected function register( string $id, Closure|string|null $concrete, bool $singleton ): void {
 		$this->maybePurgeIfAliasOrInstance( $id );
 
-		$concrete = Generator::generateClosure( $id, concrete: $concrete ?? $id );
-
-		$this->bindings->set( key: $id, value: new Binding( $concrete, $singleton ) );
+		$concrete              = Generator::generateClosure( $id, concrete: $concrete ?? $id );
+		$this->bindings[ $id ] = new Binding( $concrete, $singleton );
 
 		if ( $this->resolved( $id ) ) {
 			$this->rebound( $id );

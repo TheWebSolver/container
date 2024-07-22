@@ -54,12 +54,10 @@ class Generator implements Countable, IteratorAggregate {
 	}
 
 	public static function generateClosure( string $id, Closure|string $concrete ): Closure {
-		if ( $concrete instanceof Closure ) {
-			return $concrete;
-		}
-
-		return static fn( Container $app, array $params = array() ): mixed => $id !== $concrete
-			? $app->withoutEvents( id: $concrete, params: $params )
-			: $app->build( $id );
+		return $concrete instanceof Closure
+			? $concrete // phpcs:ignore PHPCompatibility.Operators.RemovedTernaryAssociativity.Found
+			: static fn( Container $app, array $params = array() ): mixed => $id !== $concrete
+				? $app->resolveWithoutEvents( id: $concrete, params: $params )
+				: $app->build( $id );
 	}
 }
