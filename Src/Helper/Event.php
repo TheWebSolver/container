@@ -48,8 +48,8 @@ class Event {
 		$entry = $id instanceof Closure ? $id : $this->app->getEntryFrom( alias: $id );
 
 		match ( true ) {
-			default                   => $this->addTo( $when, $callback, $entry ),
-			$entry instanceof Closure => null === $callback && $this->addTo( $when, $entry, entry: null )
+			default                   => $this->set( $when, $callback, $entry ),
+			$entry instanceof Closure => null === $callback && $this->set( $when, callback: $entry )
 		};
 	}
 
@@ -83,12 +83,13 @@ class Event {
 			return $this->bindings->get( $paramName );
 		}
 
-		$key = Stack::keyFrom( id: $this->app->getEntryFrom( $id ), name: $paramName );
+		$key = Stack::keyFrom( id: $this->app->getEntryFrom( alias: $id ), name: $paramName );
 
 		if ( ! $this->building->has( $key ) ) {
 			return null;
 		}
 
+		/** @var ?Binding */
 		$binding = Unwrap::andInvoke( $this->building[ $id ][ $paramName ], $paramName, $this->app );
 
 		if ( $binding?->isInstance() ) {
@@ -112,7 +113,7 @@ class Event {
 		$this->resolve( type: $resolved, params: null, cbs: $scopedCallbacks );
 	}
 
-	private function addTo( string $when, ?Closure $callback, Closure|string|null $entry ): void {
+	private function set( string $when, ?Closure $callback, Closure|string|null $entry = null ): void {
 		if ( $entry ) {
 			$prop = "{$when}ForEntry";
 

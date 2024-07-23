@@ -296,26 +296,26 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return new EventBuilder( $this->event, $paramName );
 	}
 
-	public function build( Closure|string $concrete ): mixed {
-		if ( $concrete instanceof Closure ) {
-			return $concrete( $this, $this->paramPool->latest() );
+	public function build( Closure|string $with ): mixed {
+		if ( $with instanceof Closure ) {
+			return $with( $this, $this->paramPool->latest() );
 		}
 
 		try {
-			$reflector = new ReflectionClass( $concrete );
+			$reflector = new ReflectionClass( $with );
 		} catch ( ReflectionException $error ) {
-			throw ContainerError::unResolvableEntry( id: $concrete, previous: $error );
+			throw ContainerError::unResolvableEntry( id: $with, previous: $error );
 		}
 
 		if ( ! $reflector->isInstantiable() ) {
-			throw ContainerError::unInstantiableEntry( id: $concrete, artefact: $this->artefact );
+			throw ContainerError::unInstantiableEntry( id: $with, artefact: $this->artefact );
 		}
 
 		if ( null === ( $constructor = $reflector->getConstructor() ) ) {
-			return new $concrete();
+			return new $with();
 		}
 
-		$this->artefact->push( value: $concrete );
+		$this->artefact->push( value: $with );
 
 		try {
 			$resolver = new ParamResolver( $this, $this->paramPool, $this->event );
@@ -445,7 +445,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->paramPool->push( value: $with );
 
-		$resolved = $this->build( $contextual ?? $this->getConcrete( $id ) );
+		$resolved = $this->build( with: $contextual ?? $this->getConcrete( $id ) );
 
 		foreach ( ( $this->extenders[ $id ] ?? array() ) as $extender ) {
 			$resolved = $extender( $resolved, $this );
