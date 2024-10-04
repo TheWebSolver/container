@@ -8,6 +8,7 @@
 declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
@@ -181,5 +182,20 @@ class ParamResolverTest extends TestCase {
 		$this->assertInstanceOf( expected: self::class, actual: $class );
 		$this->assertSame( expected: 'event', actual: $eventText );
 		$this->assertSame( expected: array( 2, 3, 4 ), actual: array_slice( $resolved2, offset: 2 ) );
+	}
+
+	public function testResolveContainerItself(): void {
+		$expected    = $this->mockedArgs[0];
+		$asInterface = static function ( ContainerInterface $app ) {};
+		$param       = new ReflectionParameter( function: $asInterface, param: 0 );
+		$actual      = $this->resolve->fromTyped( $param, type: $param->getType()->getName() );
+
+		$this->assertSame( $expected, $actual );
+
+		$asConcrete = static function ( Container $app ) {};
+		$param      = new ReflectionParameter( function: $asConcrete, param: 0 );
+		$actual     = $this->resolve->fromTyped( $param, type: $param->getType()->getName() );
+
+		$this->assertSame( $expected, $actual );
 	}
 }

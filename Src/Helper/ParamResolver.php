@@ -12,6 +12,7 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use Closure;
 use ReflectionNamedType;
 use ReflectionParameter;
+use Psr\Container\ContainerInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
@@ -62,6 +63,7 @@ class ParamResolver {
 
 		try {
 			return match ( true ) {
+				$this->isApp( $type )     => $this->app,
 				is_string( $value )       => $this->app->get( id: $value ),
 				$value instanceof Closure => Unwrap::andInvoke( $value, $this->app ),
 				default                   => $this->app->get( id: $type )
@@ -69,6 +71,10 @@ class ParamResolver {
 		} catch ( ContainerError $unresolvable ) {
 			return static::defaultFrom( $param, error: $unresolvable );
 		}
+	}
+
+	private function isApp( string $type ): bool {
+		return ContainerInterface::class === $type || Container::class === $type;
 	}
 
 	protected function for( ReflectionParameter $param, mixed $result ): void {
