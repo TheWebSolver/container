@@ -13,17 +13,22 @@ use Closure;
 use ReflectionNamedType;
 use ReflectionParameter;
 use Psr\Container\ContainerInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
+use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use Psr\Container\ContainerExceptionInterface as ContainerError;
+use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
 class ParamResolver {
 	public function __construct(
 		protected readonly Container $app,
 		protected readonly Param $pool,
-		protected readonly Event $event,
+		protected readonly EventDispatcherInterface $dispatcher,
 		protected readonly IndexStack $result = new IndexStack(),
 	) {}
 
@@ -91,9 +96,50 @@ class ParamResolver {
 	}
 
 	protected function fromEvent( ReflectionParameter $param ): mixed {
-		return ( $type = $param->getType() ) instanceof ReflectionNamedType
-			? $this->event->fireDuringBuild( $type->getName(), $param->getName() )?->concrete
-			: null;
+		if ( ! ( $type = $param->getType() ) instanceof ReflectionNamedType ) {
+			return null;
+		}
+
+		$id = Stack::keyFrom( id: $this->app->getEntryFrom( $type->getName() ), name: $param->getName() );
+
+		$this->maybeAddEventListenerFromAttributeOf( $param, $id );
+
+		// We'll resolve the instance directly from the app binding instead of using "Container::get()" method.
+		// This is done so that Event Dispatcher is bypassed which might otherwise trigger an infinite loop.
+		if ( $this->app->isInstance( $id ) ) {
+			return $this->app->getBinding( $id )?->concrete;
+		}
+
+		$event = $this->dispatcher->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $id ) );
+
+		// We'll confirm whether dispatched event has been returned by the Event Dispatcher.
+		// This is done as a type check as well as allows making the resolver testable.
+		if ( ! $event instanceof BuildingEvent ) {
+			return null;
+		}
+
+		$binding = $event->getBinding();
+
+		if ( $binding?->isInstance() && is_object( $instance = $binding->concrete ) ) {
+			$this->app->setInstance( $id, $instance );
+		}
+
+		return $binding?->concrete;
+	}
+
+	private function maybeAddEventListenerFromAttributeOf( ReflectionParameter $param, string $id ): void {
+		if ( ! $this->dispatcher instanceof ListenerRegistry ) {
+			return;
+		}
+
+		if ( empty( $attributes = $param->getAttributes( ListenTo::class ) ) ) {
+			return;
+		}
+
+		$this->dispatcher->addListener(
+			listener: ( $attributes[0]->newInstance()->listener )( ... ),
+			forEntry: $id
+		);
 	}
 
 	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {

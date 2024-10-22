@@ -15,6 +15,7 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use ReflectionMethod;
 use ReflectionFunction;
 use ReflectionFunctionAbstract;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
@@ -25,7 +26,7 @@ class MethodResolver {
 
 	public function __construct(
 		protected readonly Container $app,
-		protected readonly Event $event,
+		protected readonly EventDispatcherInterface $dispatcher,
 		protected readonly Artefact $artefact = new Artefact(),
 		protected readonly Param $pool = new Param(),
 	) {}
@@ -85,7 +86,7 @@ class MethodResolver {
 			$this->artefact->push( value: $this->context );
 		}
 
-		$resolved = ( new ParamResolver( app: $this->app, pool: $this->pool, event: $this->event ) )
+		$resolved = ( new ParamResolver( $this->app, $this->pool, $this->dispatcher ) )
 			->resolve( dependencies: static::reflector( of: $cb )->getParameters() );
 
 		if ( $this->artefact->has( value: $this->context ) ) {

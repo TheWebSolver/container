@@ -9,20 +9,22 @@ declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
+use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 class MethodResolverTest extends TestCase {
 	private Container|MockObject|null $app;
-	private Event|MockObject|null $event;
+	private EventDispatcherInterface|MockObject|null $event;
 	private ?MethodResolver $resolver;
 
 	protected function setUp(): void {
 		$this->app      = $this->createMock( Container::class );
-		$this->event    = $this->createMock( Event::class );
+		$this->event    = $this->createMock( EventDispatcherInterface::class );
 		$this->resolver = new MethodResolver( $this->app, $this->event );
 	}
 
@@ -66,6 +68,11 @@ class MethodResolverTest extends TestCase {
 			->method( 'getBinding' )
 			->with( $instanceId )
 			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John' ) ), null );
+
+		$this->event
+			->expects( $this->once() )
+			->method( 'dispatch' )
+			->willReturn( new BuildingEvent( $this->app, 'test' ) );
 
 		$this->assertSame(
 			expected: 'Name: John',
@@ -223,11 +230,19 @@ class MethodResolverTest extends TestCase {
 			->with( '$name' )
 			->willReturn( static fn() => 'Contextual' );
 
-		// Eventual value will take precedence over contextual & default value.
+		$eventWithValue = $this->createMock( BuildingEvent::class );
+		$eventWithValue
+			->expects( $this->once() )
+			->method( 'getBinding' )
+			->willReturn( new Binding( concrete: 'Eventual' ) );
+
+		$eventWithoutValue = $this->createMock( BuildingEvent::class );
+		$eventWithValue->expects( $this->once() )->method( 'getBinding' )->willReturn( null );
+
+		// Binding from Event Dispatcher value will take precedence over contextual & default value.
 		$this->event->expects( $this->exactly( 2 ) )
-			->method( 'fireDuringBuild' )
-			->with( 'string', 'name' )
-			->willReturn( new Binding( concrete: 'Eventual' ), null );
+			->method( 'dispatch' )
+			->willReturn( $eventWithValue, $eventWithoutValue );
 
 		$this->assertSame(
 			expected: 'Name: Eventual',

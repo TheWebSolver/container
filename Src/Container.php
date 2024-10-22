@@ -23,6 +23,7 @@ use ReflectionException;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Container\ContainerExceptionInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
@@ -30,20 +31,29 @@ use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
+use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator;
 use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
+use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
+use TheWebSolver\Codegarage\Lib\Container\Event\BuildingProvider;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
+use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildProvider;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
 class Container implements ArrayAccess, ContainerInterface, Resettable {
-	protected static Container $instance;
+	/** @var ?static */
+	protected static $instance;
 	protected readonly Event $event;
 	protected readonly MethodResolver $methodResolver;
+	private EventDispatcherInterface&ListenerRegistry $buildingDispatcher;
+	protected EventDispatcherInterface&ListenerRegistry $beforeBuildDispatcher;
 
 	// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	/**
@@ -55,6 +65,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 */
 	// phpcs:enable Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	final public function __construct(
+		EventDispatcherInterface&ListenerRegistry $beforeBuildEventDispatcher = null,
+		EventDispatcherInterface&ListenerRegistry $buildingEventDispatcher = null,
 		protected readonly Stack $bindings = new Stack(),
 		protected readonly Param $paramPool = new Param(),
 		protected readonly Artefact $artefact = new Artefact(),
@@ -63,10 +75,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		protected readonly Stack $contextual = new Stack(),
 		protected readonly Stack $extenders = new Stack(),
 		protected readonly Stack $tags = new Stack(),
-		protected readonly Stack $rebounds = new Stack()
+		protected readonly Stack $rebounds = new Stack(),
 	) {
-		$this->event          = new Event( $this, $bindings );
-		$this->methodResolver = new MethodResolver( $this, $this->event, $artefact );
+		$this->beforeBuildDispatcher = $beforeBuildEventDispatcher ?? new EventDispatcher( new BeforeBuildProvider() );
+		$this->buildingDispatcher    = $buildingEventDispatcher ?? new EventDispatcher( new BuildingProvider() );
+		$this->event                 = new Event( $this, $bindings );
+		$this->methodResolver        = new MethodResolver( $this, $this->buildingDispatcher, $artefact );
 
 		$this->extenders->asCollection();
 		$this->rebounds->asCollection();
@@ -154,7 +168,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/**
-	 * @param mixed[]|ArrayAccess $with The injected parameters.
+	 * @param ArrayAccess|array<string,mixed> $with The injected parameters.
 	 * @throws NotFoundExceptionInterface  When entry with given $id was not found in the container.
 	 * @throws ContainerExceptionInterface When cannot resolve concrete from the given $id.
 	 */
@@ -262,22 +276,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->set( id: MethodResolver::keyFrom( id: $entry ), concrete: $callback );
 	}
 
-	/**
-	 * @param string|(Closure(Closure|string $id, mixed[] $params, Container $app): void) $id
-	 * @param ?Closure(Closure|string        $id, mixed[] $params, Container $app): void $callback
-	 */
-	public function subscribeBeforeBuild( Closure|string $id, ?Closure $callback = null ): void {
-		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_BEFORE_BUILD );
-	}
-
-	/**
-	 * @param string|(Closure(string  $id, Container $app): void) $id
-	 * @param ?Closure(Closure|string $id, Container $app): void $callback
-	 */
-	public function subscribeAfterBuild( Closure|string $id, ?Closure $callback = null ): void {
-		$this->event->subscribeWith( $id, $callback, when: Event::FIRE_BUILT );
-	}
-
 	/*
 	 |================================================================================================
 	 | CREATOR METHODS
@@ -292,8 +290,13 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return new ContextBuilder( for: $ids, app: $this, contextual: $this->contextual );
 	}
 
-	public function matches( string $paramName ): EventBuilder {
-		return new EventBuilder( $this->event, $paramName );
+	public function whenEvent( EventType $type ): EventBuilder {
+		$registry = match ( $type ) {
+			EventType::BeforeBuild => $this->beforeBuildDispatcher,
+			EventType::Building    => $this->buildingDispatcher,
+		};
+
+		return new EventBuilder( $registry, $type, app: $this );
 	}
 
 	public function build( Closure|string $with ): mixed {
@@ -318,7 +321,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->artefact->push( value: $with );
 
 		try {
-			$resolver = new ParamResolver( $this, $this->paramPool, $this->event );
+			$resolver = new ParamResolver( $this, $this->paramPool, $this->buildingDispatcher );
 			$resolved = $resolver->resolve( dependencies: $constructor->getParameters() );
 		} catch ( ContainerExceptionInterface $e ) {
 			$this->artefact->pull();
@@ -428,12 +431,14 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 	}
 
-	/** @param mixed[] $with */
-	protected function resolve( string $id, array $with, bool $dispatch ): mixed {
+	/** @param ArrayAccess|array<string,mixed> $with */
+	protected function resolve( string $id, array|ArrayAccess $with, bool $dispatch ): mixed {
 		$id = $this->getEntryFrom( alias: $id );
 
 		if ( $dispatch ) {
-			$this->event->fireBeforeBuild( $id, params: $with );
+			/** @var BeforeBuildEvent */
+			$event = $this->beforeBuildDispatcher->dispatch( new BeforeBuildEvent( $id, params: $with ) );
+			$with  = $event->getParams();
 		}
 
 		$contextual = $this->getContextualFor( context: $id );

@@ -18,7 +18,11 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
+use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
+use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
+use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
+use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
 
 class ContainerTest extends TestCase {
 	private ?Container $app;
@@ -187,10 +191,10 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testAutoWireDependenciesRecursively(): void {
-		$this->app->get( _Main__EntryClass__Stub::class );
+		$this->app->get( _Main__EntryClass__Stub_Child::class );
 
 		$toBeResolved = array(
-			_Main__EntryClass__Stub::class,
+			_Main__EntryClass__Stub_Child::class,
 			_Primary__EntryClass__Stub::class,
 			_Secondary__EntryClass__Stub::class,
 			stdClass::class,
@@ -202,31 +206,35 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testResolvingParamDuringBuildEventIntegration(): void {
-		$subscribedClass = new class() extends _Primary__EntryClass__Stub {
-			public function __construct( public readonly string $value = 'Using Event' ) {}
-		};
+		$this->app->whenEvent( EventType::Building )
+			->needsListenerFor( entry: ArrayAccess::class, paramName: 'array' )
+			->give(
+				function ( BuildingEvent $event ) {
+					$stack = new Stack();
+					$stack->set( 'key', 'value' );
 
-		$this->app
-			->matches( paramName: 'primary' )
-			->for( concrete: _Primary__EntryClass__Stub::class )
-			->give( implementation: new Binding( $subscribedClass ) );
+					$event->setBinding( new Binding( concrete: $stack ) );
+				}
+			);
 
 		$this->assertSame(
-			expected: 'Using Event',
-			actual: $this->app->get( _Main__EntryClass__Stub::class )->primary->value
+			expected: 'value',
+			actual: $this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class )->array->get( 'key' )
 		);
 
-		$AutoWiredClass = new class() extends _Primary__EntryClass__Stub {
-			public function __construct( public readonly string $value = 'Using Injection' ) {}
+		$AutoWiredClass = new class() extends Stack {
+			public function __construct() {
+				$this->set( 'key', 'withParams' );
+			}
 		};
 
 		$this->assertSame(
 			message: 'The injected param value when resolving entry must override event value.',
-			expected: 'Using Injection',
+			expected: 'withParams',
 			actual: $this->app->get(
-				id: _Main__EntryClass__Stub::class,
-				with: array( 'primary' => $AutoWiredClass )
-			)->primary->value
+				id: _Stack__ContextualBindingWithArrayAccess__Stub::class,
+				with: array( 'array' => $AutoWiredClass )
+			)->array->get( 'key' )
 		);
 	}
 
@@ -262,10 +270,13 @@ class ContainerTest extends TestCase {
 			public function __construct( public readonly string $value = 'Using Event Builder' ) {}
 		};
 
-		$this->app
-			->matches( paramName: 'secondary' )
-			->for( concrete: _Secondary__EntryClass__Stub::class )
-			->give( implementation: new Binding( $eventualClass ) );
+		$this->app->whenEvent( EventType::Building )
+			->needsListenerFor( entry: _Secondary__EntryClass__Stub::class, paramName: 'secondary' )
+			->give(
+				function ( BuildingEvent $event ) use ( $eventualClass ) {
+					$event->setBinding( new Binding( concrete: $eventualClass ) );
+				}
+			);
 
 		$secondaryClass = $this->app->get( _Primary__EntryClass__Stub::class )->secondary;
 
@@ -301,7 +312,6 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testMethodCallForInvocableClassInstance(): void {
-		$app                      = new Container();
 		[ $test, $testGetString ] = $this->getTestClassInstanceStub();
 		$testInvokeInstance       = Unwrap::callback( cb: $test );
 		$testInvokeString         = Unwrap::asString( object: $test::class, methodName: '__invoke' );
@@ -339,39 +349,25 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 3000, actual: $this->app->call( $test::class . '::alt' ) );
 
-		$this->app->matches( paramName: 'val' )
-			->for( concrete: 'int' )
-			->give( implementation: new Binding( concrete: 85 ) );
+		$this->withEventListenerValue( value: 85 );
 
 		$this->assertSame( expected: 90, actual: $this->app->call( $test ) );
 
-		$this->app->matches( paramName: 'val' )
-			->for( concrete: 'int' )
-			->give( implementation: new Binding( concrete: 85 ) );
-
 		$this->assertSame( expected: 90, actual: $this->app->call( array( $test, '__invoke' ) ) );
 
-		$this->app->matches( paramName: 'val' )
-			->for( concrete: 'int' )
-			->give( implementation: new Binding( concrete: 185 ) );
+		$this->withEventListenerValue( value: 185 );
 
 		$this->assertSame( expected: 190, actual: $this->app->call( $test::class ) );
 
-		$this->app->matches( paramName: 'val' )
-			->for( concrete: 'int' )
-			->give( implementation: new Binding( concrete: 188 ) );
+		$this->withEventListenerValue( value: 188 );
 
 		$this->assertSame( expected: 190, actual: $this->app->call( $testGetString ) );
 
-		$this->app->matches( paramName: 'val' )
-			->for( concrete: 'int' )
-			->give( implementation: new Binding( concrete: 0 ) );
+		$this->withEventListenerValue( value: 0 );
 
 		$this->assertSame( expected: 10, actual: $this->app->call( $test->alt( ... ) ) );
 
-		$this->app->matches( paramName: 'val' )
-			->for( concrete: 'int' )
-			->give( implementation: new Binding( concrete: 0 ) );
+		$this->withEventListenerValue( value: 0 );
 
 		$this->assertSame( expected: 10, actual: $this->app->call( array( $test, 'alt' ) ) );
 
@@ -425,6 +421,12 @@ class ContainerTest extends TestCase {
 			expected: 500,
 			actual: $this->app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'alt' )
 		);
+	}
+
+	private function withEventListenerValue( int $value ): void {
+		$this->app->whenEvent( EventType::Building )
+			->needsListenerFor( entry: 'int', paramName: 'val' )
+			->give( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: $value ) ) );
 	}
 
 	public function testReboundValueOfDependencyBindingUpdatedAtLaterTime(): void {
@@ -503,6 +505,71 @@ class ContainerTest extends TestCase {
 
 		$this->app->get( id: 'noDependencyBound' );
 	}
+
+	public function testFireBeforeBuild(): void {
+		$app = new Container();
+
+		$app->whenEvent( EventType::BeforeBuild )
+			->needsListenerFor( entry: _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->give( listener: $this->beforeBuildListener( ... ) );
+
+		$app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class, with: array( 'array' => new WeakMap() ) );
+	}
+
+	private function beforeBuildListener( BeforeBuildEvent $event ): void {
+		$this->assertSame( _Stack__ContextualBindingWithArrayAccess__Stub::class, $event->getEntry() );
+		$this->assertInstanceOf( WeakMap::class, actual: $event->getParams()['array'] );
+	}
+
+	public function testUsingEventListenerDuringBuild(): void {
+		/** @var _Main__EntryClass__Stub_Child */
+		$instance = $this->app->get( _Main__EntryClass__Stub_Child::class );
+
+		$this->assertInstanceOf( _Primary__EntryClass__Stub::class, $instance->primary );
+
+		/** @var _Main__EntryClass__Stub */
+		$instance = $this->app->get( _Main__EntryClass__Stub::class );
+
+		$this->assertTrue(
+			$this->app->isInstance( id: Stack::keyFrom( _Primary__EntryClass__Stub::class, 'primary' ) )
+		);
+		$this->assertInstanceOf( _Primary__EntryClass__Stub_Child::class, actual: $instance->primary );
+
+		/** @var _Main__EntryClass__Stub_Child */
+		$instance = $this->app->get( _Main__EntryClass__Stub_Child::class );
+
+		$this->assertInstanceOf(
+			message: 'Same type hinted parameter name must resolve same instance by the container if binding set by the Event Listener has instance set to "true".',
+			expected: _Primary__EntryClass__Stub_Child::class,
+			actual: $instance->primary
+		);
+	}
+
+	public function testEventOverridesPreviousListenerBindingDuringBuild(): void {
+		$this->app->whenEvent( EventType::Building )
+			->needsListenerFor( entry: ArrayAccess::class, paramName: 'array' )
+			->give(
+				fn ( BuildingEvent $event ) => $event->setBinding(
+					new Binding( $this->app->get( Stack::class ), instance: true )
+				)
+			);
+
+		$this->app->whenEvent( EventType::Building )
+			->needsListenerFor( entry: ArrayAccess::class, paramName: 'array' )
+			->give(
+				fn ( BuildingEvent $event ) => $event->setBinding(
+					new Binding( $this->app->get( Stack::class ), instance: false )
+				)
+			);
+
+		$this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class );
+
+		$this->assertFalse(
+			condition: $this->app->isInstance( id: Stack::keyFrom( ArrayAccess::class, 'array' ) ),
+			message: 'Only one listener is allowed during build to resolve the particular entry parameter.'
+			. ' Subsequent listener will override the previous listener binding.'
+		);
+	}
 }
 
 class _Stack__ContextualBindingWithArrayAccess__Stub {
@@ -518,11 +585,28 @@ class _Stack__ContextualBindingWithArrayAccess__Stub {
 }
 
 class _Main__EntryClass__Stub {
+	public function __construct(
+		#[ListenTo( listener: array( self::class, 'resolvePrimaryChild' ) )]
+		public readonly _Primary__EntryClass__Stub $primary
+	) {}
+
+	public static function resolvePrimaryChild( BuildingEvent $event ): void {
+		$event->setBinding(
+			new Binding( concrete: $event->app()->get( _Primary__EntryClass__Stub_Child::class ), instance: true )
+		);
+	}
+}
+
+class _Main__EntryClass__Stub_Child extends _Main__EntryClass__Stub {
 	public function __construct( public readonly _Primary__EntryClass__Stub $primary ) {}
 }
 
 class _Primary__EntryClass__Stub {
 	public function __construct( public readonly _Secondary__EntryClass__Stub $secondary ) {}
+}
+
+class _Primary__EntryClass__Stub_Child extends _Primary__EntryClass__Stub {
+	public function __construct() {}
 }
 
 class _Secondary__EntryClass__Stub {

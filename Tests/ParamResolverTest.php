@@ -11,23 +11,24 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\ContainerExceptionInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
+use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
 
 class ParamResolverTest extends TestCase {
 	private ?ParamResolver $resolve;
 
-	/** @var array{0:Container&MockObject,1:Param&MockObject,2:Event&MockObject} */
+	/** @var array{0:Container&MockObject,1:Param&MockObject,2:EventDispatcher&MockObject} */
 	private ?array $mockedArgs;
 
 	protected function setUp(): void {
 		$this->mockedArgs = array(
 			$this->createMock( Container::class ),
 			$this->createMock( Param::class ),
-			$this->createMock( Event::class ),
+			$this->createMock( EventDispatcherInterface::class ),
 		);
 
 		$this->resolve = new ParamResolver( ...$this->mockedArgs );
@@ -154,10 +155,22 @@ class ParamResolverTest extends TestCase {
 			->with( '$other' )
 			->willReturn( null );
 
+		$eventWithStringValue = $this->createMock( BuildingEvent::class );
+		$eventWithStringValue
+			->expects( $this->once() )
+			->method( 'getBinding' )
+			->willReturn( new Binding( concrete: 'event' ) );
+
+		$eventWithArrayValue = $this->createMock( BuildingEvent::class );
+		$eventWithArrayValue
+			->expects( $this->once() )
+			->method( 'getBinding' )
+			->willReturn( new Binding( concrete: array( 2, 3, 4 ) ) );
+
 		$event
 			->expects( $this->exactly( 2 ) )
-			->method( 'fireDuringBuild' )
-			->willReturn( new Binding( concrete: 'event' ), new Binding( concrete: array( 2, 3, 4 ) ) );
+			->method( 'dispatch' )
+			->willReturn( $eventWithStringValue, $eventWithArrayValue );
 
 		$resolved = ( new ParamResolver( $app, $pool, $event ) )->resolve( $ref->getParameters() );
 
