@@ -112,7 +112,7 @@ class Unwrap {
 	 *                                  string using `Unwrap::asString()`.
 	 * @return string|array{0:object|string,1:string}
 	 * @throws TypeError When `$cb` is a first-class callable of a static method.
-	 * @phpstan-return ($asArray is true ? array{0:object|string,1:string}, string)
+	 * @phpstan-return ($asArray is true ? array{0:object|string,1:string} : string)
 	 */
 	public static function callback( callable|string $cb, bool $asArray = false ): string|array {
 		return match ( true ) {
