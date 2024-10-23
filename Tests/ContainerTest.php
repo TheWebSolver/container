@@ -527,6 +527,10 @@ class ContainerTest extends TestCase {
 
 		$this->assertInstanceOf( _Primary__EntryClass__Stub::class, $instance->primary );
 
+		$this->app->whenEvent( EventType::Building )
+			->needsListenerFor( entry: _Primary__EntryClass__Stub::class, paramName: 'primary' )
+			->give( fn( BuildingEvent $e ) => $e->setBinding( new Binding( 'this listener is halted' ) ) );
+
 		/** @var _Main__EntryClass__Stub */
 		$instance = $this->app->get( _Main__EntryClass__Stub::class );
 
@@ -610,7 +614,7 @@ class _Main__EntryClass__Stub {
 	) {}
 
 	public static function resolvePrimaryChild( BuildingEvent $event ): void {
-		$event->setBinding(
+		$event->stopPropagation()->setBinding(
 			new Binding( concrete: $event->app()->get( _Primary__EntryClass__Stub_Child::class ), instance: true )
 		);
 	}

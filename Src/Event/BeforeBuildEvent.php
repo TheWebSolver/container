@@ -10,9 +10,13 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Event;
 
 use ArrayAccess;
+use Psr\EventDispatcher\StoppableEventInterface;
+use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 
-class BeforeBuildEvent implements TaggableEvent {
+class BeforeBuildEvent implements StoppableEventInterface, TaggableEvent {
+	use StopPropagation;
+
 	/**
 	 * @param string                               $entry
 	 * @param ArrayAccess|array<string,mixed>|null $params

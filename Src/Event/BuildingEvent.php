@@ -9,11 +9,15 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Event;
 
+use Psr\EventDispatcher\StoppableEventInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
+use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 
-class BuildingEvent implements TaggableEvent {
+class BuildingEvent implements StoppableEventInterface, TaggableEvent {
+	use StopPropagation;
+
 	private ?Binding $binding = null;
 
 	public function __construct( private readonly Container $app, private readonly string $paramTypeWithName ) {}

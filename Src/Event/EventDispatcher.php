@@ -10,6 +10,7 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Event;
 
 use Closure;
+use Psr\EventDispatcher\StoppableEventInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\EventDispatcher\ListenerProviderInterface;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
@@ -34,6 +35,10 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 			$callbacks = $listener instanceof Closure ? array( $listener ) : $listener;
 
 			foreach ( $callbacks as $callback ) {
+				if ( $event instanceof StoppableEventInterface && $event->isPropagationStopped() ) {
+					break 2;
+				}
+
 				$callback( $event );
 			}
 		}

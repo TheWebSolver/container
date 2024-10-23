@@ -138,8 +138,9 @@ class ParamResolver {
 
 		$attribute = $attributes[0]->newInstance();
 
-		// We'll push Event Listener supplied as the Parameter Attribute as last Listener.
-		// This is done so any user-defined Event Listener will get overridden by it.
+		// We'll push Event Listener supplied as the Parameter Attribute as a last Listener.
+		// This is done so any user-defined Event Listener will be listened before it.
+		// Or, in other case, user-defined Listener may halt this Event Listener.
 		if ( $attribute->isFinal ) {
 			$this->dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id );
 
@@ -151,7 +152,8 @@ class ParamResolver {
 		$this->dispatcher->reset( collectionId: $id );
 
 		// We'll push Event Listener supplied as the Parameter Attribute as first Listener.
-		// This is done so any user-defined Event Listener takes precedence over it.
+		// This is done so any user-defined Event Listener will take precedence over it.
+		// Or, in other case, this Event Listener may halt the user-defined Listeners.
 		foreach ( array( ( $attribute->listener )( ... ), ...$listeners ) as $listener ) {
 			$this->dispatcher->addListener( $listener, forEntry: $id );
 		}
