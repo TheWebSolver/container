@@ -138,6 +138,17 @@ class StackWithArrayAccessTest extends TestCase {
 
 		$this->stack->set( key: 'primary||1', value: 'update 1' );
 		$this->assertSame( expected: 'update 1', actual: $this->stack->get( item: 'primary||1' ) );
+
+		$this->stack->set( key: 'primary||collectionKey', value: 'with string key' );
+		$this->assertArrayHasKey( key: 'collectionKey', array: $this->stack->get( item: 'primary' ) );
+		$this->assertSame( expected: 'with string key', actual: $this->stack->get( 'primary||collectionKey' ) );
+
+		$this->stack->reset( 'primary' );
+		$this->assertArrayHasKey( key: 'primary', array: $this->stack->getItems() );
+		$this->assertEmpty( $this->stack->get( 'primary' ) );
+
+		$this->stack->reset();
+		$this->assertEmpty( $this->stack->getItems() );
 	}
 
 	public function testGetterSetterWithIndexWithoutDeclaringAsCollection(): void {

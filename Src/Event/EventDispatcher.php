@@ -21,6 +21,14 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 		$this->provider->addListener( $listener, $forEntry );
 	}
 
+	public function getListeners( ?string $forEntry = null ): array {
+		return $this->provider->getListeners( $forEntry );
+	}
+
+	public function reset( ?string $collectionId = null ): void {
+		$this->provider->reset( $collectionId );
+	}
+
 	public function dispatch( object $event ) {
 		foreach ( $this->provider->getListenersForEvent( $event ) as $listener ) {
 			$callbacks = $listener instanceof Closure ? array( $listener ) : $listener;

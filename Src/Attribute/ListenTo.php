@@ -15,6 +15,8 @@ use Attribute;
 final readonly class ListenTo {
 	/**
 	 * @param string|array{0:string,1:string} $listener Accepts `BuildingEvent` as argument.
+	 * @param bool                            $isFinal  Whether Attribute Event Listener should be considered final.
+	 *                                                  If it is final, user-defined listeners will be ignored.
 	 */
-	public function __construct( public string|array $listener ) {}
+	public function __construct( public string|array $listener, public bool $isFinal = false ) {}
 }

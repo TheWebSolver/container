@@ -8,6 +8,7 @@
  * @phpcs:disable Squiz.Commenting.FunctionComment.WrongStyle
  * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
  * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
+ * @phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped
  */
 
 declare( strict_types = 1 );
@@ -15,6 +16,7 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container;
 
 use Closure;
+use WeakMap;
 use Exception;
 use ArrayAccess;
 use LogicException;
@@ -24,6 +26,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
+use Psr\EventDispatcher\ListenerProviderInterface;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
@@ -34,6 +37,7 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator;
 use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
+use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
@@ -42,31 +46,31 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingProvider;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
+use TheWebSolver\Codegarage\Lib\Container\Traits\ListenerRegistrar;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
-use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildProvider;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
-
+/** @template-implements ArrayAccess<string,mixed> */
 class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @var ?static */
 	protected static $instance;
 	protected readonly Event $event;
 	protected readonly MethodResolver $methodResolver;
-	private EventDispatcherInterface&ListenerRegistry $buildingDispatcher;
-	protected EventDispatcherInterface&ListenerRegistry $beforeBuildDispatcher;
+
+	/** @var WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> */
+	protected WeakMap $eventDispatchers;
 
 	// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	/**
-	 * @param Stack&ArrayAccess<string,Binding>                           $bindings
-	 * @param Stack&ArrayAccess<string,array<string,Closure|string|null>> $contextual
-	 * @param Stack&ArrayAccess<string,array<int,string>>                 $tags
-	 * @param Stack&ArrayAccess<string,Closure[]>                         $rebounds
-	 * @param Stack&ArrayAccess<string,Closure[]>                         $extenders
+	 * @param WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> $eventDispatchers
+	 * @param Stack&ArrayAccess<string,Binding>                            $bindings
+	 * @param Stack&ArrayAccess<string,array<string,Closure|string|null>>  $contextual
+	 * @param Stack&ArrayAccess<string,array<int,string>>                  $tags
+	 * @param Stack&ArrayAccess<string,Closure[]>                          $rebounds
+	 * @param Stack&ArrayAccess<string,Closure[]>                          $extenders
 	 */
 	// phpcs:enable Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	final public function __construct(
-		EventDispatcherInterface&ListenerRegistry $beforeBuildEventDispatcher = null,
-		EventDispatcherInterface&ListenerRegistry $buildingEventDispatcher = null,
 		protected readonly Stack $bindings = new Stack(),
 		protected readonly Param $paramPool = new Param(),
 		protected readonly Artefact $artefact = new Artefact(),
@@ -76,15 +80,56 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		protected readonly Stack $extenders = new Stack(),
 		protected readonly Stack $tags = new Stack(),
 		protected readonly Stack $rebounds = new Stack(),
+		?WeakMap $eventDispatchers = null,
 	) {
-		$this->beforeBuildDispatcher = $beforeBuildEventDispatcher ?? new EventDispatcher( new BeforeBuildProvider() );
-		$this->buildingDispatcher    = $buildingEventDispatcher ?? new EventDispatcher( new BuildingProvider() );
-		$this->event                 = new Event( $this, $bindings );
-		$this->methodResolver        = new MethodResolver( $this, $this->buildingDispatcher, $artefact );
+		$this->polyfillEventDispatchers( $eventDispatchers );
+
+		$this->event          = new Event( $this, $bindings );
+		$this->methodResolver = new MethodResolver( $this, $this->eventDispatchers[ EventType::Building ], $artefact );
 
 		$this->extenders->asCollection();
 		$this->rebounds->asCollection();
 		$this->tags->asCollection();
+	}
+
+	/** @param WeakMap<EventType,EventDispatcherInterface &ListenerRegistry> $eventDispatchers */
+	private function polyfillEventDispatchers( ?WeakMap $eventDispatchers ): void {
+		if ( $eventDispatchers ) {
+			$this->eventDispatchers = $eventDispatchers;
+
+			return;
+		}
+
+		$beforeBuild = new class() implements ListenerProviderInterface, ListenerRegistry {
+			use ListenerRegistrar;
+
+			protected function isValid( object $event ): bool {
+				return $event instanceof BeforeBuildEvent;
+			}
+
+			protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool {
+				$entry = $event->getEntry();
+
+				return $entry === $currentEntry || is_subclass_of( $entry, $currentEntry, allow_string: true );
+			}
+		};
+
+		$building = new class() implements ListenerProviderInterface, ListenerRegistry {
+			use ListenerRegistrar;
+
+			protected function isValid( object $event ): bool {
+				return $event instanceof BuildingEvent;
+			}
+
+			protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool {
+				return $event->getEntry() === $currentEntry;
+			}
+		};
+
+		$dispatchers                           = new WeakMap();
+		$dispatchers[ EventType::BeforeBuild ] = new EventDispatcher( provider: $beforeBuild );
+		$dispatchers[ EventType::Building ]    = new EventDispatcher( provider: $building );
+		$this->eventDispatchers                = $dispatchers;
 	}
 
 	public static function boot(): static {
@@ -291,12 +336,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	public function whenEvent( EventType $type ): EventBuilder {
-		$registry = match ( $type ) {
-			EventType::BeforeBuild => $this->beforeBuildDispatcher,
-			EventType::Building    => $this->buildingDispatcher,
-		};
-
-		return new EventBuilder( $registry, $type, app: $this );
+		return new EventBuilder( $this, $type, registry: $this->eventDispatchers[ $type ] );
 	}
 
 	public function build( Closure|string $with ): mixed {
@@ -321,7 +361,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->artefact->push( value: $with );
 
 		try {
-			$resolver = new ParamResolver( $this, $this->paramPool, $this->buildingDispatcher );
+			$resolver = new ParamResolver( $this, $this->paramPool, $this->eventDispatchers[ EventType::Building ] );
 			$resolved = $resolver->resolve( dependencies: $constructor->getParameters() );
 		} catch ( ContainerExceptionInterface $e ) {
 			$this->artefact->pull();
@@ -400,7 +440,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->isInstance( $id ) && $this->bindings->remove( key: $id );
 	}
 
-	public function reset(): void {
+	public function reset( ?string $collectionId = null ): void {
 		$props = get_object_vars( $this );
 
 		array_walk( $props, static fn( mixed $pool ) => $pool instanceof Resettable && $pool->reset() );
@@ -437,7 +477,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		if ( $dispatch ) {
 			/** @var BeforeBuildEvent */
-			$event = $this->beforeBuildDispatcher->dispatch( new BeforeBuildEvent( $id, params: $with ) );
+			$event = $this->eventDispatchers[ EventType::BeforeBuild ]->dispatch( new BeforeBuildEvent( $id, params: $with ) );
 			$with  = $event->getParams();
 		}
 

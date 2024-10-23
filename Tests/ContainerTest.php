@@ -545,6 +545,25 @@ class ContainerTest extends TestCase {
 		);
 	}
 
+	public function testEventListenerFromParamAttributeOverridesUserDefinedListener(): void {
+		$listener = function ( BuildingEvent $e ): void {
+			$concrete = new WeakMap();
+
+			$concrete[ EventType::Building ] = 'from user';
+
+			$e->setBinding( new Binding( $concrete ) );
+		};
+
+		$this->app->whenEvent( EventType::Building )
+			->needsListenerFor( WeakMap::class, 'attrListenerPrecedence' )
+			->give( $listener );
+
+			/** @var _OverrideWth_Param_Event_Listener__Stub */
+		$instance = $this->app->get( _OverrideWth_Param_Event_Listener__Stub::class );
+
+		$this->assertSame( 'from attribute', actual: $instance->attrListenerPrecedence[ EventType::Building ] );
+	}
+
 	public function testEventOverridesPreviousListenerBindingDuringBuild(): void {
 		$this->app->whenEvent( EventType::Building )
 			->needsListenerFor( entry: ArrayAccess::class, paramName: 'array' )
@@ -636,5 +655,20 @@ class _Rebound__SetterGetter__Stub {
 
 	public function get(): Binding {
 		return $this->binding;
+	}
+}
+
+class _OverrideWth_Param_Event_Listener__Stub {
+	public function __construct(
+		#[ListenTo( listener: array( self::class, 'override' ), isFinal: true )]
+		public readonly WeakMap $attrListenerPrecedence
+	) {}
+
+	public static function override( BuildingEvent $e ): void {
+		$concrete = new WeakMap();
+
+		$concrete[ EventType::Building ] = 'from attribute';
+
+		$e->setBinding( new Binding( $concrete ) );
 	}
 }

@@ -16,7 +16,9 @@ use Closure;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 
 trait ListenerRegistrar {
+	/** @var array<string,array<Closure(object $event): void>> */
 	protected array $listenersForEntry = array();
+	/** @var array<Closure(object $event): void> */
 	protected array $listeners = array();
 
 	/**
@@ -25,15 +27,15 @@ trait ListenerRegistrar {
 	 * Usually, validation id done whether the provided event is actually an
 	 * instanceof the desired event class for listeners to get registered.
 	 */
-	abstract protected function isEventValid( object $event ): bool;
+	abstract protected function isValid( object $event ): bool;
 
 	/**
-	 * Validates whether event entry matches with the current entry in loop when event is dispatched.
+	 * Validates whether event listener should be invoked or not.
 	 *
 	 * Usually, validation is done by comparing if the event entry and current entry is same.
 	 * Also, check can be performed whether event entry is a subclass of the current entry.
 	 */
-	abstract protected function isEntryValid( TaggableEvent $event, string $currentEntry ): bool;
+	abstract protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool;
 
 	/** @param Closure(object $event): void $listener */
 	public function addListener( Closure $listener, ?string $forEntry = null ): void {
@@ -46,26 +48,42 @@ trait ListenerRegistrar {
 		$this->listeners[] = $listener;
 	}
 
+	public function getListeners( ?string $forEntry = null ): array {
+		return ! $forEntry ? $this->getAllListeners() : $this->listenersForEntry[ $forEntry ] ?? array();
+	}
+
+	public function reset( ?string $collectionId = null ): void {
+		if ( ! $collectionId ) {
+			$this->listeners = array();
+
+			return;
+		}
+
+		if ( isset( $this->listenersForEntry[ $collectionId ] ) ) {
+			$this->listenersForEntry[ $collectionId ] = array();
+		}
+	}
+
 	public function getListenersForEvent( object $event ): iterable {
-		if ( ! $this->isEventValid( $event ) ) {
+		if ( ! $this->isValid( $event ) ) {
 			return array();
 		}
 
-		yield from $this->getListeners();
+		yield from $this->getAllListeners();
 
 		if ( $event instanceof TaggableEvent ) {
 			yield from $this->getListenersFor( $event );
 		}
 	}
 
-	/** @return array<Closure(BeforeBuildEvent $event): void> */
-	protected function getListeners(): iterable {
+	/** @return array<Closure(object $event): void> */
+	protected function getAllListeners(): iterable {
 		return $this->listeners;
 	}
 
 	protected function getListenersFor( TaggableEvent $event ): iterable {
 		foreach ( $this->listenersForEntry as $entry => $listeners ) {
-			if ( $this->isEntryValid( $event, currentEntry: $entry ) ) {
+			if ( $this->shouldFire( $event, currentEntry: $entry ) ) {
 				yield $listeners;
 			}
 		}

@@ -22,9 +22,9 @@ final readonly class EventBuilder {
 	private string $key;
 
 	public function __construct(
-		private ListenerRegistry $registry,
+		private Container $app,
 		private EventType $type,
-		private Container $app
+		private ListenerRegistry $registry
 	) {}
 
 	/**

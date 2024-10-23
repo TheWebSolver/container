@@ -10,5 +10,5 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Interfaces;
 
 interface Resettable {
-	public function reset(): void;
+	public function reset( ?string $collectionId = null ): void;
 }

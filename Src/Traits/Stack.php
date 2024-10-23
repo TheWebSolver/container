@@ -22,7 +22,7 @@ trait Stack {
 		return ! empty( $this->stack );
 	}
 
-	public function reset(): void {
+	public function reset( ?string $collectionId = null ): void {
 		$this->stack = array();
 	}
 }

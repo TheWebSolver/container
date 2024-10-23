@@ -54,7 +54,7 @@ class Aliases implements Resettable {
 		return $this->remover( $id );
 	}
 
-	public function reset(): void {
+	public function reset( ?string $collectionId = null ): void {
 		$this->stack = array();
 
 		$this->entryStack->reset();
@@ -66,7 +66,7 @@ class Aliases implements Resettable {
 		}
 
 		foreach ( $this->entryStack->getItems() as $entry => $aliases ) {
-			$this->removeFromEntryStack( $aliases, $entry, given: $id );
+			$this->removeFromEntryStack( $aliases, (string) $entry, given: $id );
 		}
 	}
 

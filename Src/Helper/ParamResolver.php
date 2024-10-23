@@ -132,14 +132,29 @@ class ParamResolver {
 			return;
 		}
 
-		if ( empty( $attributes = $param->getAttributes( ListenTo::class ) ) ) {
+		if ( empty( $attributes = $param->getAttributes( name: ListenTo::class ) ) ) {
 			return;
 		}
 
-		$this->dispatcher->addListener(
-			listener: ( $attributes[0]->newInstance()->listener )( ... ),
-			forEntry: $id
-		);
+		$attribute = $attributes[0]->newInstance();
+
+		// We'll push Event Listener supplied as the Parameter Attribute as last Listener.
+		// This is done so any user-defined Event Listener will get overridden by it.
+		if ( $attribute->isFinal ) {
+			$this->dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id );
+
+			return;
+		}
+
+		$listeners = $this->dispatcher->getListeners( forEntry: $id );
+
+		$this->dispatcher->reset( collectionId: $id );
+
+		// We'll push Event Listener supplied as the Parameter Attribute as first Listener.
+		// This is done so any user-defined Event Listener takes precedence over it.
+		foreach ( array( ( $attribute->listener )( ... ), ...$listeners ) as $listener ) {
+			$this->dispatcher->addListener( $listener, forEntry: $id );
+		}
 	}
 
 	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {

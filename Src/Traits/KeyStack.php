@@ -86,4 +86,18 @@ trait KeyStack {
 
 		return array( $keys[0], $keys[1] ?? null );
 	}
+
+	public function reset( ?string $collectionId = null ): void {
+		if ( ! $collectionId ) {
+			$this->stack = array();
+
+			return;
+		}
+
+		[ $for ] = $this->getKeys( from: $collectionId );
+
+		if ( isset( $this->stack[ $for ] ) ) {
+			$this->stack[ $for ] = array();
+		}
+	}
 }
