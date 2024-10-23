@@ -10,6 +10,7 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
 use Closure;
+use TypeError;
 use ReflectionNamedType;
 use ReflectionParameter;
 use Psr\Container\ContainerInterface;
@@ -18,9 +19,9 @@ use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
+use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use Psr\Container\ContainerExceptionInterface as ContainerError;
-use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
@@ -28,7 +29,7 @@ class ParamResolver {
 	public function __construct(
 		protected readonly Container $app,
 		protected readonly Param $pool,
-		protected readonly EventDispatcherInterface $dispatcher,
+		protected readonly ?EventDispatcherInterface $dispatcher,
 		protected readonly IndexStack $result = new IndexStack(),
 	) {}
 
@@ -110,7 +111,7 @@ class ParamResolver {
 			return $this->app->getBinding( $id )?->concrete;
 		}
 
-		$event = $this->dispatcher->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $id ) );
+		$event = $this->dispatcher?->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $id ) );
 
 		// We'll confirm whether dispatched event has been returned by the Event Dispatcher.
 		// This is done as a type check as well as allows making the resolver testable.
@@ -137,6 +138,15 @@ class ParamResolver {
 		}
 
 		$attribute = $attributes[0]->newInstance();
+
+		if ( ! is_callable( $attribute->listener ) ) {
+			throw new TypeError(
+				sprintf(
+					'Event Listener passed to "%s" Attribute must be a callable string or an array.',
+					ListenTo::class
+				)
+			);
+		}
 
 		// We'll push Event Listener supplied as the Parameter Attribute as a last Listener.
 		// This is done so any user-defined Event Listener will be listened before it.

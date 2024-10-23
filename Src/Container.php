@@ -41,6 +41,7 @@ use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
+use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
@@ -92,10 +93,15 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->tags->asCollection();
 	}
 
-	/** @param WeakMap<EventType,EventDispatcherInterface &ListenerRegistry> $eventDispatchers */
+	/**
+	 * @param WeakMap<EventType,EventDispatcherInterface &ListenerRegistry> $eventDispatchers
+	 * @throws LogicException When all three Event Type Dispatchers were not provided.
+	 */
 	private function polyfillEventDispatchers( ?WeakMap $eventDispatchers ): void {
 		if ( $eventDispatchers ) {
-			$this->eventDispatchers = $eventDispatchers;
+			if ( 3 !== $eventDispatchers->count() ) {
+				throw new LogicException( 'All three Event Type Dispatchers must be provided.' );
+			}
 
 			return;
 		}
@@ -126,9 +132,23 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			}
 		};
 
+		$afterBuild = new class() implements ListenerProviderInterface, ListenerRegistry {
+			use ListenerRegistrar;
+
+			protected function isValid( object $event ): bool {
+				return $event instanceof AfterBuildEvent;
+			}
+
+			protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool {
+				return $event->getEntry() === $currentEntry
+					|| $event instanceof AfterBuildEvent && $event->getResolved() instanceof $currentEntry;
+			}
+		};
+
 		$dispatchers                           = new WeakMap();
 		$dispatchers[ EventType::BeforeBuild ] = new EventDispatcher( provider: $beforeBuild );
 		$dispatchers[ EventType::Building ]    = new EventDispatcher( provider: $building );
+		$dispatchers[ EventType::AfterBuild ]  = new EventDispatcher( provider: $afterBuild );
 		$this->eventDispatchers                = $dispatchers;
 	}
 
@@ -339,7 +359,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return new EventBuilder( $this, $type, registry: $this->eventDispatchers[ $type ] );
 	}
 
-	public function build( Closure|string $with ): mixed {
+	public function build( Closure|string $with, bool $dispatch = true ): mixed {
 		if ( $with instanceof Closure ) {
 			return $with( $this, $this->paramPool->latest() );
 		}
@@ -361,8 +381,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->artefact->push( value: $with );
 
 		try {
-			$resolver = new ParamResolver( $this, $this->paramPool, $this->eventDispatchers[ EventType::Building ] );
-			$resolved = $resolver->resolve( dependencies: $constructor->getParameters() );
+			$dispatcher = $dispatch ? $this->eventDispatchers[ EventType::Building ] : null;
+			$resolver   = new ParamResolver( $this, $this->paramPool, $dispatcher );
+			$resolved   = $resolver->resolve( dependencies: $constructor->getParameters() );
 		} catch ( ContainerExceptionInterface $e ) {
 			$this->artefact->pull();
 
@@ -477,8 +498,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		if ( $dispatch ) {
 			/** @var BeforeBuildEvent */
-			$event = $this->eventDispatchers[ EventType::BeforeBuild ]->dispatch( new BeforeBuildEvent( $id, params: $with ) );
-			$with  = $event->getParams();
+			$event = $this->eventDispatchers[ EventType::BeforeBuild ]
+				->dispatch( event: new BeforeBuildEvent( $id, params: $with ) );
+
+			$with = $event->getParams();
 		}
 
 		$contextual = $this->getContextualFor( context: $id );
@@ -490,7 +513,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->paramPool->push( value: $with );
 
-		$resolved = $this->build( with: $contextual ?? $this->getConcrete( $id ) );
+		$resolved = $this->build( with: $contextual ?? $this->getConcrete( $id ), dispatch: $dispatch );
 
 		foreach ( ( $this->extenders[ $id ] ?? array() ) as $extender ) {
 			$resolved = $extender( $resolved, $this );
@@ -501,7 +524,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 
 		if ( $dispatch && is_object( value: $resolved ) ) {
-			$this->event->fireAfterBuild( $id, $resolved );
+			$this->eventDispatchers[ EventType::AfterBuild ]
+				->dispatch( event: new AfterBuildEvent( $resolved, app: $this, entry: $id ) );
 		}
 
 		$this->resolved->set( key: $id, value: true );

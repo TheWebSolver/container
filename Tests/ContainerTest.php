@@ -22,6 +22,7 @@ use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
+use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
 
 class ContainerTest extends TestCase {
@@ -585,13 +586,24 @@ class ContainerTest extends TestCase {
 				)
 			);
 
-		$this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class );
+			$afterBuild = fn ( AfterBuildEvent $e ) => $e->call(
+				fn( Stack $stack ) => $stack->set( key: 'afterBuild', value: 'Stack As ArrayAccess' )
+			);
+
+		$this->app->whenEvent( EventType::AfterBuild )
+			->needsListenerFor( ArrayAccess::class )
+			->give( listener: $afterBuild );
+
+			/** @var _Stack__ContextualBindingWithArrayAccess__Stub */
+		$instance = $this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class );
 
 		$this->assertFalse(
 			condition: $this->app->isInstance( id: Stack::keyFrom( ArrayAccess::class, 'array' ) ),
 			message: 'Only one listener is allowed during build to resolve the particular entry parameter.'
 			. ' Subsequent listener will override the previous listener binding.'
 		);
+
+		$this->assertSame( 'Stack As ArrayAccess', actual: $instance->array['afterBuild'] );
 	}
 }
 
