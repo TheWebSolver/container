@@ -18,8 +18,8 @@ class BeforeBuildEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;
 
 	/**
-	 * @param string                               $entry
-	 * @param ArrayAccess|array<string,mixed>|null $params
+	 * @param string                                                    $entry
+	 * @param ArrayAccess<object|string,mixed>|array<string,mixed>|null $params
 	 */
 	public function __construct( private readonly string $entry, private array|ArrayAccess|null $params = null ) {}
 
@@ -31,7 +31,7 @@ class BeforeBuildEvent implements StoppableEventInterface, TaggableEvent {
 		$this->params[ $name ] = $value;
 	}
 
-	/** @return ArrayAccess|array<string,mixed>|null */
+	/** @return ArrayAccess<object|string,mixed>|array<string,mixed>|null */
 	public function getParams(): array|ArrayAccess|null {
 		return $this->params;
 	}

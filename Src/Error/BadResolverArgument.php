@@ -21,7 +21,7 @@ class BadResolverArgument extends ContainerError implements ContainerExceptionIn
 		return new self( "Unable to instantiate entry: {$id}." );
 	}
 
-	public static function noParam( ReflectionParameter $ref ) {
+	public static function noParam( ReflectionParameter $ref ): self {
 		$msg = "Unable to resolve dependency parameter: {$ref}" . (
 			( $class = $ref->getDeclaringClass() ) ? " in class: {$class->getName()}" : ''
 		);

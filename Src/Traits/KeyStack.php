@@ -11,7 +11,9 @@ namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 
 use Countable;
 
+/** @template TValue */
 trait KeyStack {
+	/** @use Stack<string,TValue> */
 	use Stack;
 
 	private bool $asCollection = false;
@@ -21,6 +23,7 @@ trait KeyStack {
 		$this->asCollection = true;
 	}
 
+	/** @phpstan-assert-if-true !null $this->get() */
 	public function has( string $key ): bool {
 		return null !== $this->get( $key );
 	}
@@ -35,9 +38,9 @@ trait KeyStack {
 		};
 	}
 
-	/** @return mixed `null` if cannot get data. */
-	public function get( string $item ): mixed {
-		[ $for, $key ] = $this->getKeys( $item );
+	/** @return TValue `null` if cannot get data. */
+	public function get( string $id ): mixed {
+		[ $for, $key ] = $this->getKeys( $id );
 
 		return null !== $key ? $this->stack[ $for ][ $key ] ?? null : $this->stack[ $for ] ?? null;
 	}
@@ -55,11 +58,12 @@ trait KeyStack {
 			return true;
 		}
 
+		// @phpstan-ignore-next-line -- Possible when each stack item is used as collection or key deliberately creates collection.
 		if ( ! isset( $this->stack[ $for ][ $key ] ) ) {
 			return false;
 		}
 
-		unset( $this->stack[ $for ][ $key ] );
+		unset( $this->stack[ $for ][ $key ] ); // @phpstan-ignore-line -- Ditto
 
 		return true;
 	}
@@ -75,16 +79,10 @@ trait KeyStack {
 			return count( $this->stack );
 		}
 
-		$data = $this->get( item: $this->useKey );
+		$data = $this->get( id: $this->useKey );
 
+		// @phpstan-ignore-next-line -- Possible when each stack item is used as collection.
 		return is_array( $data ) || $data instanceof Countable ? count( $data ) : 0;
-	}
-
-	/** @return array{0:string,1:?string} */
-	private function getKeys( string $from ): array {
-		$keys = explode( separator: '||', string: $from, limit: 2 );
-
-		return array( $keys[0], $keys[1] ?? null );
 	}
 
 	public function reset( ?string $collectionId = null ): void {
@@ -97,7 +95,14 @@ trait KeyStack {
 		[ $for ] = $this->getKeys( from: $collectionId );
 
 		if ( isset( $this->stack[ $for ] ) ) {
-			$this->stack[ $for ] = array();
+			unset( $this->stack[ $for ] );
 		}
+	}
+
+	/** @return array{0:string,1:?string} */
+	private function getKeys( string $from ): array {
+		$keys = explode( separator: '||', string: $from, limit: 2 );
+
+		return array( $keys[0], $keys[1] ?? null );
 	}
 }

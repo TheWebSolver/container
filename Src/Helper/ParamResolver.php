@@ -18,7 +18,6 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
-use TheWebSolver\Codegarage\Lib\Container\Pool\IndexStack;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use Psr\Container\ContainerExceptionInterface as ContainerError;
@@ -30,7 +29,7 @@ class ParamResolver {
 		protected readonly Container $app,
 		protected readonly Param $pool,
 		protected readonly ?EventDispatcherInterface $dispatcher,
-		protected readonly IndexStack $result = new IndexStack(),
+		protected readonly Stack $result = new Stack(),
 	) {}
 
 	/**
@@ -46,10 +45,8 @@ class ParamResolver {
 				default                                        => $param
 			};
 
-			$this->for( $param, result: $param === $result ? $this->from( $result ) : $result );
+			$this->result->set( key: $param->getName(), value:  $param === $result ? $this->from( $param ) : $result );
 		}
-
-		$this->pool->pull();
 
 		return $this->result->getItems();
 	}
@@ -65,28 +62,24 @@ class ParamResolver {
 
 	/** @throws ContainerError When resolving dependencies fails. */
 	public function fromTyped( ReflectionParameter $param, string $type ): mixed {
-		$value = $this->app->getContextualFor( context: $type );
+		$context = $this->app->getContextualFor( context: $type );
 
 		try {
 			return match ( true ) {
-				$this->isApp( $type )     => $this->app,
-				is_string( $value )       => $this->app->get( id: $value ),
-				$value instanceof Closure => Unwrap::andInvoke( $value, $this->app ),
-				default                   => $this->app->get( id: $type )
+				$this->isApp( $type )       => $this->app,
+				is_string( $context )       => $this->app->get( id: $context ),
+				$context instanceof Closure => Unwrap::andInvoke( $context, $this->app ),
+				default                     => $this->app->get( id: $type )
 			};
 		} catch ( ContainerError $unresolvable ) {
 			return static::defaultFrom( $param, error: $unresolvable );
 		}
 	}
 
-	private function isApp( string $type ): bool {
-		return ContainerInterface::class === $type || Container::class === $type;
-	}
-
 	protected function for( ReflectionParameter $param, mixed $result ): void {
 		match ( true ) {
-			$param->isVariadic() => $this->result->restackWith( newValue: $result, mergeArray: true ),
-			default              => $this->result->set( value: $result )
+			$param->isVariadic() => $this->result->set( key: $param->getName(), value: $result ),
+			default              => $this->result->set( key: $param->getName(), value: $result )
 		};
 	}
 
@@ -128,6 +121,18 @@ class ParamResolver {
 		return $binding?->concrete;
 	}
 
+	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {
+		return match ( true ) {
+			$param->isDefaultValueAvailable() => $param->getDefaultValue(),
+			$param->isVariadic()              => array(),
+			default                           => throw $error,
+		};
+	}
+
+	private function isApp( string $type ): bool {
+		return ContainerInterface::class === $type || Container::class === $type;
+	}
+
 	private function maybeAddEventListenerFromAttributeOf( ReflectionParameter $param, string $id ): void {
 		if ( ! $this->dispatcher instanceof ListenerRegistry ) {
 			return;
@@ -167,13 +172,5 @@ class ParamResolver {
 		foreach ( array( ( $attribute->listener )( ... ), ...$listeners ) as $listener ) {
 			$this->dispatcher->addListener( $listener, forEntry: $id );
 		}
-	}
-
-	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {
-		return match ( true ) {
-			$param->isDefaultValueAvailable() => $param->getDefaultValue(),
-			$param->isVariadic()              => array(),
-			default                           => throw $error,
-		};
 	}
 }

@@ -9,11 +9,15 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 
+/**
+ * @template TKey
+ * @template TValue
+*/
 trait Stack {
-	/** @var mixed[] */
+	/** @var array<TKey,TValue> */
 	private array $stack = array();
 
-	/** @return mixed[] */
+	/** @return array<TKey,TValue> */
 	public function getItems(): array {
 		return $this->stack;
 	}

@@ -9,10 +9,16 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 
+/** @template TValue */
 trait PushPullStack {
+	/**
+	 * @use Stack<int,TValue>
+	 * @use Puller<TValue>
+	 */
 	use Stack, Puller;
 
-	public function push( mixed $value ): void {
+	/** @param TValue $value */
+	public function push( mixed $value ): void { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 		$this->stack[] = $value;
 	}
 }

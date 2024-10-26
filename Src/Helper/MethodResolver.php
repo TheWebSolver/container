@@ -15,6 +15,8 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use ReflectionMethod;
 use ReflectionFunction;
 use ReflectionFunctionAbstract;
+use Psr\Container\NotFoundExceptionInterface;
+use Psr\Container\ContainerExceptionInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
@@ -26,7 +28,7 @@ class MethodResolver {
 
 	public function __construct(
 		protected readonly Container $app,
-		protected readonly EventDispatcherInterface $dispatcher,
+		protected readonly ?EventDispatcherInterface $dispatcher,
 		protected readonly Artefact $artefact = new Artefact(),
 		protected readonly Param $pool = new Param(),
 	) {}
@@ -44,11 +46,13 @@ class MethodResolver {
 			return $this->instantiateFrom( $cb, method: $default );
 		}
 
-		$this->context    = static::artefactFrom( $unwrapped = Unwrap::callback( $cb, asArray: true ) );
+		/** @var array{0:object|string,1:string} $unwrapped */
+		$unwrapped        = Unwrap::callback( $cb, asArray: true );
+		$this->context    = static::artefactFrom( $unwrapped );
 		[ $cls, $method ] = $unwrapped;
 		$resolved         = is_string( $cls ) // The $cls is obj: at this point. Ensure just in case...
 			? $this->instantiateFrom( $cls, $method )
-			: $this->resolveFrom( id: $this->context, cb: $unwrapped, obj: $cls );
+			: $this->resolveFrom( id: $this->context, cb: $unwrapped, obj: $cls ); // @phpstan-ignore-line
 
 		$this->pool->pull();
 
@@ -56,7 +60,9 @@ class MethodResolver {
 	}
 
 	public static function keyFrom( callable|string $id ): string {
-		return is_string( value: $id ) ? $id : Unwrap::callback( cb: $id );
+		return is_string( $key = Unwrap::callback( cb: $id ) ) ? $key : throw new BadResolverArgument(
+			sprintf( 'Unable to generate key from "%s".', is_string( $id ) ? $id : 'Closure' )
+		);
 	}
 
 	protected function resolveFrom( string $id, callable $cb, object $obj ): mixed {
@@ -73,8 +79,8 @@ class MethodResolver {
 			throw BadResolverArgument::noMethod( class: $parts[0] );
 		} elseif ( $class = static::instantiatedClass( name: $parts[0] ) ) {
 			throw BadResolverArgument::instantiatedBeforehand( $class, $method );
-		} elseif ( ! is_callable( $om = array( $this->app->get( id: $parts[0] ), $method ) ) ) {
-			throw BadResolverArgument::nonInstantiableEntry( id: $parts[0] );
+		} elseif ( ! is_callable( $om = $this->makeCallableFrom( $id = $parts[0], $method ) ) ) {
+			throw BadResolverArgument::nonInstantiableEntry( id: $id );
 		}
 
 		return $this->resolveFrom( id: Unwrap::asString( $parts[0], $method ), cb: $om, obj: $om[0] );
@@ -97,7 +103,7 @@ class MethodResolver {
 	}
 
 	protected static function reflector( callable $of ): ReflectionFunctionAbstract {
-		return is_array( $of ) ? new ReflectionMethod( ...$of ) : new ReflectionFunction( $of );
+		return is_array( $of ) ? new ReflectionMethod( ...$of ) : new ReflectionFunction( $of( ... ) );
 	}
 
 	/** @param string|array{0:object|string,1:string} $cb */
@@ -118,5 +124,17 @@ class MethodResolver {
 
 		return isset( $parts[1] ) // $parts[0] => classname, $parts[1] => ?spl_object_id()::methodName.
 			&& is_numeric( value: Unwrap::partsFrom( $parts[1] )[0] ) ? $parts[0] : null;
+	}
+
+	/**
+	 * @return array{0:object,1:string}
+	 * @throws NotFoundExceptionInterface When entry with given `$id` was not found in the container.
+	 * @throws ContainerExceptionInterface When cannot resolve concrete from the given `$id`.
+	 */
+	private function makeCallableFrom( string $id, string $method ): array {
+		/** @var array{0:object,1:string} */
+		$array = array( $this->app->get( $id ), $method );
+
+		return $array;
 	}
 }

@@ -165,7 +165,7 @@ class ParamResolverTest extends TestCase {
 		$eventWithArrayValue
 			->expects( $this->once() )
 			->method( 'getBinding' )
-			->willReturn( new Binding( concrete: array( 2, 3, 4 ) ) );
+			->willReturn( new Binding( concrete: array( 2, array( 3 ), array( 4 ) ) ) );
 
 		$event
 			->expects( $this->exactly( 2 ) )
@@ -174,12 +174,9 @@ class ParamResolverTest extends TestCase {
 
 		$resolved = ( new ParamResolver( $app, $pool, $event ) )->resolve( $ref->getParameters() );
 
-		[ $class, $injectedText /* ...{$other} is an empty array, so not included */ ] = $resolved;
-
-		$this->assertCount( expectedCount: 2, haystack: $resolved );
-		$this->assertEmpty( actual: $pool->getItems() );
-		$this->assertInstanceOf( expected: self::class, actual: $class );
-		$this->assertSame( expected: 'injected value', actual: $injectedText );
+		$this->assertCount( expectedCount: 3, haystack: $resolved );
+		$this->assertInstanceOf( expected: self::class, actual: $resolved['class'] );
+		$this->assertSame( expected: 'injected value', actual: $resolved['text'] );
 
 		$testFn2 = static function ( TestCase $class, string $text, int ...$other ) {};
 		$ref2    = new ReflectionFunction( $testFn2 );
@@ -188,13 +185,10 @@ class ParamResolverTest extends TestCase {
 
 		$resolved2 = ( new ParamResolver( $app, $pool, $event ) )->resolve( $ref2->getParameters() );
 
-		[ $class, $eventText /* ...[2, 3, 4] => ...{$other} from event binding */ ] = $resolved2;
-
-		$this->assertCount( expectedCount: 5, haystack: $resolved2 );
-		$this->assertEmpty( actual: $pool->getItems() );
-		$this->assertInstanceOf( expected: self::class, actual: $class );
-		$this->assertSame( expected: 'event', actual: $eventText );
-		$this->assertSame( expected: array( 2, 3, 4 ), actual: array_slice( $resolved2, offset: 2 ) );
+		$this->assertCount( expectedCount: 3, haystack: $resolved2 ); // Variadic is an array.
+		$this->assertInstanceOf( expected: self::class, actual: $resolved2['class'] );
+		$this->assertSame( expected: 'event', actual: $resolved2['text'] );
+		$this->assertSame( expected: array( 2, array( 3 ), array( 4 ) ), actual: $resolved2['other'] );
 	}
 
 	public function testResolveContainerItself(): void {

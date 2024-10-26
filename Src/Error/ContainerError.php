@@ -15,7 +15,7 @@ use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 
 class ContainerError extends Exception implements ContainerExceptionInterface {
-	public static function unResolvableEntry( string $id, ReflectionException $previous ): self {
+	public static function unResolvableEntry( string $id, ?ReflectionException $previous = null ): self {
 		return new self(
 			message: "Unable to find the target class: \"{$id}\".",
 			previous: $previous

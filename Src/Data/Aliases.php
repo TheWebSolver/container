@@ -15,13 +15,13 @@ use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
 class Aliases implements Resettable {
+	/** @use KeyStack<string> */
 	use KeyStack {
 		KeyStack::remove as remover;
 	}
 
-	// phpcs:ignore Squiz.Commenting.FunctionComment.ParamNameNoMatch, Squiz.Commenting.FunctionComment.SpacingAfterParamType
-	/** @param Stack&ArrayAccess<string,array<int,string>> $entryStack */
-	public function __construct( private readonly Stack $entryStack = new Stack() ) {
+	/** @param Stack<string[]> $entryStack */
+	public function __construct( private readonly Stack $entryStack = new Stack() ) { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 		$this->entryStack->asCollection();
 	}
 

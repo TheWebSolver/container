@@ -9,11 +9,12 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 
+/** @template TValue */
 trait Puller {
-	/** @var mixed[] */
+	/** @var array<int,TValue> */
 	private array $stack = array();
 
-	/** @return mixed Empty array if no items or all items from stack has been pulled. */
+	/** @return TValue|array{} Empty array if no items or all items from stack has been pulled. */
 	public function latest(): mixed {
 		return count( $this->stack ) ? end( $this->stack ) : array();
 	}

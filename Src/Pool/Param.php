@@ -13,6 +13,7 @@ use TheWebSolver\Codegarage\Lib\Container\Traits\PushPullStack;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
 class Param implements Resettable {
+	/** @use PushPullStack<array<string,mixed>|\ArrayAccess<object|string,mixed>> */
 	use PushPullStack;
 
 	public function has( string $paramName ): bool {

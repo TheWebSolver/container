@@ -21,7 +21,11 @@ use ReflectionParameter;
 class Unwrap {
 	private const NO_METHOD = 'Method name must be provided to create binding ID for class: "%s".';
 
-	/** @return mixed[] */
+	/**
+	 * @param T|T[] $thing
+	 * @return T[]
+	 * @template T
+	 */
 	public static function asArray( mixed $thing ): array {
 		return is_array( $thing ) ? $thing : array( $thing );
 	}
@@ -54,10 +58,10 @@ class Unwrap {
 	}
 
 	/**
-	 * @return string|array{0:object|string,1:string}
+	 * @return string|array{0:string|object,1:string}
 	 * @throws LogicException When method name not given if `$object` is a classname or an instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
-	 * @phpstan-return ($asArray is true ? array{0:object,1:string}, string)
+	 * @phpstan-return ($asArray is true ? array{0:string|object,1:string} : string)
 	 */
 	public static function forBinding(
 		object|string $object,
@@ -98,7 +102,7 @@ class Unwrap {
 
 		return null === ( $class = $reflection->getDeclaringClass() ) ? $name : match ( $name ) {
 			'self'   => $class->getName(),
-			'parent' => $class->getParentClass()->getName(),
+			'parent' => ( $p = $class->getParentClass() ) ? $p->getName() : $name,
 			default  => $name
 		};
 	}
@@ -108,24 +112,30 @@ class Unwrap {
 	}
 
 	/**
-	 * @param callable|string $cb Either a valid callback or a normalized
-	 *                                  string using `Unwrap::asString()`.
-	 * @return string|array{0:object|string,1:string}
+	 * @param (callable(TItem):TReturn)|string $cb Either a valid callback or a normalized
+	 *                                       string using `Unwrap::asString()`.
+	 * @return string|(callable(TItem):TReturn)|array{(callable(TItem):TReturn)|object|string,string}
 	 * @throws TypeError When `$cb` is a first-class callable of a static method.
-	 * @phpstan-return ($asArray is true ? array{0:object|string,1:string} : string)
+	 * @phpstan-return ($asArray is true ? array{(callable(TItem):TReturn)|object|string,string} : string|(callable(TItem):TReturn))
+	 * @template TItem
+	 * @template TReturn
 	 */
-	public static function callback( callable|string $cb, bool $asArray = false ): string|array {
+	public static function callback( callable|string $cb, bool $asArray = false ): callable|string|array {
 		return match ( true ) {
 			default                => $asArray ? array( $cb, '' ) : $cb,
 			$cb instanceof Closure => self::forBinding( $cb, asArray: $asArray ),
-			is_array( $cb )        => self::forBinding( ...array( ...$cb, $asArray ) ),
-			is_object( $cb )       => self::forBinding( $cb, '__invoke', $asArray ),
+			is_array( $cb )        => self::forBinding( $cb[0], $cb[1] ?? '', $asArray ),
+			is_object( $cb )       => self::forBinding( $cb, '__invoke', $asArray )
 		};
 	}
 
-	/** @return array{0:string,1?:string} */
+	/**
+	 * @param string           $string
+	 * @param non-empty-string $separator
+	 * @return array{0:string,1?:string}
+	 */
 	public static function partsFrom( string $string, string $separator = '::' ): array {
-		return explode( $separator, $string, limit: 2 );
+		return explode( $separator, $string, limit: 2 ); // @phpstan-ignore-line -- Only two parts returned.
 	}
 
 	/** @return ?array{0:array{0:object,1:string},1:string} */

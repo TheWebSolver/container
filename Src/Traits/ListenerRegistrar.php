@@ -15,10 +15,11 @@ namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 use Closure;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 
+/** @template T of object */
 trait ListenerRegistrar {
-	/** @var array<string,array<Closure(object $event): void>> */
+	/** @var array<string,array<Closure(T $event): void>> */
 	protected array $listenersForEntry = array();
-	/** @var array<Closure(object $event): void> */
+	/** @var array<Closure(T $event): void> */
 	protected array $listeners = array();
 
 	/**
@@ -26,6 +27,9 @@ trait ListenerRegistrar {
 	 *
 	 * Usually, validation id done whether the provided event is actually an
 	 * instanceof the desired event class for listeners to get registered.
+	 *
+	 * @param T $object
+	 * @phpstan-assert-if-true T $object
 	 */
 	abstract protected function isValid( object $event ): bool;
 
@@ -37,7 +41,7 @@ trait ListenerRegistrar {
 	 */
 	abstract protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool;
 
-	/** @param Closure(object $event): void $listener */
+	/** @param Closure(T $event): void $listener */
 	public function addListener( Closure $listener, ?string $forEntry = null ): void {
 		if ( $forEntry ) {
 			$this->listenersForEntry[ $forEntry ][] = $listener;
@@ -48,6 +52,7 @@ trait ListenerRegistrar {
 		$this->listeners[] = $listener;
 	}
 
+	/** @return array<Closure(T $event): void> */
 	public function getListeners( ?string $forEntry = null ): array {
 		return ! $forEntry ? $this->getAllListeners() : $this->listenersForEntry[ $forEntry ] ?? array();
 	}
@@ -64,6 +69,7 @@ trait ListenerRegistrar {
 		}
 	}
 
+	/** @return ($event is T ? \Generator : array{}) */
 	public function getListenersForEvent( object $event ): iterable {
 		if ( ! $this->isValid( $event ) ) {
 			return array();
@@ -76,11 +82,12 @@ trait ListenerRegistrar {
 		}
 	}
 
-	/** @return array<Closure(object $event): void> */
-	protected function getAllListeners(): iterable {
+	/** @return array<Closure(T $event): void> */
+	protected function getAllListeners(): array {
 		return $this->listeners;
 	}
 
+	/** @return \Generator */
 	protected function getListenersFor( TaggableEvent $event ): iterable {
 		foreach ( $this->listenersForEntry as $entry => $listeners ) {
 			if ( $this->shouldFire( $event, currentEntry: $entry ) ) {

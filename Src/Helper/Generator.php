@@ -52,12 +52,4 @@ class Generator implements Countable, IteratorAggregate {
 			yield ! is_object( $concrete ) ? $app->get( $concrete ) : $concrete;
 		}
 	}
-
-	public static function generateClosure( string $id, Closure|string $concrete ): Closure {
-		return $concrete instanceof Closure
-			? $concrete // phpcs:ignore PHPCompatibility.Operators.RemovedTernaryAssociativity.Found
-			: static fn( Container $app, array $params = array() ): mixed => $id !== $concrete
-				? $app->resolveWithoutEvents( id: $concrete, params: $params )
-				: $app->build( $id );
-	}
 }

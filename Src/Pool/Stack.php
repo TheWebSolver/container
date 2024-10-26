@@ -13,23 +13,30 @@ use Countable;
 use ArrayAccess;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
-
+/**
+ * @template TValue
+ * @template-implements ArrayAccess<string,TValue>
+ */
 class Stack implements ArrayAccess, Countable, Resettable {
+	/** @use KeyStack<TValue> */
 	use KeyStack;
 
+	/** @param string $key */
 	public function offsetExists( $key ): bool {
 		return $this->has( $key );
 	}
 
-	/** @param string $key The key. */
-	#[\ReturnTypeWillChange]
+	/**
+	 * @param string $key
+	 * @return TValue
+	 */
 	public function offsetGet( $key ): mixed {
 		return $this->get( $key );
 	}
 
 	/**
 	 * @param string $key
-	 * @param mixed  $value
+	 * @param TValue $value
 	 */
 	public function offsetSet( $key, $value ): void {
 		$this->set( $key, $value );

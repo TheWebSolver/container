@@ -3,6 +3,8 @@
  * Contextual bindings for the container during the entry's build process.
  *
  * @package TheWebSolver\Codegarage\Container
+ *
+ * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
  */
 
 declare( strict_types = 1 );
@@ -11,22 +13,26 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
 use Closure;
 use Generator;
+use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 
-readonly class ContextBuilder {
-	protected string $toBeResolved;
+final class ContextBuilder {
+	protected string $dependency;
 
-	/** @param string[] $for */
+	/**
+	 * @param string[]                                 $for
+	 * @param Stack<array<string,Closure|string|null>> $contextual
+	 */
 	public function __construct(
-		private array $for,
-		private Container $app,
-		private Stack $contextual
+		private readonly array $for,
+		private readonly Container $app,
+		private readonly Stack $contextual
 	) {}
 
 	public function needs( string $requirement ): self {
-		$this->toBeResolved = $requirement;
+		$this->dependency = $requirement;
 
 		return $this;
 	}
@@ -34,7 +40,7 @@ readonly class ContextBuilder {
 	public function give( Closure|string $value ): void {
 		foreach ( $this->for as $id ) {
 			$this->contextual->set(
-				key: Stack::keyFrom( id: $this->app->getEntryFrom( alias: $id ), name: $this->toBeResolved ),
+				key: Stack::keyFrom( id: $this->app->getEntryFrom( alias: $id ), name: $this->getDependency() ),
 				value: $value
 			);
 		}
@@ -55,11 +61,17 @@ readonly class ContextBuilder {
 	 */
 	public function giveOnce( array $entries ): void {
 		$this->give(
-			static fn () => iterator_to_array(
-				new AppGenerator(
-					generator: static fn(): Generator => AppGenerator::generate( $entries, $this->app ),
-					count: count( $entries )
-				)
+			fn () => iterator_to_array(
+				new AppGenerator( fn(): Generator => AppGenerator::generate( $entries, $this->app ), count( $entries ) )
+			)
+		);
+	}
+
+	private function getDependency(): string {
+		return $this->dependency ?: throw new LogicException(
+			sprintf(
+				'The dependency to be resolved must be provided for using method "%1$s".',
+				self::class . '::needs()'
 			)
 		);
 	}

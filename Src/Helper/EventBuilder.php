@@ -18,7 +18,7 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
-final readonly class EventBuilder {
+final class EventBuilder {
 	private string $key;
 
 	public function __construct(
@@ -28,7 +28,7 @@ final readonly class EventBuilder {
 	) {}
 
 	/**
-	 * @param string $paramName Parameter name when event is being registered to provide the parameter
+	 * @param string $paramName The dependency parameter name to provide the parameter
 	 *                          value when app is resolving the given {@param $entry}.
 	 * @throws LogicException When param name not passed for `EventType::Building`.
 	 */

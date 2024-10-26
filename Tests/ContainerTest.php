@@ -74,7 +74,8 @@ class ContainerTest extends TestCase {
 		$this->assertTrue( $this->app->hasBinding( id: 'testClass' ) );
 		$this->assertFalse( $this->app->hasBinding( id: self::class ), 'Bound using alias.' );
 		$this->assertSame( 'testClass', $this->app->getEntryFrom( alias: 'testClass' ) );
-		$this->assertInstanceOf( Closure::class, actual: $this->app->getBinding( 'testClass' )->concrete );
+		// $this->assertInstanceOf( Closure::class, actual: $this->app->getBinding( 'testClass' )->concrete );
+		$this->assertSame( array( 'testClass' => self::class ), $this->app->getBinding( 'testClass' )->concrete );
 
 		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
 		$this->assertTrue( $this->app->resolved( id: 'testClass' ) );
@@ -293,7 +294,7 @@ class ContainerTest extends TestCase {
 				;
 			}
 
-			public function alt( int $val = 7 ): int {
+			public function addsTen( int $val = 7 ): int {
 				return $val + 10;
 			}
 
@@ -301,7 +302,7 @@ class ContainerTest extends TestCase {
 				return $val + 5;
 			}
 
-			public static function getStatic( int $val ): int {
+			public static function addsThree( int $val ): int {
 				return $val + 3;
 			}
 		};
@@ -337,18 +338,18 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 300, actual: $this->app->call( $testGetString ) );
 
-		$this->app->when( concrete: $test->alt( ... ) )
+		$this->app->when( concrete: $test->addsTen( ... ) )
 			->needs( '$val' )
 			->give( value: static fn(): int => 380 );
 
-		$this->assertSame( expected: 390, actual: $this->app->call( $test->alt( ... ) ) );
-		$this->assertSame( expected: 390, actual: $this->app->call( array( $test, 'alt' ) ) );
+		$this->assertSame( expected: 390, actual: $this->app->call( $test->addsTen( ... ) ) );
+		$this->assertSame( expected: 390, actual: $this->app->call( array( $test, 'addsTen' ) ) );
 
-		$this->app->when( concrete: $test::class . '::alt' )
+		$this->app->when( concrete: $test::class . '::addsTen' )
 			->needs( '$val' )
 			->give( value: static fn (): int => 2990 );
 
-		$this->assertSame( expected: 3000, actual: $this->app->call( $test::class . '::alt' ) );
+		$this->assertSame( expected: 3000, actual: $this->app->call( $test::class . '::addsTen' ) );
 
 		$this->withEventListenerValue( value: 85 );
 
@@ -366,11 +367,11 @@ class ContainerTest extends TestCase {
 
 		$this->withEventListenerValue( value: 0 );
 
-		$this->assertSame( expected: 10, actual: $this->app->call( $test->alt( ... ) ) );
+		$this->assertSame( expected: 10, actual: $this->app->call( $test->addsTen( ... ) ) );
 
 		$this->withEventListenerValue( value: 0 );
 
-		$this->assertSame( expected: 10, actual: $this->app->call( array( $test, 'alt' ) ) );
+		$this->assertSame( expected: 10, actual: $this->app->call( array( $test, 'addsTen' ) ) );
 
 		$this->assertSame( expected: 30, actual: $this->app->call( $test, params: array( 'val' => 25 ) ) );
 		$this->assertSame(
@@ -393,7 +394,7 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame(
 			expected: 40,
-			actual: $this->app->call( $test->alt( ... ), params: array( 'val' => 30 ), defaultMethod: 'no effect' )
+			actual: $this->app->call( $test->addsTen( ... ), params: array( 'val' => 30 ), defaultMethod: 'no effect' )
 		);
 
 		$this->app->setMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
@@ -404,7 +405,7 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 120, actual: $this->app->call( $test::class ) );
 
-		$this->app->setMethod( entry: $testGetString, callback: static fn( $test ) => $test->alt( 140 ) );
+		$this->app->setMethod( entry: $testGetString, callback: static fn( $test ) => $test->addsTen( 140 ) );
 
 		$this->assertSame( expected: 150, actual: $this->app->call( $testGetString ) );
 		$this->assertSame(
@@ -413,14 +414,14 @@ class ContainerTest extends TestCase {
 			message: 'Coz "$test::get" is already bound ($testGetString), we get binding result instead.'
 		);
 
-		$this->app->setMethod( entry: $test->alt( ... ), callback: static fn() => 23 );
+		$this->app->setMethod( entry: $test->addsTen( ... ), callback: static fn() => 23 );
 
-		$this->assertSame( expected: 23, actual: $this->app->call( $test->alt( ... ) ) );
-		$this->assertSame( expected: 23, actual: $this->app->call( array( $test, 'alt' ) ) );
+		$this->assertSame( expected: 23, actual: $this->app->call( $test->addsTen( ... ) ) );
+		$this->assertSame( expected: 23, actual: $this->app->call( array( $test, 'addsTen' ) ) );
 
 		$this->assertSame(
 			expected: 500,
-			actual: $this->app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'alt' )
+			actual: $this->app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'addsTen' )
 		);
 	}
 
@@ -586,12 +587,15 @@ class ContainerTest extends TestCase {
 				)
 			);
 
-			$afterBuild = fn ( AfterBuildEvent $e ) => $e->call(
-				fn( Stack $stack ) => $stack->set( key: 'afterBuild', value: 'Stack As ArrayAccess' )
-			);
+			$afterBuild = function ( AfterBuildEvent $e ) {
+				// $e->call( fn( Stack $stack ) => $stack->set( key: 'afterBuild', value: 'Stack As ArrayAccess' ) );
+				$e->update(
+					with: fn( Stack $stack ) => $stack->set( key: 'afterBuild', value: 'Stack As ArrayAccess' ),
+				);
+			};
 
 		$this->app->whenEvent( EventType::AfterBuild )
-			->needsListenerFor( ArrayAccess::class )
+			->needsListenerFor( Stack::class )
 			->give( listener: $afterBuild );
 
 			/** @var _Stack__ContextualBindingWithArrayAccess__Stub */
@@ -605,10 +609,68 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( 'Stack As ArrayAccess', actual: $instance->array['afterBuild'] );
 	}
+
+	public function testAllEvents(): void {
+		$this->app->set( JustTest__Stub::class, _Stack__ContextualBindingWithArrayAccess__Stub::class );
+
+		$resolvedArray = static function ( BeforeBuildEvent $e ) {
+			$e->setParam( name: 'array', value: new Stack() );
+		};
+
+		$this->app->whenEvent( EventType::BeforeBuild )
+			->needsListenerFor( _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->give( $resolvedArray );
+
+		$this->app->whenEvent( EventType::Building )
+			->needsListenerFor( 'string', 'name' )
+			->give( fn( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: 'hello!' ) ) );
+
+		$this->app->whenEvent( EventType::AfterBuild )
+			->needsListenerFor( _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->give(
+				function ( AfterBuildEvent $e ) {
+					$e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+						->update(
+							with: function ( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub $decorator ) {
+								$decorator->stub->array['updated'] = 'from event';
+							}
+						);
+				}
+			);
+
+		/** @var _Stack__ContextualBindingWithArrayAccess__Decorator__Stub */
+		$instance = $this->app->get( JustTest__Stub::class );
+
+		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $instance );
+		$this->assertSame( 'from event', $instance->stub->array['updated'] );
+		$this->assertSame( 'hello!', $instance->name );
+	}
+
+	public function testWithAbstract(): void {
+		$this->app->setAlias( self::class, 'selfClass' );
+		$this->app->set( TestCase::class, 'selfClass' );
+		// $this->app->set( self::class, self::class );
+		$this->assertInstanceOf( self::class, $this->app->get( self::class ) );
+	}
+
+	private static function useForTest(): void {
+		// var_dump( 'works' );
+	}
 }
 
-class _Stack__ContextualBindingWithArrayAccess__Stub {
-	public function __construct( public readonly ArrayAccess $array ) {}
+interface JustTest__Stub {}
+
+class _Stack__ContextualBindingWithArrayAccess__Stub implements JustTest__Stub {
+	public function __construct( public readonly ArrayAccess $array ) {
+		try {
+			call_user_func( ContainerTest::class . '::useForTest' );
+		} catch ( TypeError $e ) {
+			$reflection = new ReflectionMethod( ContainerTest::class, 'useForTest' );
+			$reflection->setAccessible( true );
+
+			$reflection->invoke( null );
+		}
+	}
 
 	public function has( string $key ) {
 		return $this->array->offsetExists( $key );
@@ -619,10 +681,18 @@ class _Stack__ContextualBindingWithArrayAccess__Stub {
 	}
 }
 
+class _Stack__ContextualBindingWithArrayAccess__Decorator__Stub {
+	public function __construct( public readonly _Stack__ContextualBindingWithArrayAccess__Stub $stub, public readonly string $name ) {}
+
+	public function test( Stack $stack ): void {
+		$stack->set( 'asAttr', 'works' );
+	}
+}
+
 class _Main__EntryClass__Stub {
 	public function __construct(
 		#[ListenTo( listener: array( self::class, 'resolvePrimaryChild' ) )]
-		public readonly _Primary__EntryClass__Stub $primary
+		public _Primary__EntryClass__Stub $primary
 	) {}
 
 	public static function resolvePrimaryChild( BuildingEvent $event ): void {
@@ -633,7 +703,7 @@ class _Main__EntryClass__Stub {
 }
 
 class _Main__EntryClass__Stub_Child extends _Main__EntryClass__Stub {
-	public function __construct( public readonly _Primary__EntryClass__Stub $primary ) {}
+	public function __construct( public _Primary__EntryClass__Stub $primary ) {}
 }
 
 class _Primary__EntryClass__Stub {
