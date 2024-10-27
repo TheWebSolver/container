@@ -568,6 +568,9 @@ class ContainerTest extends TestCase {
 		$instance = $this->app->get( _OverrideWth_Param_Event_Listener__Stub::class );
 
 		$this->assertSame( 'from attribute', actual: $instance->attrListenerPrecedence[ EventType::Building ] );
+
+		$value = $this->app->call( $instance->getValue( ... ) );
+		$this->assertSame( 'from attribute', $value );
 	}
 
 	public function testEventOverridesPreviousListenerBindingDuringBuild(): void {
@@ -750,11 +753,19 @@ class _OverrideWth_Param_Event_Listener__Stub {
 		public readonly WeakMap $attrListenerPrecedence
 	) {}
 
+	public function getValue( #[ListenTo( array( self::class, 'setType' ) )] EventType $type ): string {
+		return $this->attrListenerPrecedence[ $type ];
+	}
+
 	public static function override( BuildingEvent $e ): void {
 		$concrete = new WeakMap();
 
 		$concrete[ EventType::Building ] = 'from attribute';
 
 		$e->setBinding( new Binding( $concrete ) );
+	}
+
+	public static function setType( BuildingEvent $e ): void {
+		$e->setBinding( new Binding( EventType::Building ) );
 	}
 }
