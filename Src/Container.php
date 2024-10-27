@@ -59,8 +59,6 @@ use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @var ?static */
 	protected static $instance;
-	protected readonly Event $event;
-	protected readonly MethodResolver $methodResolver;
 
 	/** @var WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> */
 	protected WeakMap $eventDispatchers;
@@ -89,14 +87,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		?WeakMap $eventDispatchers = null,
 	) {
 		$this->polyfillEventDispatchers( $eventDispatchers );
-
-		$this->event          = new Event( $this, $bindings );
-		$this->methodResolver = new MethodResolver( $this, $this->eventDispatchers[ EventType::Building ], $artefact );
-
 		$this->extenders->asCollection();
 		$this->rebounds->asCollection();
 		$this->tags->asCollection();
-		$this->resolvedParams = new Artefact();
 	}
 
 	/**
@@ -248,7 +241,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		array $params = array(),
 		?string $defaultMethod = null
 	): mixed {
-		return $this->methodResolver->resolve( $callback, $defaultMethod, $params );
+		return ( new MethodResolver( $this, $this->eventDispatchers[ EventType::Building ], $this->artefact ) )
+			->resolve( $callback, $defaultMethod, $params );
 	}
 
 	/**
@@ -399,8 +393,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			$dispatcher = $dispatch ? $this->eventDispatchers[ EventType::Building ] : null;
 			$resolver   = new ParamResolver( $this, $this->paramPool, $dispatcher );
 			$resolved   = $resolver->resolve( dependencies: $constructor->getParameters() );
-
-			$this->resolvedParams->push( $resolved );
 		} catch ( ContainerExceptionInterface $e ) {
 			$this->artefact->pull();
 
@@ -411,8 +403,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		return array( $reflector, $reflector->newInstanceArgs( args: $resolved ) );
 	}
-
-	private Artefact $resolvedParams;
 
 	/** @return iterable<int,object> */
 	public function tagged( string $name ) {
@@ -556,7 +546,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 
 		$this->paramPool->pull();
-		$this->resolvedParams->pull();
 		$this->resolved->set( key: $id, value: true );
 
 		return $resolved;
