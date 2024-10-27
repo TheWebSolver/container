@@ -58,6 +58,7 @@ class Unwrap {
 	}
 
 	/**
+	 * @param class-string|object $object
 	 * @return string|array{0:string|object,1:string}
 	 * @throws LogicException When method name not given if `$object` is a classname or an instance.
 	 * @throws TypeError      When first-class callable was not created using non-static method.
