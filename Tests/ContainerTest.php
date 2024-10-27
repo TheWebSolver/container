@@ -148,13 +148,13 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testContextualBinding(): void {
-		$this->app->when( concrete: Binding::class )
+		$this->app->when( Binding::class )
 			->needs( requirement: '$concrete' )
 			->give( value: 'With Builder' );
 
 		$this->assertSame( 'With Builder', $this->app->get( id: Binding::class )->concrete );
 
-		$this->app->when( concrete: Binding::class )
+		$this->app->when( Binding::class )
 			->needs( requirement: '$concrete' )
 			->give( value: static fn (): string => 'With Builder from closure' );
 
@@ -169,13 +169,13 @@ class ContainerTest extends TestCase {
 			return $stack;
 		};
 
-		$this->app->when( concrete: $class )
+		$this->app->when( $class )
 			->needs( requirement: ArrayAccess::class )
 			->give( value: $implementation );
 
 		$this->assertSame( expected: 'value', actual: $this->app->get( $class )->getStack()->get( 'key' ) );
 
-		$this->app->when( concrete: $class )
+		$this->app->when( $class )
 			->needs( requirement: ArrayAccess::class )
 			->give( value: Stack::class );
 
@@ -184,7 +184,7 @@ class ContainerTest extends TestCase {
 
 	public function testContextualBindingWithAliasing(): void {
 		$this->app->setAlias( entry: Binding::class, alias: 'test' );
-		$this->app->when( concrete: 'test' )->needs( requirement: '$concrete' )->give( value: 'update' );
+		$this->app->when( 'test' )->needs( requirement: '$concrete' )->give( value: 'update' );
 
 		$this->assertSame(
 			actual: $this->app->getContextual( for: 'test', context: '$concrete' ),
@@ -208,9 +208,9 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testResolvingParamDuringBuildEventIntegration(): void {
-		$this->app->whenEvent( EventType::Building )
-			->needsListenerFor( entry: ArrayAccess::class, paramName: 'array' )
-			->give(
+		$this->app->when( EventType::Building )
+			->for( entry: ArrayAccess::class, paramName: 'array' )
+			->listen(
 				function ( BuildingEvent $event ) {
 					$stack = new Stack();
 					$stack->set( 'key', 'value' );
@@ -272,9 +272,9 @@ class ContainerTest extends TestCase {
 			public function __construct( public readonly string $value = 'Using Event Builder' ) {}
 		};
 
-		$this->app->whenEvent( EventType::Building )
-			->needsListenerFor( entry: _Secondary__EntryClass__Stub::class, paramName: 'secondary' )
-			->give(
+		$this->app->when( EventType::Building )
+			->for( entry: _Secondary__EntryClass__Stub::class, paramName: 'secondary' )
+			->listen(
 				function ( BuildingEvent $event ) use ( $eventualClass ) {
 					$event->setBinding( new Binding( concrete: $eventualClass ) );
 				}
@@ -318,34 +318,34 @@ class ContainerTest extends TestCase {
 		$testInvokeInstance       = Unwrap::callback( cb: $test );
 		$testInvokeString         = Unwrap::asString( object: $test::class, methodName: '__invoke' );
 
-		$this->app->when( concrete: $testInvokeInstance )
+		$this->app->when( $testInvokeInstance )
 			->needs( '$val' )
 			->give( value: static fn(): int => 95 );
 
 		$this->assertSame( expected: 100, actual: $this->app->call( $test ) );
 		$this->assertSame( expected: 100, actual: $this->app->call( array( $test, '__invoke' ) ) );
 
-		$this->app->when( concrete: $testInvokeString )
+		$this->app->when( $testInvokeString )
 			->needs( '$val' )
 			->give( value: static fn(): int => 195 );
 
 		$this->assertSame( expected: 200, actual: $this->app->call( $testInvokeString ) );
 		$this->assertSame( expected: 200, actual: $this->app->call( $test::class ) );
 
-		$this->app->when( concrete: $testGetString )
+		$this->app->when( $testGetString )
 			->needs( '$val' )
 			->give( value: static fn(): int => 298 );
 
 		$this->assertSame( expected: 300, actual: $this->app->call( $testGetString ) );
 
-		$this->app->when( concrete: $test->addsTen( ... ) )
+		$this->app->when( $test->addsTen( ... ) )
 			->needs( '$val' )
 			->give( value: static fn(): int => 380 );
 
 		$this->assertSame( expected: 390, actual: $this->app->call( $test->addsTen( ... ) ) );
 		$this->assertSame( expected: 390, actual: $this->app->call( array( $test, 'addsTen' ) ) );
 
-		$this->app->when( concrete: $test::class . '::addsTen' )
+		$this->app->when( $test::class . '::addsTen' )
 			->needs( '$val' )
 			->give( value: static fn (): int => 2990 );
 
@@ -426,9 +426,9 @@ class ContainerTest extends TestCase {
 	}
 
 	private function withEventListenerValue( int $value ): void {
-		$this->app->whenEvent( EventType::Building )
-			->needsListenerFor( entry: 'int', paramName: 'val' )
-			->give( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: $value ) ) );
+		$this->app->when( EventType::Building )
+			->for( entry: 'int', paramName: 'val' )
+			->listen( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: $value ) ) );
 	}
 
 	public function testReboundValueOfDependencyBindingUpdatedAtLaterTime(): void {
@@ -511,9 +511,9 @@ class ContainerTest extends TestCase {
 	public function testFireBeforeBuild(): void {
 		$app = new Container();
 
-		$app->whenEvent( EventType::BeforeBuild )
-			->needsListenerFor( entry: _Stack__ContextualBindingWithArrayAccess__Stub::class )
-			->give( listener: $this->beforeBuildListener( ... ) );
+		$app->when( EventType::BeforeBuild )
+			->for( entry: _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->listen( $this->beforeBuildListener( ... ) );
 
 		$app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class, with: array( 'array' => new WeakMap() ) );
 	}
@@ -529,9 +529,9 @@ class ContainerTest extends TestCase {
 
 		$this->assertInstanceOf( _Primary__EntryClass__Stub::class, $instance->primary );
 
-		$this->app->whenEvent( EventType::Building )
-			->needsListenerFor( entry: _Primary__EntryClass__Stub::class, paramName: 'primary' )
-			->give( fn( BuildingEvent $e ) => $e->setBinding( new Binding( 'this listener is halted' ) ) );
+		$this->app->when( EventType::Building )
+			->for( entry: _Primary__EntryClass__Stub::class, paramName: 'primary' )
+			->listen( fn( BuildingEvent $e ) => $e->setBinding( new Binding( 'this listener is halted' ) ) );
 
 		/** @var _Main__EntryClass__Stub */
 		$instance = $this->app->get( _Main__EntryClass__Stub::class );
@@ -560,9 +560,9 @@ class ContainerTest extends TestCase {
 			$e->setBinding( new Binding( $concrete ) );
 		};
 
-		$this->app->whenEvent( EventType::Building )
-			->needsListenerFor( WeakMap::class, 'attrListenerPrecedence' )
-			->give( $listener );
+		$this->app->when( EventType::Building )
+			->for( WeakMap::class, 'attrListenerPrecedence' )
+			->listen( $listener );
 
 			/** @var _OverrideWth_Param_Event_Listener__Stub */
 		$instance = $this->app->get( _OverrideWth_Param_Event_Listener__Stub::class );
@@ -571,17 +571,17 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testEventOverridesPreviousListenerBindingDuringBuild(): void {
-		$this->app->whenEvent( EventType::Building )
-			->needsListenerFor( entry: ArrayAccess::class, paramName: 'array' )
-			->give(
+		$this->app->when( EventType::Building )
+			->for( entry: ArrayAccess::class, paramName: 'array' )
+			->listen(
 				fn ( BuildingEvent $event ) => $event->setBinding(
 					new Binding( $this->app->get( Stack::class ), instance: true )
 				)
 			);
 
-		$this->app->whenEvent( EventType::Building )
-			->needsListenerFor( entry: ArrayAccess::class, paramName: 'array' )
-			->give(
+		$this->app->when( EventType::Building )
+			->for( entry: ArrayAccess::class, paramName: 'array' )
+			->listen(
 				fn ( BuildingEvent $event ) => $event->setBinding(
 					new Binding( $this->app->get( Stack::class ), instance: false )
 				)
@@ -594,9 +594,9 @@ class ContainerTest extends TestCase {
 				);
 			};
 
-		$this->app->whenEvent( EventType::AfterBuild )
-			->needsListenerFor( Stack::class )
-			->give( listener: $afterBuild );
+		$this->app->when( EventType::AfterBuild )
+			->for( Stack::class )
+			->listen( $afterBuild );
 
 			/** @var _Stack__ContextualBindingWithArrayAccess__Stub */
 		$instance = $this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class );
@@ -617,17 +617,17 @@ class ContainerTest extends TestCase {
 			$e->setParam( name: 'array', value: new Stack() );
 		};
 
-		$this->app->whenEvent( EventType::BeforeBuild )
-			->needsListenerFor( _Stack__ContextualBindingWithArrayAccess__Stub::class )
-			->give( $resolvedArray );
+		$this->app->when( EventType::BeforeBuild )
+			->for( _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->listen( $resolvedArray );
 
-		$this->app->whenEvent( EventType::Building )
-			->needsListenerFor( 'string', 'name' )
-			->give( fn( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: 'hello!' ) ) );
+		$this->app->when( EventType::Building )
+			->for( 'string', 'name' )
+			->listen( fn( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: 'hello!' ) ) );
 
-		$this->app->whenEvent( EventType::AfterBuild )
-			->needsListenerFor( _Stack__ContextualBindingWithArrayAccess__Stub::class )
-			->give(
+		$this->app->when( EventType::AfterBuild )
+			->for( _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->listen(
 				function ( AfterBuildEvent $e ) {
 					$e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
 						->update(

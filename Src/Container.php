@@ -33,7 +33,6 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Event;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
@@ -360,16 +359,19 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 |================================================================================================
 	 */
 
-	/** @param string|string[]|Closure $concrete */
-	public function when( string|array|Closure $concrete ): ContextBuilder {
-		$concrete = $concrete instanceof Closure ? Unwrap::forBinding( $concrete ) : $concrete;
-		$ids      = array_map( $this->getEntryFrom( ... ), array: Unwrap::asArray( $concrete ) );
+	/**
+	 * @param EventType|string|string[]|Closure $constraint
+	 * @return ($constraint is EventType ? EventBuilder : ContextBuilder)
+	 */
+	public function when( EventType|string|array|Closure $constraint ): ContextBuilder|EventBuilder {
+		if ( $constraint instanceof EventType ) {
+			return new EventBuilder( app: $this, type: $constraint, registry: $this->eventDispatchers[ $constraint ] );
+		}
+
+		$constraint = $constraint instanceof Closure ? Unwrap::forBinding( $constraint ) : $constraint;
+		$ids      = array_map( $this->getEntryFrom( ... ), array: Unwrap::asArray( $constraint ) );
 
 		return new ContextBuilder( for: $ids, app: $this, contextual: $this->contextual );
-	}
-
-	public function whenEvent( EventType $type ): EventBuilder {
-		return new EventBuilder( $this, $type, registry: $this->eventDispatchers[ $type ] );
 	}
 
 	/**

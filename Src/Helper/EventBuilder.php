@@ -28,12 +28,13 @@ final class EventBuilder {
 	) {}
 
 	/**
+	 * @param string $entry     Either the Parameter Type name or its aliased string value.
 	 * @param string $paramName The dependency parameter name to provide the parameter
 	 *                          value when app is resolving the given {@param $entry}.
 	 * @throws LogicException When param name not passed for `EventType::Building`.
 	 */
-	public function needsListenerFor( string $entry, ?string $paramName = null ): self {
-		$this->assertParamNameProvidedForBuildingEventType( $entry, $paramName );
+	public function for( string $entry, ?string $paramName = null ): self {
+		$this->assertParamNameProvidedWhenResolving( $entry, $paramName );
 
 		$entry     = $this->app->getEntryFrom( alias: $entry );
 		$this->key = $paramName ? Stack::keyFrom( id: $entry, name: $paramName ) : $entry;
@@ -42,19 +43,19 @@ final class EventBuilder {
 	}
 
 	/**
-	 * @param Closure(object $event): void $listener
+	 * @param Closure(object $event): void $with
 	 * @throws LogicException When this method is invoked before `EventBuilder::needsListenerFor()` method.
 	 */
-	public function give( Closure $listener ): void { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
+	public function listen( Closure $with ): void { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 		$this->registry->addListener(
-			listener: $listener,
+			listener: $with,
 			forEntry: $this->key ?? throw new LogicException(
-				sprintf( 'Entry not registered. Register using method: %s.', self::class . '::needsListenerFor()' )
+				sprintf( 'Entry not registered. Register using method: %s.', self::class . '::for()' )
 			)
 		);
 	}
 
-	private function assertParamNameProvidedForBuildingEventType( string $entry, ?string $paramName ): void {
+	private function assertParamNameProvidedWhenResolving( string $entry, ?string $paramName ): void {
 		if ( EventType::Building !== $this->type || null !== $paramName ) {
 			return;
 		}
