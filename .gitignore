@@ -4,6 +4,7 @@
 !composer.json
 !composer.lock
 !phpunit.xml.dist
+!phpstan.dist.neon
 !LICENSE
 !/*.md
 !/Src

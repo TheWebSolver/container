@@ -1,0 +1,12 @@
+parameters:
+	checkGenericClassInNonGenericObjectType: false
+	level: max
+	paths:
+		- Src
+
+	ignoreErrors:
+		-
+			path: Src/Container.php
+			messages:
+				- '#^Parameter \#1 \$with of method TheWebSolver\\Codegarage\\Lib\\Container\\Container\:\:build\(\) expects class\-string\|Closure, Closure\|string given\.$#'
+				- '#^Dead catch \- ReflectionException is never thrown in the try block\.$#'
