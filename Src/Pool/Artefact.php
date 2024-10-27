@@ -14,6 +14,7 @@ use TheWebSolver\Codegarage\Lib\Container\Traits\PushPullStack;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
 class Artefact implements Stringable, Resettable {
+	/** @use PushPullStack<string> */
 	use PushPullStack;
 
 	public function __toString(): string {
