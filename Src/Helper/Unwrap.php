@@ -91,10 +91,10 @@ class Unwrap {
 		);
 	}
 
-	public static function paramTypeFrom( ReflectionParameter $reflection ): ?string {
+	public static function paramTypeFrom( ReflectionParameter $reflection, bool $checkBuiltIn = true ): ?string {
 		$type = $reflection->getType();
 
-		if ( ! $type instanceof ReflectionNamedType || $type->isBuiltin() ) {
+		if ( ! $type instanceof ReflectionNamedType || ( $checkBuiltIn && $type->isBuiltin() ) ) {
 			return null;
 		}
 
