@@ -10,8 +10,6 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
 use Closure;
-use TypeError;
-use ReflectionNamedType;
 use ReflectionParameter;
 use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -142,35 +140,28 @@ class ParamResolver {
 			return;
 		}
 
-		$attribute = $attributes[0]->newInstance();
-
-		if ( ! is_callable( $attribute->listener ) ) {
-			throw new TypeError(
-				sprintf(
-					'Event Listener passed to "%s" Attribute must be a callable string or an array.',
-					ListenTo::class
-				)
-			);
-		}
+		/** @var ListenerRegistry<BuildingEvent> */
+		$dispatcher = $this->dispatcher;
+		$attribute  = $attributes[0]->newInstance();
 
 		// We'll push Event Listener supplied as the Parameter Attribute as a last Listener.
 		// This is done so any user-defined Event Listener will be listened before it.
 		// Or, in other case, user-defined Listener may halt this Event Listener.
 		if ( $attribute->isFinal ) {
-			$this->dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id );
+			$dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id );
 
 			return;
 		}
 
-		$listeners = $this->dispatcher->getListeners( forEntry: $id );
+		$listeners = $dispatcher->getListeners( forEntry: $id );
 
-		$this->dispatcher->reset( collectionId: $id );
+		$dispatcher->reset( collectionId: $id );
 
 		// We'll push Event Listener supplied as the Parameter Attribute as first Listener.
 		// This is done so any user-defined Event Listener will take precedence over it.
 		// Or, in other case, this Event Listener may halt the user-defined Listeners.
 		foreach ( array( ( $attribute->listener )( ... ), ...$listeners ) as $listener ) {
-			$this->dispatcher->addListener( $listener, forEntry: $id );
+			$dispatcher->addListener( $listener, forEntry: $id );
 		}
 	}
 }
