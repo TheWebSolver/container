@@ -14,18 +14,19 @@ namespace TheWebSolver\Codegarage\Lib\Container\Interfaces;
 
 use Closure;
 
+/** @template T of object */
 interface ListenerRegistry extends Resettable {
 	/**
 	 * Adds listener to the listener provider.
 	 *
-	 * @param Closure(object $event): void $listener
+	 * @param Closure(T $event): void $listener
 	 */
 	public function addListener( Closure $listener, ?string $forEntry ): void;
 
 	/**
 	 * Gets all listeners registered to the listener provider.
 	 *
-	 * @return array<Closure(object $event): void>
+	 * @return array<Closure(T $event): void>
 	 */
 	public function getListeners( ?string $forEntry = null ): array;
 }

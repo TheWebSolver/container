@@ -41,7 +41,6 @@ trait ListenerRegistrar {
 	 */
 	abstract protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool;
 
-	/** @param Closure(T $event): void $listener */
 	public function addListener( Closure $listener, ?string $forEntry = null ): void {
 		if ( $forEntry ) {
 			$this->listenersForEntry[ $forEntry ][] = $listener;
@@ -52,7 +51,6 @@ trait ListenerRegistrar {
 		$this->listeners[] = $listener;
 	}
 
-	/** @return array<Closure(T $event): void> */
 	public function getListeners( ?string $forEntry = null ): array {
 		return ! $forEntry ? $this->getAllListeners() : $this->listenersForEntry[ $forEntry ] ?? array();
 	}

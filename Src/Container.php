@@ -112,7 +112,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			return;
 		}
 
-		$beforeBuild = new class() implements ListenerProviderInterface, ListenerRegistry {
+		$beforeBuild = new /** @template-implements ListenerRegistry<BeforeBuildEvent> */
+		class() implements ListenerProviderInterface, ListenerRegistry {
 			/** @use ListenerRegistrar<BeforeBuildEvent> */
 			use ListenerRegistrar;
 
@@ -127,7 +128,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			}
 		};
 
-		$building = new class() implements ListenerProviderInterface, ListenerRegistry {
+		$building = new /** @template-implements ListenerRegistry<BuildingEvent> */
+		class() implements ListenerProviderInterface, ListenerRegistry {
 			/** @use ListenerRegistrar<BuildingEvent> */
 			use ListenerRegistrar;
 
@@ -140,7 +142,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			}
 		};
 
-		$afterBuild = new class() implements ListenerProviderInterface, ListenerRegistry {
+		$afterBuild = new /** @template-implements ListenerRegistry<AfterBuildEvent> */
+		class() implements ListenerProviderInterface, ListenerRegistry {
 			/** @use ListenerRegistrar<AfterBuildEvent> */
 			use ListenerRegistrar;
 
