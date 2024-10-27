@@ -90,11 +90,11 @@ class ParamResolver {
 	}
 
 	protected function fromEvent( ReflectionParameter $param ): mixed {
-		if ( ! ( $type = $param->getType() ) instanceof ReflectionNamedType ) {
+		if ( ! $type = Unwrap::paramTypeFrom( reflection: $param, checkBuiltIn: false ) ) {
 			return null;
 		}
 
-		$id = Stack::keyFrom( id: $this->app->getEntryFrom( $type->getName() ), name: $param->getName() );
+		$id = Stack::keyFrom( id: $type, name: $param->getName() );
 
 		$this->maybeAddEventListenerFromAttributeOf( $param, $id );
 
