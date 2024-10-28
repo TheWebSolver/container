@@ -19,7 +19,7 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 
 final class ContextBuilder {
-	protected string $dependency;
+	protected string $constraint;
 
 	/**
 	 * @param string[]                                 $for
@@ -31,8 +31,8 @@ final class ContextBuilder {
 		private readonly Stack $contextual
 	) {}
 
-	public function needs( string $requirement ): self {
-		$this->dependency = $requirement;
+	public function needs( string $constraint ): self {
+		$this->constraint = $constraint;
 
 		return $this;
 	}
@@ -40,7 +40,7 @@ final class ContextBuilder {
 	public function give( Closure|string $value ): void {
 		foreach ( $this->for as $id ) {
 			$this->contextual->set(
-				key: Stack::keyFrom( id: $this->app->getEntryFrom( alias: $id ), name: $this->getDependency() ),
+				key: Stack::keyFrom( id: $this->app->getEntryFrom( alias: $id ), name: $this->getConstraint() ),
 				value: $value
 			);
 		}
@@ -67,8 +67,8 @@ final class ContextBuilder {
 		);
 	}
 
-	private function getDependency(): string {
-		return $this->dependency ?: throw new LogicException(
+	private function getConstraint(): string {
+		return $this->constraint ?: throw new LogicException(
 			sprintf(
 				'The dependency to be resolved must be provided for using method "%1$s".',
 				self::class . '::needs()'
