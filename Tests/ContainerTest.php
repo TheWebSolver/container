@@ -149,14 +149,14 @@ class ContainerTest extends TestCase {
 
 	public function testContextualBinding(): void {
 		$this->app->when( Binding::class )
-			->needs( requirement: '$concrete' )
-			->give( value: 'With Builder' );
+			->needs( '$concrete' )
+			->give( 'With Builder' );
 
 		$this->assertSame( 'With Builder', $this->app->get( id: Binding::class )->concrete );
 
 		$this->app->when( Binding::class )
-			->needs( requirement: '$concrete' )
-			->give( value: static fn (): string => 'With Builder from closure' );
+			->needs( '$concrete' )
+			->give( static fn (): string => 'With Builder from closure' );
 
 		$this->assertSame( 'With Builder from closure', $this->app->get( id: Binding::class )->concrete );
 
@@ -170,21 +170,21 @@ class ContainerTest extends TestCase {
 		};
 
 		$this->app->when( $class )
-			->needs( requirement: ArrayAccess::class )
-			->give( value: $implementation );
+			->needs( ArrayAccess::class )
+			->give( $implementation );
 
 		$this->assertSame( expected: 'value', actual: $this->app->get( $class )->getStack()->get( 'key' ) );
 
 		$this->app->when( $class )
-			->needs( requirement: ArrayAccess::class )
-			->give( value: Stack::class );
+			->needs( ArrayAccess::class )
+			->give( Stack::class );
 
 		$this->assertInstanceOf( expected: Stack::class, actual: $this->app->get( $class )->getStack() );
 	}
 
 	public function testContextualBindingWithAliasing(): void {
 		$this->app->setAlias( entry: Binding::class, alias: 'test' );
-		$this->app->when( 'test' )->needs( requirement: '$concrete' )->give( value: 'update' );
+		$this->app->when( 'test' )->needs( '$concrete' )->give( 'update' );
 
 		$this->assertSame(
 			actual: $this->app->getContextual( for: 'test', context: '$concrete' ),
@@ -320,34 +320,34 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( $testInvokeInstance )
 			->needs( '$val' )
-			->give( value: static fn(): int => 95 );
+			->give( static fn(): int => 95 );
 
 		$this->assertSame( expected: 100, actual: $this->app->call( $test ) );
 		$this->assertSame( expected: 100, actual: $this->app->call( array( $test, '__invoke' ) ) );
 
 		$this->app->when( $testInvokeString )
 			->needs( '$val' )
-			->give( value: static fn(): int => 195 );
+			->give( static fn(): int => 195 );
 
 		$this->assertSame( expected: 200, actual: $this->app->call( $testInvokeString ) );
 		$this->assertSame( expected: 200, actual: $this->app->call( $test::class ) );
 
 		$this->app->when( $testGetString )
 			->needs( '$val' )
-			->give( value: static fn(): int => 298 );
+			->give( static fn(): int => 298 );
 
 		$this->assertSame( expected: 300, actual: $this->app->call( $testGetString ) );
 
 		$this->app->when( $test->addsTen( ... ) )
 			->needs( '$val' )
-			->give( value: static fn(): int => 380 );
+			->give( static fn(): int => 380 );
 
 		$this->assertSame( expected: 390, actual: $this->app->call( $test->addsTen( ... ) ) );
 		$this->assertSame( expected: 390, actual: $this->app->call( array( $test, 'addsTen' ) ) );
 
 		$this->app->when( $test::class . '::addsTen' )
 			->needs( '$val' )
-			->give( value: static fn (): int => 2990 );
+			->give( static fn (): int => 2990 );
 
 		$this->assertSame( expected: 3000, actual: $this->app->call( $test::class . '::addsTen' ) );
 
@@ -551,7 +551,7 @@ class ContainerTest extends TestCase {
 		);
 	}
 
-	public function testEventListenerFromParamAttributeOverridesUserDefinedListener(): void {
+	public function testEventListenerFromParamAttributeAndUserDefinedListener(): void {
 		$listener = function ( BuildingEvent $e ): void {
 			$concrete = new WeakMap();
 
@@ -571,6 +571,41 @@ class ContainerTest extends TestCase {
 
 		$value = $this->app->call( $instance->getValue( ... ) );
 		$this->assertSame( 'from attribute', $value );
+
+		$stoppableListener = function ( BuildingEvent $e ): void {
+			// Use binding from previous listener.
+			$concrete = $e->getBinding()->concrete;
+
+			$concrete[ EventType::Building ] = 'halted attribute listener';
+
+			$e->setBinding( new Binding( $concrete ) )->stopPropagation();
+		};
+
+		$this->app->when( EventType::Building )
+			->for( WeakMap::class, 'attrListenerPrecedence' )
+			->listen( $stoppableListener );
+
+		$this->app->when( EventType::Building )
+			->for( WeakMap::class, 'attrListenerPrecedence' )
+			->listen(
+				function ( BuildingEvent $e ) {
+					echo 'Listener with lowest priority -10 is listened.';
+
+					$this->assertNull(
+						actual: $e->getBinding(),
+						message: 'Earliest Listener must not have any bindings unless this listener set it.'
+					);
+				},
+				-10
+			);
+
+		$this->expectOutputString( 'Listener with lowest priority -10 is listened.' );
+
+		$this->assertSame(
+			expected: 'halted attribute listener',
+			actual: $this->app->get( _OverrideWth_Param_Event_Listener__Stub::class )
+				->attrListenerPrecedence[ EventType::Building ]
+		);
 	}
 
 	public function testEventOverridesPreviousListenerBindingDuringBuild(): void {
@@ -655,25 +690,12 @@ class ContainerTest extends TestCase {
 		// $this->app->set( self::class, self::class );
 		$this->assertInstanceOf( self::class, $this->app->get( self::class ) );
 	}
-
-	private static function useForTest(): void {
-		// var_dump( 'works' );
-	}
 }
 
 interface JustTest__Stub {}
 
 class _Stack__ContextualBindingWithArrayAccess__Stub implements JustTest__Stub {
-	public function __construct( public readonly ArrayAccess $array ) {
-		try {
-			call_user_func( ContainerTest::class . '::useForTest' );
-		} catch ( TypeError $e ) {
-			$reflection = new ReflectionMethod( ContainerTest::class, 'useForTest' );
-			$reflection->setAccessible( true );
-
-			$reflection->invoke( null );
-		}
-	}
+	public function __construct( public readonly ArrayAccess $array ) {}
 
 	public function has( string $key ) {
 		return $this->array->offsetExists( $key );
@@ -753,7 +775,7 @@ class _OverrideWth_Param_Event_Listener__Stub {
 		public readonly WeakMap $attrListenerPrecedence
 	) {}
 
-	public function getValue( #[ListenTo( array( self::class, 'setType' ) )] EventType $type ): string {
+	public function getValue( #[ListenTo( array( self::class, 'useType' ) )] EventType $type ): string {
 		return $this->attrListenerPrecedence[ $type ];
 	}
 
@@ -765,7 +787,7 @@ class _OverrideWth_Param_Event_Listener__Stub {
 		$e->setBinding( new Binding( $concrete ) );
 	}
 
-	public static function setType( BuildingEvent $e ): void {
+	public static function useType( BuildingEvent $e ): void {
 		$e->setBinding( new Binding( EventType::Building ) );
 	}
 }
