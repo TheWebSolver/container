@@ -46,9 +46,10 @@ final class EventBuilder {
 	 * @param Closure(object $event): void $with
 	 * @throws LogicException When this method is invoked before `EventBuilder::needsListenerFor()` method.
 	 */
-	public function listen( Closure $with ): void { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
+	public function listen( Closure $with, int $priority = ListenerRegistry::DEFAULT_PRIORITY ): void { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 		$this->registry->addListener(
 			listener: $with,
+			priority: $priority,
 			forEntry: $this->key ?? throw new LogicException(
 				sprintf( 'Entry not registered. Register using method: %s.', self::class . '::for()' )
 			)

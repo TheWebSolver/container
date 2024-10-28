@@ -141,27 +141,23 @@ class ParamResolver {
 		}
 
 		/** @var ListenerRegistry<BuildingEvent> */
-		$dispatcher = $this->dispatcher;
-		$attribute  = $attributes[0]->newInstance();
+		$dispatcher         = $this->dispatcher;
+		$attribute          = $attributes[0]->newInstance();
+		[$lowest, $highest] = $dispatcher->getPriorities();
 
-		// We'll push Event Listener supplied as the Parameter Attribute as a last Listener.
-		// This is done so any user-defined Event Listener will be listened before it.
-		// Or, in other case, user-defined Listener may halt this Event Listener.
-		if ( $attribute->isFinal ) {
-			$dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id );
+		/*
+		 | Prioritize the Event Listener based on whether it should be treated as final or not.
+		 |
+		 | When it is set as final:
+		 |  - user-defined Event Listeners will be listened before it.
+		 |  - user-defined Event Listeners may halt this Event Listener.
+		 |
+		 | When it is not set as final:
+		 |  - it will be listened before user-defined Event Listeners.
+		 |  - it may halt the user-defined Event Listeners.
+		 */
+		$priority = $attribute->isFinal ? $highest + 1 : $lowest - 1;
 
-			return;
-		}
-
-		$listeners = $dispatcher->getListeners( forEntry: $id );
-
-		$dispatcher->reset( collectionId: $id );
-
-		// We'll push Event Listener supplied as the Parameter Attribute as first Listener.
-		// This is done so any user-defined Event Listener will take precedence over it.
-		// Or, in other case, this Event Listener may halt the user-defined Listeners.
-		foreach ( array( ( $attribute->listener )( ... ), ...$listeners ) as $listener ) {
-			$dispatcher->addListener( $listener, forEntry: $id );
-		}
+		$dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id, priority: $priority );
 	}
 }

@@ -25,13 +25,17 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 	public function __construct( private readonly ListenerProviderInterface&ListenerRegistry $provider ) {}
 
 	/** @param Closure(T $event): void $listener */
-	public function addListener( Closure $listener, ?string $forEntry ): void {
-		$this->provider->addListener( $listener, $forEntry );
+	public function addListener( Closure $listener, ?string $forEntry, int $priority = self::DEFAULT_PRIORITY ): void {
+		$this->provider->addListener( $listener, $forEntry, $priority );
 	}
 
-	/** @return array<Closure(T $event): void> */
+	/** @return array<int,array<int,Closure(T $event): void>> */
 	public function getListeners( ?string $forEntry = null ): array {
 		return $this->provider->getListeners( $forEntry );
+	}
+
+	public function getPriorities(): array {
+		return $this->provider->getPriorities();
 	}
 
 	public function reset( ?string $collectionId = null ): void {
@@ -40,15 +44,17 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 
 	/** @param T $event */
 	public function dispatch( object $event ) {
-		foreach ( $this->provider->getListenersForEvent( $event ) as $listener ) {
-			$callbacks = $listener instanceof Closure ? array( $listener ) : $listener;
+		foreach ( $this->provider->getListenersForEvent( $event ) as $listeners ) {
+			foreach ( $listeners as $listener ) {
+				$callbacks = $listener instanceof Closure ? array( $listener ) : $listener;
 
-			foreach ( $callbacks as $callback ) {
-				if ( $event instanceof StoppableEventInterface && $event->isPropagationStopped() ) {
-					break 2;
+				foreach ( $callbacks as $callback ) {
+					if ( $event instanceof StoppableEventInterface && $event->isPropagationStopped() ) {
+						break 3;
+					}
+
+					$callback( $event );
 				}
-
-				$callback( $event );
 			}
 		}
 
