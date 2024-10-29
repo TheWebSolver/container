@@ -17,11 +17,11 @@ use Generator;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
-/** @template T of object */
+/** @template TEvent of object */
 trait ListenerRegistrar {
-	/** @var array<string,array<int,array<int,Closure(T $event): void>>> */
+	/** @var array<string,array<int,array<int,Closure(TEvent $event): void>>> */
 	protected array $listenersForEntry = array();
-	/** @var array<int,array<int,Closure(T $event): void>> */
+	/** @var array<int,array<int,Closure(TEvent $event): void>> */
 	protected array $listeners = array();
 	protected bool $needsSorting = false;
 	/** @var array{0:int,1:int} */
@@ -34,8 +34,8 @@ trait ListenerRegistrar {
 	 * Usually, validation id done whether the provided event is actually an
 	 * instanceof the desired event class for listeners to get registered.
 	 *
-	 * @param T $object
-	 * @phpstan-assert-if-true T $object
+	 * @param TEvent $event
+	 * @phpstan-assert-if-true TEvent $event
 	 */
 	abstract protected function isValid( object $event ): bool;
 
@@ -64,9 +64,7 @@ trait ListenerRegistrar {
 	}
 
 	public function getListeners( ?string $forEntry = null ): array {
-		return $this->getSorted(
-			listeners: ! $forEntry ? $this->listeners : $this->listenersForEntry[ $forEntry ] ?? array()
-		);
+		return ! $forEntry ? $this->listeners : $this->listenersForEntry[ $forEntry ] ?? array();
 	}
 
 	public function getPriorities(): array {
@@ -85,7 +83,7 @@ trait ListenerRegistrar {
 		}
 	}
 
-	/** @return ($event is T ? Generator : array{}) */
+	/** @return ($event is TEvent ? Generator : array{}) */
 	public function getListenersForEvent( object $event ): iterable {
 		if ( ! $this->isValid( $event ) ) {
 			return array();
@@ -101,7 +99,7 @@ trait ListenerRegistrar {
 		}
 	}
 
-	/** @return array<int,array<int,Closure(T $event): void>> */
+	/** @return array<int,array<int,Closure(TEvent $event): void>> */
 	protected function getAllListeners( bool $needsSorting ): array {
 		return $needsSorting ? $this->getSorted( $this->listeners ) : $this->listeners;
 	}
@@ -120,8 +118,8 @@ trait ListenerRegistrar {
 	}
 
 	/**
-	 * @param array<int,array<int,Closure(T $event): void>> $listeners
-	 * @return array<int,array<int,Closure(T $event): void>>
+	 * @param array<int,array<int,Closure(TEvent $event): void>> $listeners
+	 * @return array<int,array<int,Closure(TEvent $event): void>>
 	 */
 	protected function getSorted( array $listeners ): array {
 		ksort( $listeners, flags: SORT_NUMERIC );

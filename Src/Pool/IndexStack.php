@@ -13,7 +13,9 @@ use TheWebSolver\Codegarage\Lib\Container\Traits\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
+/** @template TValue */
 class IndexStack implements Resettable {
+	/** @use Stack<int,TValue> */
 	use Stack;
 
 	public function set( mixed $value ): void {
