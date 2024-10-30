@@ -19,12 +19,12 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 
-/** @template T */
+/** @template TEvent */
 class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;
 
 	/**
-	 * @param T                               $resolved
+	 * @param TEvent                          $resolved
 	 * @param Stack<(class-string|Closure)[]> $decorators
 	 * @param Stack<Closure[]>                $updaters
 	 */
@@ -48,16 +48,12 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 		return $this->updaters;
 	}
 
-	public static function createIndexFrom( string|Closure $decorator ): string {
-		return $decorator instanceof Closure ? (string) spl_object_id( $decorator ) : $decorator;
-	}
-
 	/**
 	 * Decorates resolved value with decorator currently being registered.
 	 *
-	 * @param class-string|Closure(T $resolved, Container $app): T $decorator The decorator can be:
-	 * - a classname that accepts the resolved value as first argument and container as second via constructor, or
-	 * - a Closure that accepts the resolved value as first argument and container as second.
+	 * @param class-string|Closure(TEvent $resolved, Container $app): TEvent $decorator The decorator can be:
+	 * - a Closure that accepts the resolved value as first argument and container as second, or
+	 * - a classname that accepts the resolved value as first argument.
 	 */
 	public function decorateWith( string|Closure $decorator ): self {
 		$this->decorators->set( key: $this->entry, value: $decorator );
@@ -68,7 +64,7 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	/**
 	 * Updates the resolved value with the given callback currently being registered.
 	 *
-	 * @param Closure(T $resolved, Container $app): void $with Recommended to type-hint `$resolved` value for the
+	 * @param Closure(TEvent $resolved, Container $app): void $with Recommended to type-hint `$resolved` value for the
 	 *                                                         listener instead of nothing for IDE and better DX.
 	 */
 	public function update( Closure $with ): void {
@@ -79,7 +75,7 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 		return $this->entry;
 	}
 
-	/** @return T */
+	/** @return TEvent */
 	public function getResolved(): mixed {
 		return $this->resolved;
 	}
