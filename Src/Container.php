@@ -195,9 +195,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->resolved->has( key: $entry ) || $this->isInstance( id: $entry );
 	}
 
-	/** @return Stack<bool> */
-	public function getResolved(): Stack {
-		return $this->resolved;
+	protected function hasContextualFor( string $entry ): bool {
+		return ! empty( $this->contextual[ $entry ] );
 	}
 
 	/*
@@ -288,6 +287,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 
 		return null;
+	}
+
+	/** @return Stack<bool> */
+	public function getResolved(): Stack {
+		return $this->resolved;
 	}
 
 	/*
@@ -528,8 +532,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			$with = $event->getParams();
 		}
 
-		$contextual = $this->getContextualFor( context: $id );
-		$needsBuild = ! empty( $with ) || null !== $contextual;
+		$needsBuild = ! empty( $with ) || $this->hasContextualFor( entry: $id );
 
 		if ( $this->isInstance( $id ) && ! $needsBuild ) {
 			return $this->bindings[ $id ]->concrete;
@@ -537,7 +540,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->paramPool->push( value: $with ?? array() );
 
-		[ $reflector, $resolved ] = $this->build( $contextual ?? $bound, $dispatch, $reflector );
+		[ $reflector, $resolved ] = $this->build( $bound, $dispatch, $reflector );
 
 		if ( true === $this->getBinding( $id )?->isSingleton() && ! $needsBuild ) {
 			$this->bindings->set( key: $id, value: new Binding( concrete: $resolved, instance: true ) );
@@ -579,18 +582,16 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 */
 	protected function decorate( mixed $resolved, string|Closure $decorator, array $params ): mixed {
 		if ( $decorator instanceof Closure ) {
-			$resolved = $decorator( $resolved, $this );
-		} elseif ( is_string( $decorator ) ) {
-			$reflection = $this->getReflectionOf( $decorator );
-			$args       = array(
-				$this->getDecoratorParamFrom( $reflection, $resolved )->getName() => $resolved,
-				...$params,
-			);
-
-			$resolved = $this->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
+			return $decorator( $resolved, $this );
 		}
 
-		return $resolved;
+		$reflection = $this->getReflectionOf( $decorator );
+		$args       = array(
+			$this->getDecoratorParamFrom( $reflection, $resolved )->getName() => $resolved,
+			...$params,
+		);
+
+		return $this->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
 	}
 
 	/**
