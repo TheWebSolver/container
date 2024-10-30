@@ -184,12 +184,14 @@ class ContainerTest extends TestCase {
 
 	public function testContextualBindingWithAliasing(): void {
 		$this->app->setAlias( entry: Binding::class, alias: 'test' );
-		$this->app->when( 'test' )->needs( '$concrete' )->give( 'update' );
+		$this->app->when( 'test' )->needs( '$concrete' )->give( static fn() => 'update' );
 
 		$this->assertSame(
-			actual: $this->app->getContextual( for: 'test', context: '$concrete' ),
+			actual: $this->app->getContextual( for: 'test', context: '$concrete' )(),
 			expected: 'update'
 		);
+
+		$this->assertSame( 'update', $this->app->get( 'test' )->concrete );
 	}
 
 	public function testAutoWireDependenciesRecursively(): void {
