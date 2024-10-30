@@ -47,6 +47,7 @@ use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 use TheWebSolver\Codegarage\Lib\Container\Traits\ListenerRegistrar;
@@ -557,16 +558,21 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	protected function dispatchAfterBuildEvent( string $id, mixed $resolved, ?ReflectionClass $reflector ): mixed {
-		/** @var AfterBuildEvent */
-		$event = $this->eventDispatchers[ EventType::AfterBuild ]?->dispatch(
-			event: new AfterBuildEvent( $resolved, entry: $id )
-		);
+		/** @var EventDispatcherInterface&ListenerRegistry<AfterBuildEvent> */
+		$eventDispatcher = $this->eventDispatchers[ EventType::AfterBuild ];
 
-		/** @var array<string,mixed> */
-		$params = $this->paramPool->latest();
+		if ( $reflector && ! empty( $attributes = $reflector->getAttributes( DecorateWith::class ) ) ) {
+			$attribute = $attributes[0]->newInstance();
+
+			$eventDispatcher->reset( $id );
+			$eventDispatcher->addListener( ( $attribute->listener )( ... ), forEntry: $id, priority: 1 );
+		}
+
+		/** @var AfterBuildEvent */
+		$event = $eventDispatcher->dispatch( event: new AfterBuildEvent( $resolved, entry: $id ) );
 
 		foreach ( $event->getDecorators()[ $id ] ?? array() as $decorator ) {
-			$resolved = $this->decorate( $resolved, $decorator, $params );
+			$resolved = $this->decorate( $resolved, $decorator );
 		}
 
 		foreach ( $event->getUpdaters()[ $id ] ?? array() as $updater ) {
@@ -576,20 +582,14 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $resolved;
 	}
 
-	/**
-	 * @param class-string|Closure $decorator
-	 * @param array<string,mixed>  $params
-	 */
-	protected function decorate( mixed $resolved, string|Closure $decorator, array $params ): mixed {
+	/** @param class-string|Closure $decorator */
+	protected function decorate( mixed $resolved, string|Closure $decorator ): mixed {
 		if ( $decorator instanceof Closure ) {
 			return $decorator( $resolved, $this );
 		}
 
 		$reflection = $this->getReflectionOf( $decorator );
-		$args       = array(
-			$this->getDecoratorParamFrom( $reflection, $resolved )->getName() => $resolved,
-			...$params,
-		);
+		$args       = array( $this->getDecoratorParamFrom( $reflection, $resolved )->getName() => $resolved );
 
 		return $this->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
 	}
@@ -621,7 +621,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			);
 		}
 
-		$isResolvedObject = ! ! ( $type = Unwrap::paramTypeFrom( reflection: $param ) )
+		$isResolvedObject = ( $type = Unwrap::paramTypeFrom( reflection: $param ) )
 			&& is_object( $resolved )
 			&& is_a( $resolved, class: $type );
 
