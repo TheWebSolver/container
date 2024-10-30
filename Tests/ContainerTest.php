@@ -23,6 +23,7 @@ use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
+use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
 
 class ContainerTest extends TestCase {
@@ -684,6 +685,33 @@ class ContainerTest extends TestCase {
 		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $instance );
 		$this->assertSame( 'from event', $instance->stub->array['updated'] );
 		$this->assertSame( 'hello!', $instance->name );
+
+		$baseClass = new #[DecorateWith( listener: array( self::class, 'useDecorator' ) )]
+		class() implements JustTest__Stub {
+			public function __construct( public ArrayAccess $stack = new Stack() ) {}
+
+			public function getStack(): ArrayAccess {
+				return $this->stack;
+			}
+
+			public static function useDecorator( AfterBuildEvent $e ): void {
+				$e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+					->update(
+						with: function ( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub $decorator ) {
+							$decorator->stub->array['updated'] = 'from attribute';
+						}
+					);
+			}
+		};
+
+		$this->app->set( JustTest__Stub::class, $baseClass::class );
+
+		$this->assertInstanceOf(
+			expected: _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class,
+			actual: $decorator = $this->app->get( JustTest__Stub::class )
+		);
+
+		$this->assertSame( 'from attribute', $decorator->stub->array['updated'] );
 	}
 
 	public function testWithAbstract(): void {
@@ -694,7 +722,9 @@ class ContainerTest extends TestCase {
 	}
 }
 
-interface JustTest__Stub {}
+interface JustTest__Stub {
+	public function getStack(): ArrayAccess;
+}
 
 class _Stack__ContextualBindingWithArrayAccess__Stub implements JustTest__Stub {
 	public function __construct( public readonly ArrayAccess $array ) {}
@@ -708,11 +738,15 @@ class _Stack__ContextualBindingWithArrayAccess__Stub implements JustTest__Stub {
 	}
 }
 
-class _Stack__ContextualBindingWithArrayAccess__Decorator__Stub {
-	public function __construct( public readonly _Stack__ContextualBindingWithArrayAccess__Stub $stub, public readonly string $name ) {}
+class _Stack__ContextualBindingWithArrayAccess__Decorator__Stub implements JustTest__Stub {
+	public function __construct( public readonly JustTest__Stub $stub, public readonly string $name ) {}
 
 	public function test( Stack $stack ): void {
 		$stack->set( 'asAttr', 'works' );
+	}
+
+	public function getStack(): ArrayAccess {
+		return $this->stub->getStack();
 	}
 }
 
