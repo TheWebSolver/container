@@ -562,10 +562,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$eventDispatcher = $this->eventDispatchers[ EventType::AfterBuild ];
 
 		if ( $reflector && ! empty( $attributes = $reflector->getAttributes( DecorateWith::class ) ) ) {
-			$attribute = $attributes[0]->newInstance();
+			[ $low, $high ] = $eventDispatcher->getPriorities();
+			$attribute      = $attributes[0]->newInstance();
+			$priority       = $attribute->isFinal ? $high + 1 : $low - 1;
 
-			$eventDispatcher->reset( $id );
-			$eventDispatcher->addListener( ( $attribute->listener )( ... ), forEntry: $id, priority: 1 );
+			$eventDispatcher->addListener( ( $attribute->listener )( ... ), forEntry: $id, priority: $priority );
 		}
 
 		/** @var AfterBuildEvent */
@@ -582,13 +583,13 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $resolved;
 	}
 
-	/** @param class-string|Closure $decorator */
+	/** @param string|Closure $decorator */
 	protected function decorate( mixed $resolved, string|Closure $decorator ): mixed {
 		if ( $decorator instanceof Closure ) {
 			return $decorator( $resolved, $this );
 		}
 
-		$reflection = $this->getReflectionOf( $decorator );
+		$reflection = $this->getReflectionOf( $this->getEntryFrom( $decorator ) );
 		$args       = array( $this->getDecoratorParamFrom( $reflection, $resolved )->getName() => $resolved );
 
 		return $this->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
@@ -634,7 +635,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/** @see Container::register() For details on how entry is bound to the container. */
-	protected function getConcrete( string $entry ): Closure|string {
+	public function getConcrete( string $entry ): Closure|string {
 		if ( ! $binding = $this->getBinding( $entry ) ) {
 			return $entry;
 		}
@@ -644,14 +645,16 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return match ( true ) {
 			default => throw ContainerError::unResolvableEntry( $entry ),
 
-			// Both entry|abstract and concrete is same, or entry is already resolved as an instance.
+			// Both abstract and concrete is same, or entry is already resolved as an instance.
 			$concrete === $entry || $binding->isInstance() => $entry,
 
 			// Resolve using the user-defined Closure.
 			$concrete instanceof Closure => $concrete,
 
-			// Map of [entry|abstract => concrete]. Beyond this, the entry is unresolvable.
-			is_array( $concrete ) => $concrete[ $entry ] ?? throw ContainerError::unResolvableEntry( $entry ),
+			// Map of [abstract or its alias => concrete or its alias]. Beyond this, the entry is unresolvable.
+			is_array( $concrete ) => $this->getEntryFrom(
+				$concrete[ $entry ] ?? throw ContainerError::unResolvableEntry( $entry )
+			),
 		};
 	}
 

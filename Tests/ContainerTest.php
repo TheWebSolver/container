@@ -652,38 +652,30 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testAllEvents(): void {
-		$this->app->set( JustTest__Stub::class, _Stack__ContextualBindingWithArrayAccess__Stub::class );
-
-		$resolvedArray = static function ( BeforeBuildEvent $e ) {
-			$e->setParam( name: 'array', value: new Stack() );
-		};
+		$this->app->setAlias( _Stack__ContextualBindingWithArrayAccess__Stub::class, 'decoratorTest' );
+		$this->app->set( JustTest__Stub::class, 'decoratorTest' );
 
 		$this->app->when( EventType::BeforeBuild )
-			->for( _Stack__ContextualBindingWithArrayAccess__Stub::class )
-			->listen( $resolvedArray );
+			->for( JustTest__Stub::class )
+			->listen( fn ( BeforeBuildEvent $e ) => $e->setParam( name: 'array', value: new Stack() ) );
 
 		$this->app->when( EventType::Building )
-			->for( 'string', 'name' )
+			->for( entry: 'string', paramName: 'name' )
 			->listen( fn( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: 'hello!' ) ) );
 
 		$this->app->when( EventType::AfterBuild )
-			->for( _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->for( JustTest__Stub::class )
 			->listen(
-				function ( AfterBuildEvent $e ) {
-					$e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
-						->update(
-							with: function ( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub $decorator ) {
-								$decorator->stub->array['updated'] = 'from event';
-							}
-						);
-				}
+				fn ( AfterBuildEvent $e ) => $e
+					->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+					->update( with: fn ( JustTest__Stub $d ) => ( $d->getStack()['updated'] = 'from event' ) )
 			);
 
-		/** @var _Stack__ContextualBindingWithArrayAccess__Decorator__Stub */
+		/** @var JustTest__Stub */
 		$instance = $this->app->get( JustTest__Stub::class );
 
 		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $instance );
-		$this->assertSame( 'from event', $instance->stub->array['updated'] );
+		$this->assertSame( 'from event', $instance->getStack()['updated'] );
 		$this->assertSame( 'hello!', $instance->name );
 
 		$baseClass = new #[DecorateWith( listener: array( self::class, 'useDecorator' ) )]
@@ -694,24 +686,70 @@ class ContainerTest extends TestCase {
 				return $this->stack;
 			}
 
+			public function getStatus(): string {
+				return 'Base-Class:';
+			}
+
 			public static function useDecorator( AfterBuildEvent $e ): void {
 				$e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
 					->update(
-						with: function ( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub $decorator ) {
-							$decorator->stub->array['updated'] = 'from attribute';
+						with: function ( JustTest__Stub $decorator ) {
+							$decorator->getStack()['updated'] = 'from attribute';
 						}
 					);
 			}
 		};
 
-		$this->app->set( JustTest__Stub::class, $baseClass::class );
+		$this->tearDown();
+		$this->setUp();
 
-		$this->assertInstanceOf(
-			expected: _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class,
-			actual: $decorator = $this->app->get( JustTest__Stub::class )
-		);
+		$this->app->setAlias( $baseClass::class, 'baseClass' );
+		$this->app->set( JustTest__Stub::class, 'baseClass' );
 
-		$this->assertSame( 'from attribute', $decorator->stub->array['updated'] );
+		$firstDecorator = new class() implements JustTest__Stub {
+			public function __construct( public ?JustTest__Stub $stub = null ) {}
+
+			public function getStack(): ArrayAccess {
+				$stack          = $this->stub->getStack();
+				$stack['first'] = 'value';
+
+				return $stack;
+			}
+
+			public function getStatus(): string {
+				return $this->stub->getStatus() . 'First-Decorator:';
+			}
+		};
+
+		$finalDecorator = new class() implements JustTest__Stub {
+			public function __construct( public ?JustTest__Stub $stub = null ) {}
+
+			public function getStack(): ArrayAccess {
+				$stack          = $this->stub->getStack();
+				$stack['final'] = 'value';
+
+				return $stack;
+			}
+
+			public function getStatus(): string {
+				return $this->stub->getStatus() . 'Final-Decorator:';
+			}
+		};
+
+		$this->app->setAlias( $firstDecorator::class, 'firstDecorator' );
+		$this->app->setAlias( $finalDecorator::class, 'finalDecorator' );
+
+		$this->app->when( EventType::AfterBuild )
+			->for( 'baseClass' )
+			->listen( fn ( AfterBuildEvent $e ) => $e->decorateWith( 'finalDecorator' ), priority: 20 );
+
+			$this->app->when( EventType::AfterBuild )
+			->for( 'baseClass' )
+			->listen( fn ( AfterBuildEvent $e ) => $e->decorateWith( 'firstDecorator' ), priority: -10 );
+
+		$stub = $this->app->get( JustTest__Stub::class );
+
+		$this->assertSame( 'Base-Class:Main-Decorator:First-Decorator:Final-Decorator:', $stub->getStatus() );
 	}
 
 	public function testWithAbstract(): void {
@@ -724,6 +762,7 @@ class ContainerTest extends TestCase {
 
 interface JustTest__Stub {
 	public function getStack(): ArrayAccess;
+	public function getStatus(): string;
 }
 
 class _Stack__ContextualBindingWithArrayAccess__Stub implements JustTest__Stub {
@@ -736,10 +775,14 @@ class _Stack__ContextualBindingWithArrayAccess__Stub implements JustTest__Stub {
 	public function getStack(): ArrayAccess {
 		return $this->array;
 	}
+
+	public function getStatus(): string {
+		return 'Main-Class:';
+	}
 }
 
 class _Stack__ContextualBindingWithArrayAccess__Decorator__Stub implements JustTest__Stub {
-	public function __construct( public readonly JustTest__Stub $stub, public readonly string $name ) {}
+	public function __construct( public readonly JustTest__Stub $stub, public readonly string $name = '' ) {}
 
 	public function test( Stack $stack ): void {
 		$stack->set( 'asAttr', 'works' );
@@ -747,6 +790,10 @@ class _Stack__ContextualBindingWithArrayAccess__Decorator__Stub implements JustT
 
 	public function getStack(): ArrayAccess {
 		return $this->stub->getStack();
+	}
+
+	public function getStatus(): string {
+		return $this->stub->getStatus() . 'Main-Decorator:';
 	}
 }
 
