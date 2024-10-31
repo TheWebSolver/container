@@ -130,11 +130,11 @@ trait ListenerRegistrar {
 	protected function resetProperties( int $priority ): void {
 		$this->needsSorting = true;
 
-		if ( $priority < ( $this->priorities[0] ?? $priority ) ) {
+		if ( ! ( $low = ( $this->priorities[0] ?? null ) ) || $priority < $low ) {
 			$this->priorities[0] = $priority;
 		}
 
-		if ( $priority > ( $this->priorities[1] ?? $priority ) ) {
+		if ( ! ( $high = ( $this->priorities[1] ?? null ) ) || $priority > $high ) {
 			$this->priorities[1] = $priority;
 		}
 	}
