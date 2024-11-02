@@ -294,7 +294,6 @@ class ContainerTest extends TestCase {
 		$test = new class() {
 			public function get( int $val ): int {
 				return $val + 2;
-				;
 			}
 
 			public function addsTen( int $val = 7 ): int {
@@ -629,7 +628,6 @@ class ContainerTest extends TestCase {
 			);
 
 			$afterBuild = function ( AfterBuildEvent $e ) {
-				// $e->call( fn( Stack $stack ) => $stack->set( key: 'afterBuild', value: 'Stack As ArrayAccess' ) );
 				$e->update(
 					with: fn( Stack $stack ) => $stack->set( key: 'afterBuild', value: 'Stack As ArrayAccess' ),
 				);

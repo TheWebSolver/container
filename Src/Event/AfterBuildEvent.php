@@ -4,8 +4,8 @@
  *
  * @package TheWebSolver\Codegarage\Container
  *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
+ * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics typ-hint OK.
+ * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics typ-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -19,14 +19,14 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 
-/** @template TEvent */
+/** @template TResolved */
 class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;
 
 	/**
-	 * @param TEvent                          $resolved
-	 * @param Stack<(class-string|Closure)[]> $decorators
-	 * @param Stack<Closure[]>                $updaters
+	 * @param TResolved                                                                     $resolved
+	 * @param Stack<(class-string<TResolved>|(Closure(TResolved, Container): TResolved))[]> $decorators
+	 * @param Stack<(Closure(TResolved, Container): void)[]>                                $updaters
 	 */
 	public function __construct(
 		private readonly mixed $resolved,
@@ -38,12 +38,12 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 		$updaters->asCollection();
 	}
 
-	/** @return Stack<(class-string|Closure)[]> */
+	/** @return Stack<(class-string<TResolved>|(Closure(TResolved, Container): TResolved))[]> */
 	public function getDecorators(): Stack {
 		return $this->decorators;
 	}
 
-	/** @return Stack<Closure[]> */
+	/** @return Stack<(Closure(TResolved, Container): void)[]> */
 	public function getUpdaters(): Stack {
 		return $this->updaters;
 	}
@@ -51,7 +51,7 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	/**
 	 * Decorates resolved value with decorator currently being registered.
 	 *
-	 * @param class-string|Closure(TEvent $resolved, Container $app): TEvent $decorator The decorator can be:
+	 * @param class-string<TResolved>|(Closure(TResolved, Container): TResolved) $decorator The decorator can be:
 	 * - a Closure that accepts the resolved value as first argument and container as second, or
 	 * - a classname that accepts the resolved value as first argument.
 	 */
@@ -64,8 +64,8 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	/**
 	 * Updates the resolved value with the given callback currently being registered.
 	 *
-	 * @param Closure(TEvent $resolved, Container $app): void $with Recommended to type-hint `$resolved` value for the
-	 *                                                         listener instead of nothing for IDE and better DX.
+	 * @param Closure(TResolved, Container): void $with Recommended to type-hint first parameter's value to
+	 *                                              resolved type instead of `mixed` for IDE support.
 	 */
 	public function update( Closure $with ): void {
 		$this->updaters->set( key: $this->entry, value: $with );
@@ -75,7 +75,7 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 		return $this->entry;
 	}
 
-	/** @return TEvent */
+	/** @return TResolved */
 	public function getResolved(): mixed {
 		return $this->resolved;
 	}

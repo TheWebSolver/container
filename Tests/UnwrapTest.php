@@ -9,10 +9,9 @@
 
 declare( strict_types = 1 );
 
-use PHPUnit\Framework\Reorderable;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
-use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 
 class UnwrapTest extends TestCase {
@@ -248,8 +247,8 @@ class UnwrapTest extends TestCase {
 
 function _wrapped__Lambda() {
 	return function () {};
-};
+}
 
 function _wrapped__staticLambda() {
 	return static function () {};
-};
+}

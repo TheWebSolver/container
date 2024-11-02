@@ -3,8 +3,6 @@
  * Performs unwrapping for various container APIs.
  *
  * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Exact number is vague.
  */
 
 declare( strict_types = 1 );

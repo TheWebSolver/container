@@ -3,9 +3,6 @@
  * Method resolver for DI & Auto-wiring method calls.
  *
  * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
  */
 
 declare( strict_types = 1 );
@@ -34,7 +31,9 @@ class MethodResolver {
 	) {}
 
 	/**
-	 * @param array<string,mixed> $params The method's injected parameters.
+	 * @param callable|string     $cb      The callable or a string representation of invoked method.
+	 * @param ?string             $default The default method name. Defaults to `__invoke()`.
+	 * @param array<string,mixed> $params  The method's injected parameters.
 	 * @throws BadResolverArgument When method cannot be resolved or no `$default`.
 	 */
 	public function resolve( callable|string $cb, ?string $default, array $params = array() ): mixed {

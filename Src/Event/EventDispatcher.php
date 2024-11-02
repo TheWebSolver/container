@@ -4,8 +4,8 @@
  *
  * @package TheWebSolver\Codegarage\Container
  *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- * @Phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
+ * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics typ-hint OK.
+ * @Phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics typ-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -18,18 +18,18 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\EventDispatcher\ListenerProviderInterface;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
-/** @template T of object */
+/** @template TEvent of object */
 class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 	// phpcs:ignore Squiz.Commenting.FunctionComment.SpacingAfterParamType
-	/** @param ListenerProviderInterface&ListenerRegistry<T> $provider */
+	/** @param ListenerProviderInterface&ListenerRegistry<TEvent> $provider */
 	public function __construct( private readonly ListenerProviderInterface&ListenerRegistry $provider ) {}
 
-	/** @param Closure(T $event): void $listener */
+	/** @param Closure(TEvent $event): void $listener */
 	public function addListener( Closure $listener, ?string $forEntry, int $priority = self::DEFAULT_PRIORITY ): void {
 		$this->provider->addListener( $listener, $forEntry, $priority );
 	}
 
-	/** @return array<int,array<int,Closure(T $event): void>> */
+	/** @return array<int,array<int,Closure(TEvent $event): void>> */
 	public function getListeners( ?string $forEntry = null ): array {
 		return $this->provider->getListeners( $forEntry );
 	}
@@ -42,7 +42,7 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 		$this->provider->reset( $collectionId );
 	}
 
-	/** @param T $event */
+	/** @param TEvent $event */
 	public function dispatch( object $event ) {
 		foreach ( $this->provider->getListenersForEvent( $event ) as $listeners ) {
 			foreach ( $listeners as $listener ) {

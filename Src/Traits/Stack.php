@@ -26,6 +26,7 @@ trait Stack {
 		return ! empty( $this->stack );
 	}
 
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
 	public function reset( ?string $collectionId = null ): void {
 		$this->stack = array();
 	}

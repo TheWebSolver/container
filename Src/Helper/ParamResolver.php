@@ -146,16 +146,16 @@ class ParamResolver {
 		[$lowest, $highest] = $dispatcher->getPriorities();
 
 		/*
-		 | Prioritize the Event Listener based on whether it should be treated as final or not.
-		 |
-		 | When it is set as final:
-		 |  - user-defined Event Listeners will be listened before it.
-		 |  - user-defined Event Listeners may halt this Event Listener.
-		 |
-		 | When it is not set as final:
-		 |  - it will be listened before user-defined Event Listeners.
-		 |  - it may halt the user-defined Event Listeners.
-		 */
+		| Prioritize the Event Listener based on whether it should be treated as final or not.
+		|
+		| When it is set as final:
+		|  - user-defined Event Listeners will be listened before it.
+		|  - user-defined Event Listeners may halt this Event Listener.
+		|
+		| When it is not set as final:
+		|  - it will be listened before user-defined Event Listeners.
+		|  - it may halt the user-defined Event Listeners.
+		*/
 		$priority = $attribute->isFinal ? $highest + 1 : $lowest - 1;
 
 		$dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id, priority: $priority );

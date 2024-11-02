@@ -4,8 +4,8 @@
  *
  * @package TheWebSolver\Codegarage\Container
  *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
+ * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics type-hint OK.
+ * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics & Closure type-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -23,9 +23,9 @@ trait ListenerRegistrar {
 	protected array $listenersForEntry = array();
 	/** @var array<int,array<int,Closure(TEvent $event): void>> */
 	protected array $listeners = array();
-	protected bool $needsSorting = false;
 	/** @var array{0:int,1:int} */
 	protected array $priorities;
+	protected bool $needsSorting = false;
 
 
 	/**

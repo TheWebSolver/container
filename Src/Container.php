@@ -4,11 +4,9 @@
  *
  * @package TheWebSolver\Codegarage\Container
  *
- * @phpcs:disable Squiz.Commenting.FunctionCommentThrowTag.Missing
- * @phpcs:disable Squiz.Commenting.FunctionComment.WrongStyle
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
- * @phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped
+ * @phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType -- Intersection param type OK.
+ * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics & Closure type-hint OK.
+ * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics & Closure type-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -63,7 +61,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @var WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> */
 	protected WeakMap $eventDispatchers;
 
-	// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	/**
 	 * @param WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> $eventDispatchers
 	 * @param Stack<Binding>                                               $bindings
@@ -73,7 +70,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param Stack<array<class-string|Closure>>                           $extenders
 	 * @param Stack<bool>                                                  $resolved
 	 */
-	// phpcs:enable Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	final public function __construct(
 		protected readonly Stack $bindings = new Stack(),
 		protected readonly Param $paramPool = new Param(),
@@ -93,7 +89,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/**
-	 * @param WeakMap<EventType,EventDispatcherInterface &ListenerRegistry> $eventDispatchers
+	 * @param ?WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> $eventDispatchers
 	 * @throws LogicException When all three Event Type Dispatchers were not provided.
 	 */
 	private function polyfillEventDispatchers( ?WeakMap $eventDispatchers ): void {
@@ -146,7 +142,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 			protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool {
 				return $event->getEntry() === $currentEntry
-					|| $event instanceof AfterBuildEvent && $event->getResolved() instanceof $currentEntry;
+					|| ( $event instanceof AfterBuildEvent && $event->getResolved() instanceof $currentEntry );
 			}
 		};
 
@@ -163,10 +159,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/*
-	 |================================================================================================
-	 | ASSERTION METHODS
-	 |================================================================================================
-	 */
+	|================================================================================================
+	| ASSERTION METHODS
+	|================================================================================================
+	*/
 
 	/** @param string $key The key. */
 	public function offsetExists( $key ): bool {
@@ -201,10 +197,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/*
-	 |================================================================================================
-	 | GETTER METHODS
-	 |================================================================================================
-	 */
+	|================================================================================================
+	| GETTER METHODS
+	|================================================================================================
+	*/
 
 	/** @param string $key The key. */
 	#[\ReturnTypeWillChange]
@@ -296,10 +292,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/*
-	 |================================================================================================
-	 | SETTER METHODS
-	 |================================================================================================
-	 */
+	|================================================================================================
+	| SETTER METHODS
+	|================================================================================================
+	*/
 
 	/**
 	 * @param string              $key
@@ -359,10 +355,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/*
-	 |================================================================================================
-	 | CREATOR METHODS
-	 |================================================================================================
-	 */
+	|================================================================================================
+	| CREATOR METHODS
+	|================================================================================================
+	*/
 
 	/**
 	 * @param EventType|string|string[]|Closure $constraint
@@ -374,7 +370,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 
 		$constraint = $constraint instanceof Closure ? Unwrap::forBinding( $constraint ) : $constraint;
-		$ids      = array_map( $this->getEntryFrom( ... ), array: Unwrap::asArray( $constraint ) );
+		$ids        = array_map( $this->getEntryFrom( ... ), array: Unwrap::asArray( $constraint ) );
 
 		return new ContextBuilder( for: $ids, app: $this, contextual: $this->contextual );
 	}
@@ -382,6 +378,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/**
 	 * @param class-string|Closure $with
 	 * @return array{0:?ReflectionClass,1:mixed}
+	 * @throws ContainerExceptionInterface When cannot build `$with`.
 	 */
 	public function build( string|Closure $with, bool $dispatch = true, ?ReflectionClass $reflector = null ): array {
 		if ( $with instanceof Closure ) {
@@ -423,7 +420,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		);
 	}
 
-	// TODO: Remove once EventType::AfterBuild is implemented.
+	/**
+	 * TODO: Remove once EventType::AfterBuild is implemented.
+	 */
 	public function extend( string $id, Closure $closure ): void {
 		$id = $this->getEntryFrom( alias: $id );
 
@@ -448,7 +447,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 *
 	 * @param Closure(object $obj, Container $app): ?object $with
 	 * @return mixed The resolved data, `null` if nothing was bound before.
-	 * @throws NotFoundExceptionInterface When binding not found for the given id `$of`.
+	 * @throws EntryNotFound When binding not found for the given id `$of`.
 	 */
 	public function useRebound( string $of, Closure $with ): mixed {
 		$this->rebounds->set( key: $of, value: $with );
@@ -457,10 +456,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/*
-	 |================================================================================================
-	 | DESTRUCTOR METHODS
-	 |================================================================================================
-	 */
+	|================================================================================================
+	| DESTRUCTOR METHODS
+	|================================================================================================
+	*/
 
 	/** @param string $key */
 	public function offsetUnset( $key ): void {
@@ -482,11 +481,14 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/*
-	 |================================================================================================
-	 | HELPER METHODS
-	 |================================================================================================
-	 */
+	|================================================================================================
+	| HELPER METHODS
+	|================================================================================================
+	*/
 
+	/**
+	 * @param string $id The abstract or a concrete/alias.
+	 */
 	protected function rebound( string $id ): void {
 		$old = $this->get( $id );
 
@@ -583,7 +585,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $resolved;
 	}
 
-	/** @param string|Closure $decorator */
+	/** @param class-string|(Closure(mixed, Container): mixed) $decorator */
 	protected function decorate( mixed $resolved, string|Closure $decorator ): mixed {
 		if ( $decorator instanceof Closure ) {
 			return $decorator( $resolved, $this );
@@ -634,7 +636,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		);
 	}
 
-	/** @see Container::register() For details on how entry is bound to the container. */
+	/**
+	 * @see Container::register() For details on how entry is bound to the container.
+	 * @throws ContainerError When concrete not found for given `$entry`.
+	 */
 	public function getConcrete( string $entry ): Closure|string {
 		if ( ! $binding = $this->getBinding( $entry ) ) {
 			return $entry;

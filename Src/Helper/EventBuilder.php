@@ -4,7 +4,7 @@
  *
  * @package TheWebSolver\Codegarage\Container
  *
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Closure type-hint OK.
+ * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -58,10 +58,10 @@ final class EventBuilder {
 	}
 
 	/**
-	 * @param Closure(object $event): void $with
+	 * @param Closure(object): void $with
 	 * @throws LogicException When this method is invoked before `EventBuilder::needsListenerFor()` method.
 	 */
-	public function listen( Closure $with, int $priority = ListenerRegistry::DEFAULT_PRIORITY ): void { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
+	public function listen( Closure $with, int $priority = ListenerRegistry::DEFAULT_PRIORITY ): void {
 		$this->registry->addListener(
 			listener: $with,
 			priority: $priority,

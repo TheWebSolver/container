@@ -4,7 +4,7 @@
  *
  * @package TheWebSolver\Codegarage\Container
  *
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
+ * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics Type-hint OK.
  */
 
 declare( strict_types = 1 );
