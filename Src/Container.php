@@ -110,7 +110,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 				return $event instanceof BeforeBuildEvent;
 			}
 
-			protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool {
+			protected function shouldListenTo( TaggableEvent $event, string $currentEntry ): bool {
 				$entry = $event->getEntry();
 
 				return $entry === $currentEntry || is_subclass_of( $entry, $currentEntry, allow_string: true );
@@ -125,10 +125,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			protected function isValid( object $event ): bool {
 				return $event instanceof BuildingEvent;
 			}
-
-			protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool {
-				return $event->getEntry() === $currentEntry;
-			}
 		};
 
 		$afterBuild = new /** @template-implements ListenerRegistry<AfterBuildEvent> */
@@ -138,10 +134,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 			protected function isValid( object $event ): bool {
 				return $event instanceof AfterBuildEvent;
-			}
-
-			protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool {
-				return $event->getEntry() === $currentEntry;
 			}
 		};
 

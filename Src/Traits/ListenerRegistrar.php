@@ -45,7 +45,9 @@ trait ListenerRegistrar {
 	 * Usually, validation is done by comparing if the event entry and current entry is same.
 	 * Also, check can be performed whether event entry is a subclass of the current entry.
 	 */
-	abstract protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool;
+	protected function shouldListenTo( TaggableEvent $event, string $currentEntry ): bool {
+		return $event->getEntry() === $currentEntry;
+	}
 
 	public function addListener(
 		Closure $listener,
@@ -106,13 +108,10 @@ trait ListenerRegistrar {
 
 	/** @return Generator */
 	protected function getListenersFor( TaggableEvent $event, bool $needsSorting ): iterable {
-		foreach ( $this->listenersForEntry as $entry => $listeners ) {
-			if ( $needsSorting ) {
-				$listeners = $this->getSorted( $listeners );
-			}
-
-			if ( $this->shouldFire( $event, currentEntry: $entry ) ) {
-				yield $listeners;
+		foreach ( $this->listenersForEntry as $currentEntry => $listeners ) {
+			if ( $this->shouldListenTo( $event, $currentEntry ) ) {
+				yield $needsSorting ? $this->getSorted( $listeners ) : $listeners;
+				return;
 			}
 		}
 	}
