@@ -24,12 +24,10 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;
 
 	/**
-	 * @param TResolved                                                                     $resolved
 	 * @param Stack<(class-string<TResolved>|(Closure(TResolved, Container): TResolved))[]> $decorators
 	 * @param Stack<(Closure(TResolved, Container): void)[]>                                $updaters
 	 */
 	public function __construct(
-		private readonly mixed $resolved,
 		private readonly string $entry,
 		private readonly Stack $decorators = new Stack(),
 		private readonly Stack $updaters = new Stack()
@@ -73,10 +71,5 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 
 	public function getEntry(): string {
 		return $this->entry;
-	}
-
-	/** @return TResolved */
-	public function getResolved(): mixed {
-		return $this->resolved;
 	}
 }

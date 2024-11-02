@@ -141,8 +141,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			}
 
 			protected function shouldFire( TaggableEvent $event, string $currentEntry ): bool {
-				return $event->getEntry() === $currentEntry
-					|| ( $event instanceof AfterBuildEvent && $event->getResolved() instanceof $currentEntry );
+				return $event->getEntry() === $currentEntry;
 			}
 		};
 
@@ -572,7 +571,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 
 		/** @var AfterBuildEvent */
-		$event = $eventDispatcher->dispatch( event: new AfterBuildEvent( $resolved, entry: $id ) );
+		$event = $eventDispatcher->dispatch( event: new AfterBuildEvent( entry: $id ) );
 
 		foreach ( $event->getDecorators()[ $id ] ?? array() as $decorator ) {
 			$resolved = $this->decorate( $resolved, $decorator );
