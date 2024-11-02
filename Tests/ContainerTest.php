@@ -750,13 +750,13 @@ class ContainerTest extends TestCase {
 		$stub = $this->app->get( JustTest__Stub::class );
 
 		$this->assertSame( 'Base-Class:Main-Decorator:First-Decorator:Final-Decorator:', $stub->getStatus() );
+		$this->assertInstanceOf( $finalDecorator::class, $stub );
 	}
 
 	public function testWithAbstract(): void {
 		$this->app->setAlias( self::class, 'selfClass' );
 		$this->app->set( TestCase::class, 'selfClass' );
-		// $this->app->set( self::class, self::class );
-		$this->assertInstanceOf( self::class, $this->app->get( self::class ) );
+		$this->assertInstanceOf( self::class, $this->app->get( 'selfClass' ) );
 	}
 }
 
