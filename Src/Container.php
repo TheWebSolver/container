@@ -651,9 +651,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			// Resolve using the user-defined Closure.
 			$concrete instanceof Closure => $concrete,
 
-			// Map of [abstract or its alias => concrete or its alias]. Beyond this, the entry is unresolvable.
+			// Map of [abstract => concrete or its alias]. Beyond this, the entry is unresolvable.
 			is_array( $concrete ) => $this->getEntryFrom(
-				$concrete[ $entry ] ?? throw ContainerError::unResolvableEntry( $entry )
+				alias: $concrete[ $entry ] ?? throw ContainerError::unResolvableEntry( $entry )
 			),
 		};
 	}
