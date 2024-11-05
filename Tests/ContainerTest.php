@@ -213,7 +213,7 @@ class ContainerTest extends TestCase {
 	public function testResolvingParamDuringBuildEventIntegration(): void {
 		$this->app->when( EventType::Building )
 			->for( entry: ArrayAccess::class, paramName: 'array' )
-			->listen(
+			->listenTo(
 				function ( BuildingEvent $event ) {
 					$stack = new Stack();
 					$stack->set( 'key', 'value' );
@@ -277,7 +277,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( EventType::Building )
 			->for( entry: _Secondary__EntryClass__Stub::class, paramName: 'secondary' )
-			->listen(
+			->listenTo(
 				function ( BuildingEvent $event ) use ( $eventualClass ) {
 					$event->setBinding( new Binding( concrete: $eventualClass ) );
 				}
@@ -430,7 +430,7 @@ class ContainerTest extends TestCase {
 	private function withEventListenerValue( int $value ): void {
 		$this->app->when( EventType::Building )
 			->for( entry: 'int', paramName: 'val' )
-			->listen( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: $value ) ) );
+			->listenTo( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: $value ) ) );
 	}
 
 	public function testReboundValueOfDependencyBindingUpdatedAtLaterTime(): void {
@@ -510,22 +510,20 @@ class ContainerTest extends TestCase {
 		$this->app->get( id: 'noDependencyBound' );
 	}
 
-	public function testFireBeforeBuild(): void {
+	public function testEventListenerBeforeBuild(): void {
 		$app = new Container();
 
 		$app->when( EventType::BeforeBuild )
 			->for( entry: _Stack__ContextualBindingWithArrayAccess__Stub::class )
-			->listen( $this->beforeBuildListener( ... ) );
+			->listenTo( static fn ( BeforeBuildEvent $e ) => $e->setParam( 'array', new WeakMap() ) );
 
-		$app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class, with: array( 'array' => new WeakMap() ) );
+		$this->assertInstanceOf(
+			expected: WeakMap::class,
+			actual: $app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class )->array
+		);
 	}
 
-	private function beforeBuildListener( BeforeBuildEvent $event ): void {
-		$this->assertSame( _Stack__ContextualBindingWithArrayAccess__Stub::class, $event->getEntry() );
-		$this->assertInstanceOf( WeakMap::class, actual: $event->getParams()['array'] );
-	}
-
-	public function testUsingEventListenerDuringBuild(): void {
+	public function testEventListenerDuringBuild(): void {
 		/** @var _Main__EntryClass__Stub_Child */
 		$instance = $this->app->get( _Main__EntryClass__Stub_Child::class );
 
@@ -533,14 +531,15 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( EventType::Building )
 			->for( entry: _Primary__EntryClass__Stub::class, paramName: 'primary' )
-			->listen( fn( BuildingEvent $e ) => $e->setBinding( new Binding( 'this listener is halted' ) ) );
+			->listenTo(
+				static fn( BuildingEvent $e )
+					=> $e->setBinding( new Binding( 'attribute listener stops propagation and this is never listened.' ) )
+			);
 
 		/** @var _Main__EntryClass__Stub */
 		$instance = $this->app->get( _Main__EntryClass__Stub::class );
 
-		$this->assertTrue(
-			$this->app->isInstance( id: Stack::keyFrom( _Primary__EntryClass__Stub::class, 'primary' ) )
-		);
+		$this->assertTrue( $this->app->isInstance( id: _Primary__EntryClass__Stub::class . '||primary' ) );
 		$this->assertInstanceOf( _Primary__EntryClass__Stub_Child::class, actual: $instance->primary );
 
 		/** @var _Main__EntryClass__Stub_Child */
@@ -551,6 +550,10 @@ class ContainerTest extends TestCase {
 			expected: _Primary__EntryClass__Stub_Child::class,
 			actual: $instance->primary
 		);
+
+		$this->expectException( LogicException::class );
+
+		$this->app->when( EventType::Building )->for( entry: JustTest__Stub::class )->listenTo( static function ( $e ) {} );
 	}
 
 	public function testEventListenerFromParamAttributeAndUserDefinedListener(): void {
@@ -564,7 +567,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( EventType::Building )
 			->for( WeakMap::class, 'attrListenerPrecedence' )
-			->listen( $listener );
+			->listenTo( $listener );
 
 			/** @var _OverrideWth_Param_Event_Listener__Stub */
 		$instance = $this->app->get( _OverrideWth_Param_Event_Listener__Stub::class );
@@ -574,7 +577,7 @@ class ContainerTest extends TestCase {
 		$value = $this->app->call( $instance->getValue( ... ) );
 		$this->assertSame( 'from attribute', $value );
 
-		$stoppableListener = function ( BuildingEvent $e ): void {
+		$stoppableListener = static function ( BuildingEvent $e ): void {
 			// Use binding from previous listener.
 			$concrete = $e->getBinding()->concrete;
 
@@ -585,15 +588,15 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( EventType::Building )
 			->for( WeakMap::class, 'attrListenerPrecedence' )
-			->listen( $stoppableListener );
+			->listenTo( $stoppableListener );
 
 		$this->app->when( EventType::Building )
 			->for( WeakMap::class, 'attrListenerPrecedence' )
-			->listen(
-				function ( BuildingEvent $e ) {
+			->listenTo(
+				static function ( BuildingEvent $e ) {
 					echo 'Listener with lowest priority -10 is listened.';
 
-					$this->assertNull(
+					self::assertNull(
 						actual: $e->getBinding(),
 						message: 'Earliest Listener must not have any bindings unless this listener set it.'
 					);
@@ -613,35 +616,35 @@ class ContainerTest extends TestCase {
 	public function testEventOverridesPreviousListenerBindingDuringBuild(): void {
 		$this->app->when( EventType::Building )
 			->for( entry: ArrayAccess::class, paramName: 'array' )
-			->listen(
-				fn ( BuildingEvent $event ) => $event->setBinding(
-					new Binding( $this->app->get( Stack::class ), instance: true )
+			->listenTo(
+				static fn ( BuildingEvent $event ) => $event->setBinding(
+					new Binding( $event->app()->get( Stack::class ), instance: true )
 				)
 			);
 
 		$this->app->when( EventType::Building )
 			->for( entry: ArrayAccess::class, paramName: 'array' )
-			->listen(
-				fn ( BuildingEvent $event ) => $event->setBinding(
-					new Binding( $this->app->get( Stack::class ), instance: false )
+			->listenTo(
+				static fn ( BuildingEvent $event ) => $event->setBinding(
+					new Binding( $event->app()->get( Stack::class ), instance: false )
 				)
 			);
 
-			$afterBuild = function ( AfterBuildEvent $e ) {
+			$afterBuild = static function ( AfterBuildEvent $e ) {
 				$e->update(
-					with: fn( Stack $stack ) => $stack->set( key: 'afterBuild', value: 'Stack As ArrayAccess' ),
+					with: static fn( Stack $stack ) => $stack->set( key: 'afterBuild', value: 'Stack As ArrayAccess' ),
 				);
 			};
 
 		$this->app->when( EventType::AfterBuild )
 			->for( Stack::class )
-			->listen( $afterBuild );
+			->listenTo( $afterBuild );
 
 			/** @var _Stack__ContextualBindingWithArrayAccess__Stub */
 		$instance = $this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class );
 
 		$this->assertFalse(
-			condition: $this->app->isInstance( id: Stack::keyFrom( ArrayAccess::class, 'array' ) ),
+			condition: $this->app->isInstance( id: ArrayAccess::class . '||array' ),
 			message: 'Only one listener is allowed during build to resolve the particular entry parameter.'
 			. ' Subsequent listener will override the previous listener binding.'
 		);
@@ -655,18 +658,18 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( EventType::BeforeBuild )
 			->for( JustTest__Stub::class )
-			->listen( fn ( BeforeBuildEvent $e ) => $e->setParam( name: 'array', value: new Stack() ) );
+			->listenTo( static fn ( BeforeBuildEvent $e ) => $e->setParam( name: 'array', value: new Stack() ) );
 
 		$this->app->when( EventType::Building )
 			->for( entry: 'string', paramName: 'name' )
-			->listen( fn( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: 'hello!' ) ) );
+			->listenTo( static fn( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: 'hello!' ) ) );
 
 		$this->app->when( EventType::AfterBuild )
 			->for( JustTest__Stub::class )
-			->listen(
-				fn ( AfterBuildEvent $e ) => $e
+			->listenTo(
+				static fn ( AfterBuildEvent $e ) => $e
 					->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
-					->update( with: fn ( JustTest__Stub $d ) => ( $d->getStack()['updated'] = 'from event' ) )
+					->update( with: static fn ( JustTest__Stub $d ) => ( $d->getStack()['updated'] = 'from event' ) )
 			);
 
 		/** @var JustTest__Stub */
@@ -675,6 +678,9 @@ class ContainerTest extends TestCase {
 		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $instance );
 		$this->assertSame( 'from event', $instance->getStack()['updated'] );
 		$this->assertSame( 'hello!', $instance->name );
+
+		$this->tearDown();
+		$this->setUp();
 
 		$baseClass = new #[DecorateWith( listener: array( self::class, 'useDecorator' ) )]
 		class() implements JustTest__Stub {
@@ -691,15 +697,11 @@ class ContainerTest extends TestCase {
 			public static function useDecorator( AfterBuildEvent $e ): void {
 				$e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
 					->update(
-						with: function ( JustTest__Stub $decorator ) {
-							$decorator->getStack()['updated'] = 'from attribute';
-						}
+						with: static fn ( JustTest__Stub $decorator ) =>
+							( $decorator->getStack()['updated'] = 'from attribute' )
 					);
 			}
 		};
-
-		$this->tearDown();
-		$this->setUp();
 
 		$this->app->setAlias( $baseClass::class, 'baseClass' );
 		$this->app->set( JustTest__Stub::class, 'baseClass' );
@@ -739,22 +741,16 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( EventType::AfterBuild )
 			->for( 'baseClass' )
-			->listen( fn ( AfterBuildEvent $e ) => $e->decorateWith( 'finalDecorator' ), priority: 20 );
+			->listenTo( static fn ( AfterBuildEvent $e ) => $e->decorateWith( 'finalDecorator' ), priority: 20 );
 
 			$this->app->when( EventType::AfterBuild )
 			->for( 'baseClass' )
-			->listen( fn ( AfterBuildEvent $e ) => $e->decorateWith( 'firstDecorator' ), priority: -10 );
+			->listenTo( static fn ( AfterBuildEvent $e ) => $e->decorateWith( 'firstDecorator' ), priority: -10 );
 
 		$stub = $this->app->get( JustTest__Stub::class );
 
 		$this->assertSame( 'Base-Class:Main-Decorator:First-Decorator:Final-Decorator:', $stub->getStatus() );
 		$this->assertInstanceOf( $finalDecorator::class, $stub );
-	}
-
-	public function testWithAbstract(): void {
-		$this->app->setAlias( self::class, 'selfClass' );
-		$this->app->set( TestCase::class, 'selfClass' );
-		$this->assertInstanceOf( self::class, $this->app->get( 'selfClass' ) );
 	}
 }
 

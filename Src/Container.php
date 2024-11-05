@@ -51,9 +51,8 @@ use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 use TheWebSolver\Codegarage\Lib\Container\Traits\ListenerRegistrar;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
-/**
- * @template-implements ArrayAccess<string,mixed>
- */
+
+/** @template-implements ArrayAccess<string,mixed> */
 class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @var ?static */
 	protected static $instance;
@@ -206,6 +205,25 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	public function getBinding( string $id ): ?Binding {
 		return $this->bindings[ $id ] ?? null;
+	}
+
+	/**
+	 * @see Container::register() For details on how entry is bound to the container.
+	 * @throws ContainerError When concrete not found for given {@param $id}.
+	 */
+	public function getConcrete( string $id ): Closure|string {
+		if ( ( ! $binding = $this->getBinding( $id ) ) || $binding->isInstance() ) {
+			return $id;
+		}
+
+		$bound = $binding->concrete;
+
+		return match ( true ) {
+			default                   => null,
+			$bound === $id            => $id,
+			is_array( $bound )        => isset( $bound[ $id ] ) ? $this->getEntryFrom( $bound[ $id ] ) : null,
+			$bound instanceof Closure => $bound,
+		} ?? throw ContainerError::unResolvableEntry( $id );
 	}
 
 	/** @param array<string,mixed>|ArrayAccess<object|string,mixed> $params */
@@ -518,12 +536,14 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$entry = $bound instanceof Closure ? $id : $bound;
 
 		if ( $dispatch ) {
-			/** @var BeforeBuildEvent */
+			/** @var ?BeforeBuildEvent */
 			$event = $this->eventDispatchers[ EventType::BeforeBuild ]?->dispatch(
 				event: new BeforeBuildEvent( $entry, params: $with )
 			);
 
-			$with = $event->getParams();
+			if ( $event ) {
+				$with = $event->getParams();
+			}
 		}
 
 		$needsBuild = ! empty( $with ) || $this->hasContextualFor( entry: $id );
@@ -625,33 +645,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 				$class
 			)
 		);
-	}
-
-	/**
-	 * @see Container::register() For details on how entry is bound to the container.
-	 * @throws ContainerError When concrete not found for given `$entry`.
-	 */
-	public function getConcrete( string $entry ): Closure|string {
-		if ( ! $binding = $this->getBinding( $entry ) ) {
-			return $entry;
-		}
-
-		$concrete = $binding->concrete;
-
-		return match ( true ) {
-			default => throw ContainerError::unResolvableEntry( $entry ),
-
-			// Both abstract and concrete is same, or entry is already resolved as an instance.
-			$concrete === $entry || $binding->isInstance() => $entry,
-
-			// Resolve using the user-defined Closure.
-			$concrete instanceof Closure => $concrete,
-
-			// Map of [abstract => concrete or its alias]. Beyond this, the entry is unresolvable.
-			is_array( $concrete ) => $this->getEntryFrom(
-				alias: $concrete[ $entry ] ?? throw ContainerError::unResolvableEntry( $entry )
-			),
-		};
 	}
 
 	protected function fromContextual( string $context ): Closure|string|null {
