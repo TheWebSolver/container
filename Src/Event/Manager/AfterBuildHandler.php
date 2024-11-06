@@ -37,9 +37,9 @@ class AfterBuildHandler {
 		}
 
 		if ( $reflector && ! empty( $attributes = $reflector->getAttributes( DecorateWith::class ) ) ) {
-			[ $low, $high ] = $eventDispatcher->getPriorities();
-			$attribute      = $attributes[0]->newInstance();
-			$priority       = $attribute->isFinal ? $high + 1 : $low - 1;
+			$priorities = $eventDispatcher->getPriorities();
+			$attribute  = $attributes[0]->newInstance();
+			$priority   = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
 
 			$eventDispatcher->addListener( ( $attribute->listener )( ... ), forEntry: $id, priority: $priority );
 		}

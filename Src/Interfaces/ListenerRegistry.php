@@ -35,7 +35,7 @@ interface ListenerRegistry extends Resettable {
 	/**
 	 * Gets the lowest and highest priorities set by registered Event Listeners.
 	 *
-	 * @return array{0:int,1:int}
+	 * @return array{low:int,high:int}
 	 */
 	public function getPriorities(): array;
 }

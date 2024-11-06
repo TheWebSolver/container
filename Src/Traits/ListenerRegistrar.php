@@ -22,10 +22,13 @@ trait ListenerRegistrar {
 	/** @var array<string,array<int,array<int,Closure(TEvent $event): void>>> */
 	protected array $listenersForEntry = array();
 	/** @var array<int,array<int,Closure(TEvent $event): void>> */
-	protected array $listeners = array();
-	/** @var array{0:int,1:int} */
-	protected array $priorities;
+	protected array $listeners   = array();
 	protected bool $needsSorting = false;
+	/** @var array{low:int,high:int} */
+	protected array $priorities = array(
+		'low'  => ListenerRegistry::DEFAULT_PRIORITY,
+		'high' => ListenerRegistry::DEFAULT_PRIORITY,
+	);
 
 
 	/**
@@ -58,7 +61,6 @@ trait ListenerRegistrar {
 
 		if ( $forEntry ) {
 			$this->listenersForEntry[ $forEntry ][ $priority ][] = $listener;
-
 			return;
 		}
 
@@ -70,7 +72,7 @@ trait ListenerRegistrar {
 	}
 
 	public function getPriorities(): array {
-		return $this->priorities ?? array( ListenerRegistry::DEFAULT_PRIORITY, ListenerRegistry::DEFAULT_PRIORITY );
+		return $this->priorities;
 	}
 
 	public function reset( ?string $collectionId = null ): void {
@@ -126,12 +128,16 @@ trait ListenerRegistrar {
 	protected function resetProperties( int $priority ): void {
 		$this->needsSorting = true;
 
-		if ( ! ( $low = ( $this->priorities[0] ?? null ) ) || $priority < $low ) {
-			$this->priorities[0] = $priority;
+		if ( $this->currentPrioritySet( forType: 'low' ) > $priority ) {
+			$this->priorities['low'] = $priority;
 		}
 
-		if ( ! ( $high = ( $this->priorities[1] ?? null ) ) || $priority > $high ) {
-			$this->priorities[1] = $priority;
+		if ( $this->currentPrioritySet( forType: 'high' ) < $priority ) {
+			$this->priorities['high'] = $priority;
 		}
+	}
+
+	private function currentPrioritySet( string $forType ): int {
+		return $this->priorities[ $forType ];
 	}
 }
