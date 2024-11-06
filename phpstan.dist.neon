@@ -7,6 +7,7 @@ parameters:
 	ignoreErrors:
 		-
 			path: Src/Container.php
-			messages:
-				- '#^Parameter \#1 \$with of method TheWebSolver\\Codegarage\\Lib\\Container\\Container\:\:build\(\) expects class\-string\|Closure, Closure\|string given\.$#'
-				- '#^Dead catch \- ReflectionException is never thrown in the try block\.$#'
+			message: '#^Parameter \#1 \$with of method TheWebSolver\\Codegarage\\Lib\\Container\\Container\:\:build\(\) expects class\-string\|Closure, Closure\|string given\.$#'
+		-
+			path: Src/Helper/Unwrap.php
+			message: '#^Parameter \#1 \$objectOrClass of class ReflectionClass constructor expects class\-string\<T of object\>\|T of object, string given\.$#'

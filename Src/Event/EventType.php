@@ -11,13 +11,30 @@ namespace TheWebSolver\Codegarage\Lib\Container\Event;
 
 use Closure;
 use LogicException;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BuildingListenerProvider;
+use TheWebSolver\Codegarage\Lib\Container\Event\Provider\AfterBuildListenerProvider;
+use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BeforeBuildListenerProvider;
 
 enum EventType {
 	case BeforeBuild;
 	case Building;
 	case AfterBuild;
+
+	public function dispatcherId(): string {
+		return $this->name . 'EventDispatcher';
+	}
+
+	public function getDispatcher(): EventDispatcherInterface&ListenerRegistry {
+		return match ( $this ) {
+			self::BeforeBuild => new EventDispatcher( new BeforeBuildListenerProvider() ),
+			self::Building    => new EventDispatcher( new BuildingListenerProvider() ),
+			self::AfterBuild  => new EventDispatcher( new AfterBuildListenerProvider() )
+		};
+	}
 
 	/**
 	 * @param Container $app

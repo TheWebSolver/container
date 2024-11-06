@@ -21,12 +21,10 @@ use ArrayAccess;
 use LogicException;
 use ReflectionClass;
 use ReflectionException;
-use ReflectionParameter;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Psr\EventDispatcher\ListenerProviderInterface;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
@@ -36,21 +34,17 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator;
 use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
-use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
-use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
-use TheWebSolver\Codegarage\Lib\Container\Traits\ListenerRegistrar;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
+use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
 
 /** @template-implements ArrayAccess<string,mixed> */
 class Container implements ArrayAccess, ContainerInterface, Resettable {
@@ -59,9 +53,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/** @var WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> */
 	protected WeakMap $eventDispatchers;
+	protected EventManager $eventManager;
 
 	/**
-	 * @param WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> $eventDispatchers
 	 * @param Stack<Binding>                                               $bindings
 	 * @param Stack<array<string,Closure|string|null>>                     $contextual
 	 * @param Stack<array<int,string>>                                     $tags
@@ -79,69 +73,20 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		protected readonly Stack $extenders = new Stack(),
 		protected readonly Stack $tags = new Stack(),
 		protected readonly Stack $rebounds = new Stack(),
-		?WeakMap $eventDispatchers = null,
+		EventManager $eventManager = null
 	) {
-		$this->polyfillEventDispatchers( $eventDispatchers );
+		$this->polyfillEventDispatchersFor( $eventManager );
 		$this->extenders->asCollection();
 		$this->rebounds->asCollection();
 		$this->tags->asCollection();
 	}
 
-	/**
-	 * @param ?WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> $eventDispatchers
-	 * @throws LogicException When all three Event Type Dispatchers were not provided.
-	 */
-	private function polyfillEventDispatchers( ?WeakMap $eventDispatchers ): void {
-		if ( $eventDispatchers ) {
-			if ( 3 !== $eventDispatchers->count() ) {
-				throw new LogicException( 'All three Event Type Dispatchers must be provided.' );
-			}
+	private function polyfillEventDispatchersFor( ?EventManager $eventManager ): void {
+		$this->eventManager = $eventManager ?? new EventManager();
 
-			return;
+		foreach ( EventType::cases() as $eventType ) {
+			$this->eventManager->setDispatcher( $eventType->getDispatcher(), $eventType );
 		}
-
-		$beforeBuild = new /** @template-implements ListenerRegistry<BeforeBuildEvent> */
-		class() implements ListenerProviderInterface, ListenerRegistry {
-			/** @use ListenerRegistrar<BeforeBuildEvent> */
-			use ListenerRegistrar;
-
-			protected function isValid( object $event ): bool {
-				return $event instanceof BeforeBuildEvent;
-			}
-
-			protected function shouldListenTo( TaggableEvent $event, string $currentEntry ): bool {
-				$entry = $event->getEntry();
-
-				return $entry === $currentEntry || is_subclass_of( $entry, $currentEntry, allow_string: true );
-			}
-		};
-
-		$building = new /** @template-implements ListenerRegistry<BuildingEvent> */
-		class() implements ListenerProviderInterface, ListenerRegistry {
-			/** @use ListenerRegistrar<BuildingEvent> */
-			use ListenerRegistrar;
-
-			protected function isValid( object $event ): bool {
-				return $event instanceof BuildingEvent;
-			}
-		};
-
-		$afterBuild = new /** @template-implements ListenerRegistry<AfterBuildEvent> */
-		class() implements ListenerProviderInterface, ListenerRegistry {
-			/** @use ListenerRegistrar<AfterBuildEvent> */
-			use ListenerRegistrar;
-
-			protected function isValid( object $event ): bool {
-				return $event instanceof AfterBuildEvent;
-			}
-		};
-
-		/** @var WeakMap<EventType,EventDispatcherInterface&ListenerRegistry> */
-		$dispatchers                           = new WeakMap();
-		$dispatchers[ EventType::BeforeBuild ] = new EventDispatcher( provider: $beforeBuild );
-		$dispatchers[ EventType::Building ]    = new EventDispatcher( provider: $building );
-		$dispatchers[ EventType::AfterBuild ]  = new EventDispatcher( provider: $afterBuild );
-		$this->eventDispatchers                = $dispatchers;
 	}
 
 	public static function boot(): static {
@@ -245,7 +190,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		array $params = array(),
 		?string $defaultMethod = null
 	): mixed {
-		return ( new MethodResolver( $this, $this->eventDispatchers[ EventType::Building ], $this->artefact ) )
+		$dispatcher = $this->eventManager->getDispatcher( EventType::Building );
+
+		return ( new MethodResolver( $this, $dispatcher, $this->artefact ) )
 			->resolve( $callback, $defaultMethod, $params );
 	}
 
@@ -300,6 +247,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->resolved;
 	}
 
+	public function getEventManager(): EventManager {
+		return $this->eventManager;
+	}
+
 	/*
 	|================================================================================================
 	| SETTER METHODS
@@ -340,6 +291,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->register( $id, $concrete, singleton: true );
 	}
 
+	/**
+	 * @param T $instance
+	 * @return T
+	 * @template T of object
+	 */
 	public function setInstance( string $id, object $instance ): object {
 		$hasEntry = $this->has( $id );
 
@@ -372,10 +328,15 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/**
 	 * @param EventType|string|string[]|Closure $constraint
 	 * @return ($constraint is EventType ? EventBuilder : ContextBuilder)
+	 * @throws LogicException When unregistered Event Type provided to add event listener.
 	 */
 	public function when( EventType|string|array|Closure $constraint ): ContextBuilder|EventBuilder {
 		if ( $constraint instanceof EventType ) {
-			return new EventBuilder( app: $this, type: $constraint, registry: $this->eventDispatchers[ $constraint ] );
+			return ( $registry = $this->eventManager->getDispatcher( $constraint ) )
+				? new EventBuilder( app: $this, type: $constraint, registry: $registry )
+				: throw new LogicException(
+					message: sprintf( 'Cannot add Event Listener for the "%s" Event Type.', $constraint->name )
+				);
 		}
 
 		$constraint = $constraint instanceof Closure ? Unwrap::forBinding( $constraint ) : $constraint;
@@ -388,13 +349,18 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param class-string|Closure $with
 	 * @return array{0:?ReflectionClass,1:mixed}
 	 * @throws ContainerExceptionInterface When cannot build `$with`.
+	 * @throws ContainerError              When non-instantiable class-string `$with` given.
 	 */
 	public function build( string|Closure $with, bool $dispatch = true, ?ReflectionClass $reflector = null ): array {
 		if ( $with instanceof Closure ) {
 			return array( $reflector, $with( $this, $this->paramPool->latest() ) );
 		}
 
-		$reflector ??= $this->getReflectionOf( classname: $with );
+		try {
+			$reflector ??= Unwrap::classReflection( $with );
+		} catch ( ReflectionException | LogicException $e ) {
+			throw ContainerError::whenResolving( entry: $with, exception: $e, artefact: $this->artefact );
+		}
 
 		if ( null === ( $constructor = $reflector->getConstructor() ) ) {
 			return array( $reflector, new $with() );
@@ -403,7 +369,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->artefact->push( value: $with );
 
 		try {
-			$dispatcher = $dispatch ? $this->eventDispatchers[ EventType::Building ] : null;
+			$dispatcher = $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null;
 			$resolver   = new ParamResolver( $this, $this->paramPool, $dispatcher );
 			$resolved   = $resolver->resolve( dependencies: $constructor->getParameters() );
 		} catch ( ContainerExceptionInterface $e ) {
@@ -523,7 +489,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/** @param ArrayAccess<object|string,mixed>|array<string,mixed> $with */
-	protected function resolve(
+	public function resolve(
 		string $id,
 		array|ArrayAccess $with,
 		bool $dispatch,
@@ -537,9 +503,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		if ( $dispatch ) {
 			/** @var ?BeforeBuildEvent */
-			$event = $this->eventDispatchers[ EventType::BeforeBuild ]?->dispatch(
-				event: new BeforeBuildEvent( $entry, params: $with )
-			);
+			$event = $this->eventManager
+				->getDispatcher( EventType::BeforeBuild )
+				?->dispatch( event: new BeforeBuildEvent( $entry, params: $with ) );
 
 			if ( $event ) {
 				$with = $event->getParams();
@@ -549,7 +515,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$needsBuild = ! empty( $with ) || $this->hasContextualFor( entry: $id );
 
 		if ( $this->isInstance( $id ) && ! $needsBuild ) {
-			return $this->bindings[ $id ]->concrete;
+			$instance = $this->bindings[ $id ]->concrete;
+
+			return $dispatch
+				? ( new AfterBuildHandler( $this, $this->artefact ) )->handle( $id, $instance, $reflector )
+				: $instance;
 		}
 
 		$this->paramPool->push( value: $with ?? array() );
@@ -561,90 +531,13 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 
 		if ( $dispatch ) {
-			$resolved = $this->dispatchAfterBuildEvent( $entry, $resolved, $reflector );
+			$resolved = ( new AfterBuildHandler( $this, $this->artefact ) )->handle( $entry, $resolved, $reflector );
 		}
 
 		$this->paramPool->pull();
 		$this->resolved->set( key: $id, value: true );
 
 		return $resolved;
-	}
-
-	protected function dispatchAfterBuildEvent( string $id, mixed $resolved, ?ReflectionClass $reflector ): mixed {
-		/** @var EventDispatcherInterface&ListenerRegistry<AfterBuildEvent> */
-		$eventDispatcher = $this->eventDispatchers[ EventType::AfterBuild ];
-
-		if ( $reflector && ! empty( $attributes = $reflector->getAttributes( DecorateWith::class ) ) ) {
-			[ $low, $high ] = $eventDispatcher->getPriorities();
-			$attribute      = $attributes[0]->newInstance();
-			$priority       = $attribute->isFinal ? $high + 1 : $low - 1;
-
-			$eventDispatcher->addListener( ( $attribute->listener )( ... ), forEntry: $id, priority: $priority );
-		}
-
-		/** @var AfterBuildEvent */
-		$event = $eventDispatcher->dispatch( event: new AfterBuildEvent( entry: $id ) );
-
-		foreach ( $event->getDecorators()[ $id ] ?? array() as $decorator ) {
-			$resolved = $this->decorate( $resolved, $decorator );
-		}
-
-		foreach ( $event->getUpdaters()[ $id ] ?? array() as $updater ) {
-			$updater( $resolved, $this );
-		}
-
-		return $resolved;
-	}
-
-	/** @param class-string|(Closure(mixed, Container): mixed) $decorator */
-	protected function decorate( mixed $resolved, string|Closure $decorator ): mixed {
-		if ( $decorator instanceof Closure ) {
-			return $decorator( $resolved, $this );
-		}
-
-		$reflection = $this->getReflectionOf( $this->getEntryFrom( $decorator ) );
-		$args       = array( $this->getDecoratorParamFrom( $reflection, $resolved )->getName() => $resolved );
-
-		return $this->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
-	}
-
-	/**
-	 * @param class-string $classname
-	 * @throws ContainerError When invalid or un-instantiable classname given.
-	 */
-	protected function getReflectionOf( string $classname ): ReflectionClass {
-		try {
-			$reflector = new ReflectionClass( $classname );
-		} catch ( ReflectionException $error ) {
-			throw ContainerError::unResolvableEntry( id: $classname, previous: $error );
-		}
-
-		return ! $reflector->isInstantiable()
-			? throw ContainerError::unInstantiableEntry( id: $classname, artefact: $this->artefact )
-			: $reflector;
-	}
-
-	/** @throws BadResolverArgument When $resolved value Parameter could not be determined. */
-	protected function getDecoratorParamFrom( ReflectionClass $reflection, mixed $resolved ): ReflectionParameter {
-		$params = $reflection->getConstructor()?->getParameters();
-		$class  = $reflection->getName();
-
-		if ( null === $params || ! ( $param = ( $params[0] ?? null ) ) ) {
-			throw new BadResolverArgument(
-				sprintf( 'Decorating class "%s" does not have any parameters in its constructor.', $class )
-			);
-		}
-
-		$isResolvedObject = ( $type = Unwrap::paramTypeFrom( reflection: $param ) )
-			&& is_object( $resolved )
-			&& is_a( $resolved, class: $type );
-
-		return $isResolvedObject ? $param : throw new BadResolverArgument(
-			sprintf(
-				'Decorating class "%s" has invalid type-hint or not accepting the resolved object as first parameter.',
-				$class
-			)
-		);
 	}
 
 	protected function fromContextual( string $context ): Closure|string|null {
