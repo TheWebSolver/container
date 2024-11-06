@@ -243,6 +243,29 @@ class UnwrapTest extends TestCase {
 			array( array( 'OneAndTwoAndThree', 'Four' ), 'OneAndTwoAndThree&Four', '&' ),
 		);
 	}
+
+	/**
+	 * @dataProvider provideVariousClasses
+	 */
+	public function testClassReflectionUnwrap( string $classname, ?string $throws = null ): void {
+		if ( $throws ) {
+			$this->expectException( $throws );
+		}
+
+		$reflection = Unwrap::classReflection( $classname );
+
+		$this->assertSame( $classname, $reflection->getName() );
+	}
+
+	public function provideVariousClasses(): array {
+		return array(
+			array( stdClass::class ),
+			array( WeakMap::class ),
+			array( self::class ),
+			array( 'Invalid\\Class', ReflectionException::class ),
+			array( Unwrap::class, LogicException::class ),
+		);
+	}
 }
 
 function _wrapped__Lambda() {

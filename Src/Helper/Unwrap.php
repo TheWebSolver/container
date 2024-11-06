@@ -12,7 +12,9 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use Closure;
 use TypeError;
 use LogicException;
+use ReflectionClass;
 use ReflectionFunction;
+use ReflectionException;
 use ReflectionNamedType;
 use ReflectionParameter;
 
@@ -135,6 +137,17 @@ class Unwrap {
 	 */
 	public static function partsFrom( string $string, string $separator = '::' ): array {
 		return explode( $separator, $string, limit: 2 ); // @phpstan-ignore-line -- Only two parts returned.
+	}
+
+	/**
+	 * @throws ReflectionException When `$classname` is not a class-string.
+	 * @throws LogicException When non-instantiable `$classname` given.
+	 */
+	// phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Actual number is vague.
+	public static function classReflection( string $classname ): ReflectionClass {
+		return ! ( $classReflector = new ReflectionClass( $classname ) )->isInstantiable()
+			? throw new LogicException( "Non-instantiable class: {$classname}." )
+			: $classReflector;
 	}
 
 	/** @return ?array{0:array{0:object,1:string},1:string} */
