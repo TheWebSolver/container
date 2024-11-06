@@ -85,10 +85,10 @@ trait ListenerRegistrar {
 		}
 	}
 
-	/** @return ($event is TEvent ? Generator : array{}) */
+	/** @return Generator */
 	public function getListenersForEvent( object $event ): iterable {
 		if ( ! $this->isValid( $event ) ) {
-			return array();
+			return yield array();
 		}
 
 		$needsSorting       = $this->needsSorting;
@@ -101,17 +101,14 @@ trait ListenerRegistrar {
 		}
 	}
 
-	/** @return array<int,array<int,Closure(TEvent $event): void>> */
-	protected function getAllListeners( bool $needsSorting ): array {
-		return $needsSorting ? $this->getSorted( $this->listeners ) : $this->listeners;
+	protected function getAllListeners( bool $needsSorting ): Generator {
+		yield $needsSorting ? $this->getSorted( $this->listeners ) : $this->listeners;
 	}
 
-	/** @return Generator */
-	protected function getListenersFor( TaggableEvent $event, bool $needsSorting ): iterable {
+	protected function getListenersFor( TaggableEvent $event, bool $needsSorting ): Generator {
 		foreach ( $this->listenersForEntry as $currentEntry => $listeners ) {
 			if ( $this->shouldListenTo( $event, $currentEntry ) ) {
-				yield $needsSorting ? $this->getSorted( $listeners ) : $listeners;
-				return;
+				return yield $needsSorting ? $this->getSorted( $listeners ) : $listeners;
 			}
 		}
 	}
