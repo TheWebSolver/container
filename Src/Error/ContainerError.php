@@ -29,4 +29,10 @@ class ContainerError extends Exception implements ContainerExceptionInterface {
 			) . '.'
 		);
 	}
+
+	public static function whenResolving( string $entry, Exception $exception, Artefact $artefact ): self {
+		return $exception instanceof ReflectionException
+			? self::unResolvableEntry( $entry, $exception )
+			: self::unInstantiableEntry( $entry, $artefact );
+	}
 }
