@@ -32,16 +32,14 @@ final class EventManager {
 		(EventDispatcherInterface&ListenerRegistry)|false $dispatcher,
 		EventType $eventType
 	): bool {
-		if ( $this->isDispatcherDisabled( $eventType ) ) {
+		if ( $this->isDispatcherDisabled( $eventType ) || $this->isDispatcherAssigned( $eventType ) ) {
 			return false;
 		}
 
-		if ( ! $assignedPreviously = $this->isDispatcherAssigned( $eventType ) ) {
-			$this->eventDispatchers[ $eventType ]         = $dispatcher;
-			$this->assignedEventTypes[ $eventType->name ] = true;
-		}
+		$this->eventDispatchers[ $eventType ]         = $dispatcher;
+		$this->assignedEventTypes[ $eventType->name ] = true;
 
-		return ! $assignedPreviously;
+		return true;
 	}
 
 	public function getDispatcher( EventType $eventType ): (EventDispatcherInterface&ListenerRegistry)|null {
@@ -57,7 +55,7 @@ final class EventManager {
 		return false === ( $this->eventDispatchers[ $eventType ] ?? null );
 	}
 
-	private function isDispatcherAssigned( EventType $eventType ): bool {
+	public function isDispatcherAssigned( EventType $eventType ): bool {
 		return true === ( $this->assignedEventTypes[ $eventType->name ] ?? false );
 	}
 }

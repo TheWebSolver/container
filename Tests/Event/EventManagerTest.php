@@ -40,6 +40,7 @@ class EventManagerTest extends TestCase {
 
 		$this->assertNull( $this->manager->getDispatcher( EventType::BeforeBuild ) );
 		$this->assertTrue( $this->manager->isDispatcherDisabled( EventType::BeforeBuild ) );
+		$this->assertTrue( $this->manager->isDispatcherAssigned( EventType::BeforeBuild ) );
 		$this->assertFalse(
 			condition: $this->manager->setDispatcher( $this->createDispatcherStub(), EventType::BeforeBuild ),
 			message: 'Suppressed Event Dispatcher shall not be able to be re-assigned for same event type.'
@@ -47,6 +48,7 @@ class EventManagerTest extends TestCase {
 	}
 
 	public function testEventManagerSetterGetter(): void {
+		$this->assertEventDispatchersAssignedStatus( expected: false );
 		$this->assertTrue( $this->manager->setDispatcher( $beforeBuild = $this->createDispatcherStub(), EventType::BeforeBuild ) );
 		$this->assertTrue( $this->manager->setDispatcher( $building = $this->createDispatcherStub(), EventType::Building ) );
 		$this->assertFalse(
@@ -61,5 +63,12 @@ class EventManagerTest extends TestCase {
 			message: 'Must be able to assign dispatcher if not previously set.'
 		);
 		$this->assertSame( $afterBuild, $this->manager->getDispatcher( EventType::AfterBuild ) );
+		$this->assertEventDispatchersAssignedStatus( expected: true );
+	}
+
+	private function assertEventDispatchersAssignedStatus( bool $expected ): void {
+		foreach ( EventType::cases() as $eventType ) {
+			$this->assertSame( $expected, actual: $this->manager->isDispatcherAssigned( $eventType ) );
+		}
 	}
 }
