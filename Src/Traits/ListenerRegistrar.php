@@ -110,7 +110,7 @@ trait ListenerRegistrar {
 	protected function getListenersFor( TaggableEvent $event, bool $needsSorting ): Generator {
 		foreach ( $this->listenersForEntry as $currentEntry => $listeners ) {
 			if ( $this->shouldListenTo( $event, $currentEntry ) ) {
-				return yield $needsSorting ? $this->getSorted( $listeners ) : $listeners;
+				yield $needsSorting ? $this->getSorted( $listeners ) : $listeners;
 			}
 		}
 	}
