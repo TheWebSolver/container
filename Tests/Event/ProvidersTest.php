@@ -12,7 +12,9 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Tests\Event;
 
+use Generator;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 use Psr\EventDispatcher\ListenerProviderInterface;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
@@ -24,64 +26,82 @@ use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BuildingListenerProvide
 use TheWebSolver\Codegarage\Lib\Container\Event\Provider\AfterBuildListenerProvider;
 use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BeforeBuildListenerProvider;
 
-class ProviderTest extends TestCase {
+class ProvidersTest extends TestCase {
 	/**
 	 * @param class-string<ListenerProviderInterface &ListenerRegistry> $className
 	 * @dataProvider provideListenerProvidersAndValidEvent
 	 */
-	public function testListenerProviderProvidesListenersOnlyIfGivenObjectIsValidEvent( string $className, object $event ): void {
-		$provider = new $className();
+	public function testListenerProviderProvidesListenersOnlyIfGivenObjectIsValidEvent(
+		string $className,
+		MockObject $event
+	): void {
+		$listenerProvider = new $className();
 
-		$provider->addListener( function ( $e ) {}, null, 2 );
-		$provider->addListener( function ( $e ) {}, self::class, 3 );
-		$provider->addListener( function ( $e ) {}, self::class, 3 );
-		$provider->addListener( function ( $e ) {}, self::class, 7 );
+		$listenerProvider->addListener( function ( $e ) {}, null, 2 );
+		$listenerProvider->addListener( function ( $e ) {}, self::class, 7 );
+		$listenerProvider->addListener( function ( $e ) {}, self::class, 3 );
+		$listenerProvider->addListener( function ( $e ) {}, self::class, 3 );
+		$listenerProvider->addListener( function ( $e ) {}, parent::class, 7 );
 
-		$totalYielded = 0;
+		// BeforeBuildListenerProvider can listen for event entry that is subclass of another entry.
+		$event->expects( $this->exactly( BeforeBuildListenerProvider::class === $className ? 3 : 2 ) )
+			->method( 'getEntry' )
+			->willReturn( self::class );
 
-		foreach ( $provider->getListenersForEvent( $this ) as $yielded ) {
-			$this->assertEmpty( $yielded );
-			++$totalYielded;
-		}
+		/** @var Generator */
+		$invalidEventGenerator = $listenerProvider->getListenersForEvent( $this );
 
-		$this->assertSame( 1, $totalYielded, 'Only one empty array is yielded as for invalid event object.' );
-
-		$arrays = array();
-
-		// Flatten all yielded values from generators to an actual array for testing.
-		foreach ( $provider->getListenersForEvent( $event ) as $yielded ) {
-			foreach ( $yielded as $priority => $listeners ) {
-				$arrays[ $priority ] = $listeners;
-			}
-		}
-
-		$this->assertSame(
-			expected: array( 2, 3, 7 ),
-			actual: array_keys( $arrays ),
-			message: 'Both global and entry scoped listeners should be listened indexed by respective priority.'
+		$this->assertEmpty(
+			actual: $invalidEventGenerator->current(),
+			message: 'Only one empty array is yielded as for invalid event object.'
 		);
 
-		$this->assertCount( 1, $arrays[2], 'Global scoped with priority value of 2.' );
-		$this->assertCount( 2, $arrays[3], 'Entry scoped with priority value of 3.' );
-		$this->assertCount( 1, $arrays[7], 'Entry scoped with priority value of 7.' );
+		$invalidEventGenerator->next();
+
+		$this->assertFalse( $invalidEventGenerator->valid() );
+
+		/** @var Generator */
+		$validEventGenerator   = $listenerProvider->getListenersForEvent( $event );
+		$listenersWithoutEntry = $validEventGenerator->current();
+
+		$this->assertSame( array( 2 ), array_keys( $listenersWithoutEntry ) );
+		$this->assertCount( 1, $listenersWithoutEntry[2] );
+
+		$validEventGenerator->next();
+
+		$listenersWithEntry = $validEventGenerator->current();
+
+		$this->assertSame( array( 3, 7 ), array_keys( $listenersWithEntry ) );
+		$this->assertCount( 2, $listenersWithEntry[3] );
+		$this->assertCount( 1, $listenersWithEntry[7] );
+
+		$validEventGenerator->next();
+
+		// BeforeBuildListenerProvider retrieves event listeners for entry with "parent::class" also.
+		if ( BeforeBuildListenerProvider::class === $className ) {
+			$parentEventGenerator = $validEventGenerator->current();
+
+			$this->assertSame( array( 7 ), array_keys( $parentEventGenerator ) );
+			$this->assertCount( 1, $parentEventGenerator[7] );
+
+			$validEventGenerator->next();
+		}
+
+		$this->assertFalse(
+			condition: $validEventGenerator->valid(),
+			message: 'Must not be valid after global scoped and event entry scoped listeners are retrieved.'
+		);
 	}
 
 	public function provideListenerProvidersAndValidEvent(): array {
-		$beforeBuild = $this->createMock( BeforeBuildEvent::class );
-		$beforeBuild->method( 'getEntry' )->willReturn( self::class );
-		$building = $this->createMock( BuildingEvent::class );
-		$building->method( 'getEntry' )->willReturn( self::class );
-		$afterBuild = $this->createMock( AfterBuildEvent::class );
-		$afterBuild->method( 'getEntry' )->willReturn( self::class );
-
 		return array(
-			array( BeforeBuildListenerProvider::class, $beforeBuild ),
-			array( BuildingListenerProvider::class, $building ),
-			array( AfterBuildListenerProvider::class, $afterBuild ),
+			array( BeforeBuildListenerProvider::class, $this->createMock( BeforeBuildEvent::class ) ),
+			array( BuildingListenerProvider::class, $this->createMock( BuildingEvent::class ) ),
+			array( AfterBuildListenerProvider::class, $this->createMock( AfterBuildEvent::class ) ),
 		);
 	}
 
-	public function testListenerRegistrySetterAndGetter(): void {
+	public function testListenerRegistryTraitGetterAndSetter(): void {
 		$event = new class() implements TaggableEvent {
 			public function __construct( private string $name = '' ) {}
 
@@ -94,7 +114,7 @@ class ProviderTest extends TestCase {
 			}
 
 			public function getEntry(): string {
-				return ProviderTest::class;
+				return ProvidersTest::class;
 			}
 		};
 
@@ -106,9 +126,7 @@ class ProviderTest extends TestCase {
 			public function __construct( private string $eventType ) {}
 
 			protected function isValid( object $event ): bool {
-				$type = $this->eventType;
-
-				return $event instanceof $type;
+				return is_a( $event, $this->eventType );
 			}
 		};
 
@@ -137,9 +155,9 @@ class ProviderTest extends TestCase {
 
 		$listeners = $registrar->getListenersForEvent( $event );
 
-		foreach ( $listeners as $sortedListeners ) {  // Both generators: global and/or scoped.
+		foreach ( $listeners as $sortedListeners ) {  // Collection of Both generators: global and scoped.
 			foreach ( $sortedListeners as $listener ) { // Collection by sorting number.
-				foreach ( $listener as $invoke ) {        // collection inside each sortable collection.
+				foreach ( $listener as $invoke ) {        // Collection inside each sortable collection.
 					$invoke( $event );
 				}
 			}
@@ -150,5 +168,9 @@ class ProviderTest extends TestCase {
 			expected: '::global::third::first::second',
 			actual: $event->getName()
 		);
+
+		$invalidListeners = $registrar->getListenersForEvent( $this );
+
+		$this->assertEmpty( $invalidListeners->current() );
 	}
 }
