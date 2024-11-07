@@ -25,7 +25,7 @@ use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 class ParamResolver {
 	public function __construct(
 		protected readonly Container $app,
-		protected readonly Param $pool,
+		protected readonly Param $stack,
 		protected readonly ?EventDispatcherInterface $dispatcher,
 		protected readonly Stack $result = new Stack(),
 	) {}
@@ -38,7 +38,7 @@ class ParamResolver {
 	public function resolve( array $dependencies ): array {
 		foreach ( $dependencies as $param ) {
 			$result = match ( true ) {
-				$this->pool->has( $param->name )               => $this->pool->getFrom( $param->name ),
+				$this->stack->has( $param->name )              => $this->stack->getFrom( $param->name ),
 				null !== ( $val = $this->fromEvent( $param ) ) => $val,
 				default                                        => $param
 			};
@@ -74,13 +74,6 @@ class ParamResolver {
 		}
 	}
 
-	protected function for( ReflectionParameter $param, mixed $result ): void {
-		match ( true ) {
-			$param->isVariadic() => $this->result->set( key: $param->getName(), value: $result ),
-			default              => $this->result->set( key: $param->getName(), value: $result )
-		};
-	}
-
 	protected function from( ReflectionParameter $param ): mixed {
 		$type = Unwrap::paramTypeFrom( reflection: $param );
 
@@ -94,26 +87,26 @@ class ParamResolver {
 
 		$id = Stack::keyFrom( id: $type, name: $param->getName() );
 
-		$this->maybeAddEventListenerFromAttributeOf( $param, $id );
-
 		// We'll resolve the instance directly from the app binding instead of using "Container::get()" method.
 		// This is done so that Event Dispatcher is bypassed which might otherwise trigger an infinite loop.
 		if ( $this->app->isInstance( $id ) ) {
 			return $this->app->getBinding( $id )?->concrete;
 		}
 
+		$this->maybeAddEventListenerFromAttributeOf( $param, $id );
+
 		$event = $this->dispatcher?->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $id ) );
 
-		// We'll confirm whether dispatched event has been returned by the Event Dispatcher.
-		// This is done as a type check as well as allows making the resolver testable.
 		if ( ! $event instanceof BuildingEvent ) {
 			return null;
 		}
 
 		$binding = $event->getBinding();
 
-		if ( $binding?->isInstance() && is_object( $instance = $binding->concrete ) ) {
-			$this->app->setInstance( $id, $instance );
+		if ( $binding?->isInstance() ) {
+			$value = $binding->concrete;
+
+			$this->app->setInstance( $id, instance: $this->ensureObject( $value, $type, $param->name, $id ) );
 		}
 
 		return $binding?->concrete;
@@ -159,5 +152,19 @@ class ParamResolver {
 		$priority = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
 
 		$dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id, priority: $priority );
+	}
+
+	private function ensureObject( mixed $value, string $type, string $name, string $id ): object {
+		return is_object( $value ) && is_a( $value, $type )
+			? $value
+			: throw new BadResolverArgument(
+				sprintf(
+					'The bound instance from Event Listener is not a valid type. Expected an instance of'
+					. ' "%1$s" for parameter "%2$s" while building "%3$s".',
+					$type,
+					$name,
+					$id
+				)
+			);
 	}
 }
