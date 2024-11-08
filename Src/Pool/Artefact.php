@@ -18,7 +18,7 @@ class Artefact implements Stringable, Resettable {
 	use PushPullStack;
 
 	public function __toString(): string {
-		return implode( ', ', $this->stack );
+		return implode( ', ', array_unique( $this->stack ) );
 	}
 
 	public function has( string $value ): bool {
