@@ -24,7 +24,9 @@ use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
+use TheWebSolver\Codegarage\Lib\Container\Attribute\UpdateOnReset;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
+use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
 
 class ContainerTest extends TestCase {
 	private ?Container $app;
@@ -752,6 +754,47 @@ class ContainerTest extends TestCase {
 		$this->assertSame( 'Base-Class:Main-Decorator:First-Decorator:Final-Decorator:', $stub->getStatus() );
 		$this->assertInstanceOf( $finalDecorator::class, $stub );
 	}
+
+	/** @dataProvider provideVariousExceptionTypesForAfterBuildEvent */
+	public function testWaysDecoratorsCanFail( string $decorator, string $exception ): void {
+		$this->app->set( JustTest__Stub::class, _Stack__ContextualBindingWithArrayAccess__Stub::class );
+
+		$this->app->when( EventType::AfterBuild )
+			->for( JustTest__Stub::class )
+			->listenTo( static fn( AfterBuildEvent $e ) => $e->decorateWith( $decorator ) );
+
+		if ( class_exists( $exception ) ) {
+			$this->expectException( $exception );
+		} else {
+			$this->expectExceptionMessage( sprintf( $exception, $decorator ) );
+		}
+
+		$this->app->get( JustTest__Stub::class, with: array( 'array' => $this->createStub( ArrayAccess::class ) ) );
+	}
+
+	public function provideVariousExceptionTypesForAfterBuildEvent(): array {
+		$building             = _Stack__ContextualBindingWithArrayAccess__Stub::class;
+		$invalidTypeOrNoParam = AfterBuildHandler::INVALID_TYPE_HINT_OR_NOT_FIRST_PARAM;
+		$withNoParam          = _Stack__ContextualBindingWithArrayAccess__DecoratorWithNoParam__Stub::class;
+		$withInvalidType      = new class() implements JustTest__Stub {
+			public function __construct( public string $shouldBe__JustTest__Stub = '' ) {}
+
+			public function getStack(): ArrayAccess {
+				return new WeakMap();
+			}
+
+			public function getStatus(): string {
+				return '';
+			}
+		};
+
+		return array(
+			array( $withNoParam, sprintf( AfterBuildHandler::ZERO_PARAM_IN_CONSTRUCTOR, $withNoParam ) ),
+			array( parent::class, 'Unable to instantiate the target class: "%s"' ),
+			array( $withInvalidType::class, sprintf( $invalidTypeOrNoParam, $withInvalidType::class, $building ) ),
+			array( self::class, sprintf( $invalidTypeOrNoParam, self::class, $building ) ),
+		);
+	}
 }
 
 interface JustTest__Stub {
@@ -788,6 +831,18 @@ class _Stack__ContextualBindingWithArrayAccess__Decorator__Stub implements JustT
 
 	public function getStatus(): string {
 		return $this->stub->getStatus() . 'Main-Decorator:';
+	}
+}
+
+class _Stack__ContextualBindingWithArrayAccess__DecoratorWithNoParam__Stub implements JustTest__Stub {
+	public function __construct() {}
+
+	public function getStack(): ArrayAccess {
+		return new WeakMap();
+	}
+
+	public function getStatus(): string {
+		return '';
 	}
 }
 

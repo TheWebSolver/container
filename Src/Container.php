@@ -517,9 +517,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		if ( $this->isInstance( $id ) && ! $needsBuild ) {
 			$instance = $this->bindings[ $id ]->concrete;
 
-			return $dispatch
-				? ( new AfterBuildHandler( $this, $this->artefact ) )->handle( $id, $instance, $reflector )
-				: $instance;
+			if ( $dispatch ) {
+				$instance = $this->resolveFromAfterBuildEventWith( $reflector, $id, $instance );
+			}
+
+			return $instance;
 		}
 
 		$this->paramPool->push( value: $with ?? array() );
@@ -531,7 +533,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 
 		if ( $dispatch ) {
-			$resolved = ( new AfterBuildHandler( $this, $this->artefact ) )->handle( $entry, $resolved, $reflector );
+			$resolved = $this->resolveFromAfterBuildEventWith( $reflector, $entry, $resolved );
 		}
 
 		$this->paramPool->pull();
@@ -549,5 +551,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected function maybePurgeIfAliasOrInstance( string $id ): void {
 		$this->removeInstance( $id );
 		$this->aliases->remove( $id );
+	}
+
+	private function resolveFromAfterBuildEventWith( ?ReflectionClass $reflector, string $id, mixed $resolved ): mixed {
+		return AfterBuildHandler::handleWith( $this, $id, $resolved, $this->artefact, $reflector );
 	}
 }

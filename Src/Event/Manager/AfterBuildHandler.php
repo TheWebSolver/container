@@ -26,86 +26,134 @@ use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
 class AfterBuildHandler {
-	public function __construct( private readonly Container $app, private readonly Artefact $artefact ) {}
+	/** Placeholders: 1: Decorating classname 2: debug type of resolved value */
+	public const INVALID_TYPE_HINT_OR_NOT_FIRST_PARAM = 'Decorating class "%s" has invalid type-hint or not accepting the resolved object as first parameter when decorating "%2$s".';
+	/** Placeholder: %s: Decorating classname */
+	public const ZERO_PARAM_IN_CONSTRUCTOR = 'Decorating class "%s" does not have any parameter in its constructor.';
 
-	public function handle( string $id, mixed $resolved, ?ReflectionClass $reflector ): mixed {
-		/** @var (EventDispatcherInterface&ListenerRegistry<AfterBuildEvent>)|null */
-		$eventDispatcher = $this->app->getEventManager()->getDispatcher( EventType::AfterBuild );
+	/** @var (EventDispatcherInterface&ListenerRegistry<AfterBuildEvent>) */
+	public EventDispatcherInterface&ListenerRegistry $eventDispatcher;
+	private ?string $currentDecoratorClass = null;
+	private mixed $resolved;
 
-		if ( ! $eventDispatcher ) {
-			return $resolved;
+	public function __construct( private readonly Container $app, private readonly string $entry ) {
+		if ( $dispatcher = $app->getEventManager()->getDispatcher( EventType::AfterBuild ) ) {
+			$this->eventDispatcher = $dispatcher;
 		}
-
-		if ( $reflector && ! empty( $attributes = $reflector->getAttributes( DecorateWith::class ) ) ) {
-			$priorities = $eventDispatcher->getPriorities();
-			$attribute  = $attributes[0]->newInstance();
-			$priority   = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
-
-			$eventDispatcher->addListener( ( $attribute->listener )( ... ), forEntry: $id, priority: $priority );
-		}
-
-		/** @var ?AfterBuildEvent */
-		$event = $eventDispatcher->dispatch( event: new AfterBuildEvent( entry: $id ) );
-
-		if ( ! $event ) {
-			return $resolved;
-		}
-
-		foreach ( $event->getDecorators()[ $id ] ?? array() as $decorator ) {
-			$resolved = $this->decorate( $resolved, $decorator );
-		}
-
-		foreach ( $event->getUpdaters()[ $id ] ?? array() as $updater ) {
-			$updater( $resolved, $this->app );
-		}
-
-		return $resolved;
 	}
 
-	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
 	/**
-	 * @param class-string|(Closure(mixed, Container): mixed) $decorator
-	 * @throws ContainerError When non-resolvable or non-instantiable $decorator given.
+	 * @throws BadResolverArgument When `$resolved` Parameter could not be determined in decorator class.
+	 * @throws ContainerError      When decorator class is not a valid class-string or not instantiable.
 	 */
-	// phpcs:enable
-	protected function decorate( mixed $resolved, string|Closure $decorator ): mixed {
-		if ( $decorator instanceof Closure ) {
-			return $decorator( $resolved, $this->app );
-		}
-
-		$entry = $this->app->getEntryFrom( $decorator );
+	// phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Actual number is vague.
+	public static function handleWith(
+		Container $app,
+		string $entry,
+		mixed $resolved,
+		Artefact $artefact,
+		?ReflectionClass $reflector
+	): mixed {
+		$handler = new self( $app, $entry );
 
 		try {
-			$reflection = Unwrap::classReflection( $entry );
-		} catch ( ReflectionException | LogicException $e ) {
-			throw ContainerError::whenResolving( $entry, exception: $e, artefact: $this->artefact );
+			$artefact->push( $entry );
+
+			$resolved = $handler->withListenerFromAttributeOf( $reflector )->handle( $resolved );
+
+			$artefact->pull();
+
+			return $resolved;
+		} catch ( ReflectionException | LogicException $exception ) {
+			// "BadResolverArgument" is not caught. It is not part of the container error.
+			throw ContainerError::whenResolving( $handler->getLastDecorator() ?? $entry, $exception, $artefact );
+		}
+	}
+
+	public function getLastDecorator(): ?string {
+		return $this->currentDecoratorClass;
+	}
+
+	public function withListenerFromAttributeOf( ?ReflectionClass $reflection ): self {
+		if ( ! $this->hasDispatcher() || empty( $attrs = $reflection?->getAttributes( DecorateWith::class ) ) ) {
+			return $this;
 		}
 
-		$args = array( $this->getDecoratorParamFrom( $reflection, $resolved )->getName() => $resolved );
+		$priorities = $this->eventDispatcher->getPriorities();
+		$attribute  = $attrs[0]->newInstance();
+		$priority   = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
+
+		$this->eventDispatcher->addListener( ( $attribute->listener )( ... ), $this->entry, $priority );
+
+		return $this;
+	}
+
+	/**
+	 * @throws BadResolverArgument When `$resolved` Parameter could not be determined in decorator class.
+	 * @throws ReflectionException When decorator class is provided but it is not a valid class-string.
+	 * @throws LogicException      When decorator class is provided but it cannot be instantiated.
+	 */
+	public function handle( mixed $resolved ): mixed {
+		if ( ! $this->hasDispatcher() ) {
+			return $resolved;
+		}
+
+		$event = $this->eventDispatcher->dispatch( event: new AfterBuildEvent( $this->entry ) );
+
+		if ( ! $event instanceof AfterBuildEvent ) {
+			return $resolved;
+		}
+
+		$this->resolved = $resolved;
+
+		foreach ( $event->getDecorators()[ $this->entry ] ?? array() as $decorator ) {
+			$this->resolved = $this->decorateWith( $decorator );
+		}
+
+		foreach ( $event->getUpdaters()[ $this->entry ] ?? array() as $update ) {
+			$update( $this->resolved, $this->app );
+		}
+
+		return $this->resolved;
+	}
+
+	private function decorateWith( string|Closure $decorator ): mixed {
+		if ( $decorator instanceof Closure ) {
+			return $decorator( $this->resolved, $this->app );
+		}
+
+		$this->currentDecoratorClass = $decorator;
+
+		$entry      = $this->app->getEntryFrom( $decorator );
+		$reflection = Unwrap::classReflection( $entry );
+		$args       = array( $this->getDecoratorParamFrom( $reflection )->getName() => $this->resolved );
 
 		return $this->app->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
 	}
 
-	/** @throws BadResolverArgument When $resolved value Parameter could not be determined. */
-	protected function getDecoratorParamFrom( ReflectionClass $reflection, mixed $resolved ): ReflectionParameter {
-		$params = $reflection->getConstructor()?->getParameters();
-		$class  = $reflection->getName();
-
-		if ( null === $params || ! ( $param = ( $params[0] ?? null ) ) ) {
-			throw new BadResolverArgument(
-				sprintf( 'Decorating class "%s" does not have any parameters in its constructor.', $class )
-			);
+	private function getDecoratorParamFrom( ReflectionClass $reflection ): ReflectionParameter {
+		if ( ! $param = $this->firstParameterIn( decorator: $reflection ) ) {
+			$this->throwBadArgument( self::ZERO_PARAM_IN_CONSTRUCTOR );
 		}
 
-		$isResolvedObject = ( $type = Unwrap::paramTypeFrom( reflection: $param ) )
-			&& is_object( $resolved )
-			&& is_a( $resolved, class: $type );
+		return $this->isValidParameterInDecorator( $param )
+			? $param
+			: $this->throwBadArgument( self::INVALID_TYPE_HINT_OR_NOT_FIRST_PARAM, get_debug_type( $this->resolved ) );
+	}
 
-		return $isResolvedObject ? $param : throw new BadResolverArgument(
-			sprintf(
-				'Decorating class "%s" has invalid type-hint or not accepting the resolved object as first parameter.',
-				$class
-			)
-		);
+	private function hasDispatcher(): bool {
+		return isset( $this->eventDispatcher );
+	}
+
+	private function firstParameterIn( ReflectionClass $decorator ): ?ReflectionParameter {
+		return $decorator->getConstructor()?->getParameters()[0] ?? null;
+	}
+
+	private function isValidParameterInDecorator( ReflectionParameter $param ): bool {
+		return ( $type = Unwrap::paramTypeFrom( reflection: $param ) ) && $this->resolved instanceof $type;
+	}
+
+	private function throwBadArgument( string $msg, string $type = null ): never {
+		throw new BadResolverArgument( sprintf( $msg, $this->currentDecoratorClass, $type ) );
 	}
 }
