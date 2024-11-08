@@ -19,13 +19,14 @@ use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
 class MethodResolver {
 	protected string $context;
 
 	public function __construct(
 		protected readonly Container $app,
-		protected readonly ?EventDispatcherInterface $dispatcher,
+		protected (EventDispatcherInterface&ListenerRegistry)|null $dispatcher,
 		protected readonly Artefact $artefact = new Artefact(),
 		protected readonly Param $pool = new Param(),
 	) {}

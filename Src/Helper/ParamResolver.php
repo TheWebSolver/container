@@ -26,7 +26,7 @@ class ParamResolver {
 	public function __construct(
 		protected readonly Container $app,
 		protected readonly Param $stack,
-		protected readonly ?EventDispatcherInterface $dispatcher,
+		protected (EventDispatcherInterface&ListenerRegistry)|null $dispatcher,
 		protected readonly Stack $result = new Stack(),
 	) {}
 
