@@ -11,12 +11,12 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\ContainerExceptionInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
+use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 
 class ParamResolverTest extends TestCase {
 	private ?ParamResolver $resolve;
@@ -28,7 +28,7 @@ class ParamResolverTest extends TestCase {
 		$this->mockedArgs = array(
 			$this->createMock( Container::class ),
 			$this->createMock( Param::class ),
-			$this->createMock( EventDispatcherInterface::class ),
+			$this->createMock( EventDispatcher::class ),
 		);
 
 		$this->resolve = new ParamResolver( ...$this->mockedArgs );
@@ -137,10 +137,10 @@ class ParamResolverTest extends TestCase {
 	}
 
 	public function testResolveWithTypedOrUntyped() {
-		[ $app, $p, $event ] = $this->mockedArgs;
-		$testFn              = static function ( TestCase $class, ?string $text, ...$other ) {};
-		$ref                 = new ReflectionFunction( $testFn );
-		$pool                = new Param();
+		[ $app, $p, $dispatcher ] = $this->mockedArgs;
+		$testFn                   = static function ( TestCase $class, ?string $text, ...$other ) {};
+		$ref                      = new ReflectionFunction( $testFn );
+		$pool                     = new Param();
 
 		$pool->push(
 			value: array(
@@ -167,12 +167,16 @@ class ParamResolverTest extends TestCase {
 			->method( 'getBinding' )
 			->willReturn( new Binding( concrete: array( 2, array( 3 ), array( 4 ) ) ) );
 
-		$event
+		$dispatcher->expects( $this->exactly( 2 ) )
+			->method( 'hasListeners' )
+			->willReturn( true, true );
+
+		$dispatcher
 			->expects( $this->exactly( 2 ) )
 			->method( 'dispatch' )
 			->willReturn( $eventWithStringValue, $eventWithArrayValue );
 
-		$resolved = ( new ParamResolver( $app, $pool, $event ) )->resolve( $ref->getParameters() );
+		$resolved = ( new ParamResolver( $app, $pool, $dispatcher ) )->resolve( $ref->getParameters() );
 
 		$this->assertCount( expectedCount: 3, haystack: $resolved );
 		$this->assertInstanceOf( expected: self::class, actual: $resolved['class'] );
@@ -183,7 +187,7 @@ class ParamResolverTest extends TestCase {
 
 		$pool->push( value: array( 'class' => $this->createStub( self::class ) ) );
 
-		$resolved2 = ( new ParamResolver( $app, $pool, $event ) )->resolve( $ref2->getParameters() );
+		$resolved2 = ( new ParamResolver( $app, $pool, $dispatcher ) )->resolve( $ref2->getParameters() );
 
 		$this->assertCount( expectedCount: 3, haystack: $resolved2 ); // Variadic is an array.
 		$this->assertInstanceOf( expected: self::class, actual: $resolved2['class'] );

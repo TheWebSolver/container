@@ -9,28 +9,31 @@ declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 class MethodResolverTest extends TestCase {
+	private EventDispatcher|MockObject|null $dispatcher;
 	private Container|MockObject|null $app;
-	private EventDispatcherInterface|MockObject|null $event;
 	private ?MethodResolver $resolver;
 
 	protected function setUp(): void {
-		$this->app      = $this->createMock( Container::class );
-		$this->event    = $this->createMock( EventDispatcherInterface::class );
-		$this->resolver = new MethodResolver( $this->app, $this->event );
+		/** @var Container&MockObject */
+		$this->app = $this->createMock( Container::class );
+		/** @var EventDispatcher&MockObject */
+		$this->dispatcher = $this->createMock( EventDispatcher::class );
+
+		$this->resolver = new MethodResolver( $this->app, $this->dispatcher );
 	}
 
 	protected function tearDown(): void {
-		$this->app      = null;
-		$this->event    = null;
-		$this->resolver = null;
+		$this->app        = null;
+		$this->dispatcher = null;
+		$this->resolver   = null;
 	}
 
 	/** @return array{0:object,1:string,2:string} */
@@ -61,6 +64,7 @@ class MethodResolverTest extends TestCase {
 
 	public function testMethodBindingWithInstantiatedClassAsCb(): void {
 		[ $test,, $instanceId ] = $this->getTestClassInstanceStub();
+		$event                  = new BuildingEvent( $this->app, 'test' );
 
 		$this->app
 			->expects( $this->exactly( 2 ) )
@@ -68,10 +72,14 @@ class MethodResolverTest extends TestCase {
 			->with( $instanceId )
 			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John' ) ), null );
 
-		$this->event
+		$this->dispatcher->expects( $this->once() )
+			->method( 'hasListeners' )
+			->willReturn( true );
+
+		$this->dispatcher
 			->expects( $this->once() )
 			->method( 'dispatch' )
-			->willReturn( new BuildingEvent( $this->app, 'test' ) );
+			->willReturn( $event );
 
 		$this->assertSame(
 			expected: 'Name: John',
@@ -239,7 +247,11 @@ class MethodResolverTest extends TestCase {
 		$eventWithValue->expects( $this->once() )->method( 'getBinding' )->willReturn( null );
 
 		// Binding from Event Dispatcher value will take precedence over contextual & default value.
-		$this->event->expects( $this->exactly( 2 ) )
+		$this->dispatcher->expects( $this->exactly( 2 ) )
+			->method( 'hasListeners' )
+			->willReturn( true, true );
+
+		$this->dispatcher->expects( $this->exactly( 2 ) )
 			->method( 'dispatch' )
 			->willReturn( $eventWithValue, $eventWithoutValue );
 

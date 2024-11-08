@@ -87,15 +87,17 @@ class ParamResolver {
 
 		$id = Stack::keyFrom( id: $type, name: $param->getName() );
 
-		// We'll resolve the instance directly from the app binding instead of using "Container::get()" method.
-		// This is done so that Event Dispatcher is bypassed which might otherwise trigger an infinite loop.
-		if ( $this->app->isInstance( $id ) ) {
-			return $this->app->getBinding( $id )?->concrete;
-		}
-
 		$this->maybeAddEventListenerFromAttributeOf( $param, $id );
 
-		$event = $this->dispatcher?->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $id ) );
+		if ( ! $this->dispatcher?->hasListeners( forEntry: $id ) ) {
+			return null;
+		}
+
+		if ( $this->app->isInstance( $id ) ) {
+			return $this->app->get( $id );
+		}
+
+		$event = $this->dispatcher->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $id ) );
 
 		if ( ! $event instanceof BuildingEvent ) {
 			return null;
