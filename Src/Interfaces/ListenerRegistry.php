@@ -19,14 +19,22 @@ interface ListenerRegistry extends Resettable {
 	public const DEFAULT_PRIORITY = 10;
 
 	/**
-	 * Adds listener to the listener provider.
+	 * Adds event listener to the registry.
 	 *
 	 * @param Closure(TEvent $event): void $listener
 	 */
 	public function addListener( Closure $listener, ?string $forEntry, int $priority ): void;
 
 	/**
-	 * Gets all listeners registered to the listener provider.
+	 * Verifies if current registry has listeners attached.
+	 */
+	public function hasListeners( ?string $forEntry = null ): bool;
+
+	/**
+	 * Gets all event listeners registered to the registry.
+	 *
+	 * This should not return event listeners sorted by their priority and
+	 * should return event listeners in order they were registered.
 	 *
 	 * @return array<int,array<int,Closure(TEvent $event): void>>
 	 */

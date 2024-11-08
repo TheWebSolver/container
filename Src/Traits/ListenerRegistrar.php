@@ -67,6 +67,10 @@ trait ListenerRegistrar {
 		$this->listeners[ $priority ][] = $listener;
 	}
 
+	public function hasListeners( ?string $forEntry = null ): bool {
+		return ! empty( $this->getListeners( $forEntry ) );
+	}
+
 	public function getListeners( ?string $forEntry = null ): array {
 		return ! $forEntry ? $this->listeners : $this->listenersForEntry[ $forEntry ] ?? array();
 	}
