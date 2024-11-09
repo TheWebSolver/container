@@ -353,7 +353,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 */
 	public function build( string|Closure $with, bool $dispatch = true, ?ReflectionClass $reflector = null ): array {
 		if ( $with instanceof Closure ) {
-			return array( $reflector, $with( $this, $this->paramPool->latest() ) );
+			return array( $reflector, $with( $this, $this->paramPool->latest() ?? array() ) );
 		}
 
 		try {
@@ -543,7 +543,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	protected function fromContextual( string $context ): Closure|string|null {
-		return is_string( $artefact = $this->artefact->latest() )
+		return ( $artefact = $this->artefact->latest() )
 			? $this->getContextual( for: $artefact, context: $context )
 			: null;
 	}

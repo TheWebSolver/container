@@ -38,7 +38,7 @@ class ParamResolver {
 	public function resolve( array $dependencies ): array {
 		foreach ( $dependencies as $param ) {
 			$result = match ( true ) {
-				$this->stack->has( $param->name )              => $this->stack->getFrom( $param->name ),
+				$this->stack->has( $param->name )              => $this->stack->get( $param->name ),
 				null !== ( $val = $this->fromEvent( $param ) ) => $val,
 				default                                        => $param
 			};

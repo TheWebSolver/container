@@ -11,14 +11,22 @@ namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 
 /** @template TValue */
 trait PushPullStack {
-	/**
-	 * @use Stack<int,TValue>
-	 * @use Puller<TValue>
-	 */
-	use Stack, Puller;
+	/** @use Stack<int,TValue> */
+	use Stack;
 
 	/** @param TValue $value */
-	public function push( mixed $value ): void { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
+	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
+	public function push( mixed $value ): void {
 		$this->stack[] = $value;
+	}
+
+	/** @return ?TValue */
+	public function pull(): mixed {
+		return array_pop( $this->stack );
+	}
+
+	/** @return ?TValue */
+	public function latest(): mixed {
+		return end( $this->stack ) ?: null;
 	}
 }

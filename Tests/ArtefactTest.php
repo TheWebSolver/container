@@ -45,13 +45,7 @@ class ArtefactTest extends TestCase {
 		$this->contextPool->pull();
 
 		$this->assertSame( expected: 'needsWhenBuilding', actual: $this->contextPool->latest() );
-
 		$this->assertSame( expected: 'needsWhenBuilding', actual: $this->contextPool->pull() );
-
-		$this->assertSame(
-			expected: array(),
-			actual: $this->contextPool->latest(),
-			message: 'Nothing left in the Context Pool Stack.'
-		);
+		$this->assertSame( expected: null, actual: $this->contextPool->latest() );
 	}
 }

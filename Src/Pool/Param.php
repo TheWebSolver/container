@@ -20,7 +20,7 @@ class Param implements Resettable {
 		return isset( $this->latest()[ $paramName ] );
 	}
 
-	public function getFrom( string $paramName ): mixed {
-		return $this->latest()[ $paramName ];
+	public function get( string $paramName ): mixed {
+		return $this->latest()[ $paramName ] ?? null;
 	}
 }

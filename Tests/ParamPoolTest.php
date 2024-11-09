@@ -36,7 +36,7 @@ class ParamPoolTest extends TestCase {
 			$this->assertTrue( $this->paramPool->has( $param->name ) );
 			$this->assertSame(
 				expected: $param->getDefaultValue(),
-				actual: $this->paramPool->getFrom( $param->name )
+				actual: $this->paramPool->get( $param->name )
 			);
 		}
 
@@ -56,11 +56,7 @@ class ParamPoolTest extends TestCase {
 		);
 
 		$this->assertTrue( $this->paramPool->has( $custom->name ) );
-		$this->assertSame(
-			expected: 12345,
-			actual: $this->paramPool->getFrom( $custom->name )
-		);
-
+		$this->assertSame( expected: 12345, actual: $this->paramPool->get( $custom->name ) );
 		$this->assertSame( expected: array( 'custom' => 12345 ), actual: $this->paramPool->latest() );
 
 		$this->paramPool->pull();
@@ -82,10 +78,6 @@ class ParamPoolTest extends TestCase {
 		);
 
 		$this->assertFalse( $this->paramPool->has( $custom->name ) );
-		$this->assertSame(
-			expected: array(),
-			actual: $this->paramPool->latest(),
-			message: 'Nothing left in the Param Pool Stack.'
-		);
+		$this->assertSame( expected: null, actual: $this->paramPool->latest() );
 	}
 }
