@@ -25,6 +25,7 @@ use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
+/** @template T of object */
 class AfterBuildHandler {
 	/** Placeholders: 1: Decorating classname 2: debug type of resolved value */
 	public const INVALID_TYPE_HINT_OR_NOT_FIRST_PARAM = 'Decorating class "%s" has invalid type-hint or not accepting the resolved object as first parameter when decorating "%2$s".';
@@ -34,7 +35,8 @@ class AfterBuildHandler {
 	/** @var (EventDispatcherInterface&ListenerRegistry<AfterBuildEvent>) */
 	public EventDispatcherInterface&ListenerRegistry $eventDispatcher;
 	private ?string $currentDecoratorClass = null;
-	private mixed $resolved;
+	/** @var T */
+	private object $resolved;
 
 	public function __construct( private readonly Container $app, private readonly string $entry ) {
 		if ( $dispatcher = $app->getEventManager()->getDispatcher( EventType::AfterBuild ) ) {
@@ -43,27 +45,30 @@ class AfterBuildHandler {
 	}
 
 	/**
+	 * @param T $resolved
 	 * @throws BadResolverArgument When `$resolved` Parameter could not be determined in decorator class.
 	 * @throws ContainerError      When decorator class is not a valid class-string or not instantiable.
+	 * @return T
 	 */
 	// phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Actual number is vague.
 	public static function handleWith(
 		Container $app,
 		string $entry,
-		mixed $resolved,
+		object $resolved,
 		Artefact $artefact,
 		?ReflectionClass $reflector
-	): mixed {
+	): object {
+		/** @var self<T> */
 		$handler = new self( $app, $entry );
 
 		try {
 			$artefact->push( $entry );
 
-			$resolved = $handler->withListenerFromAttributeOf( $reflector )->handle( $resolved );
+			$handler->withListenerFromAttributeOf( $reflector )->handle( $resolved );
 
 			$artefact->pull();
 
-			return $resolved;
+			return $handler->resolved;
 		} catch ( ReflectionException | LogicException $exception ) {
 			// "BadResolverArgument" is not caught. It is not part of the container error.
 			throw ContainerError::whenResolving( $handler->getLastDecorator() ?? $entry, $exception, $artefact );
@@ -89,22 +94,26 @@ class AfterBuildHandler {
 	}
 
 	/**
+	 * @param T $resolved
+	 * @return T
 	 * @throws BadResolverArgument When `$resolved` Parameter could not be determined in decorator class.
 	 * @throws ReflectionException When decorator class is provided but it is not a valid class-string.
 	 * @throws LogicException      When decorator class is provided but it cannot be instantiated.
 	 */
-	public function handle( mixed $resolved ): mixed {
+	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
+	public function handle( object $resolved ): object {
+		$this->resolved = $resolved;
+
 		if ( ! $this->hasDispatcher() ) {
 			return $resolved;
 		}
 
+		/** @var ?AfterBuildEvent<T> */
 		$event = $this->eventDispatcher->dispatch( event: new AfterBuildEvent( $this->entry ) );
 
 		if ( ! $event instanceof AfterBuildEvent ) {
 			return $resolved;
 		}
-
-		$this->resolved = $resolved;
 
 		foreach ( $event->getDecorators()->get( $this->entry ) ?? array() as $decorator ) {
 			$this->resolved = $this->decorateWith( $decorator );
@@ -117,7 +126,11 @@ class AfterBuildHandler {
 		return $this->resolved;
 	}
 
-	private function decorateWith( string|Closure $decorator ): mixed {
+	/**
+	 * @param class-string<T>|Closure(T, Container): T $decorator
+	 * @return T
+	 */
+	private function decorateWith( string|Closure $decorator ): object {
 		if ( $decorator instanceof Closure ) {
 			return $decorator( $this->resolved, $this->app );
 		}
@@ -128,7 +141,10 @@ class AfterBuildHandler {
 		$reflection = Unwrap::classReflection( $entry );
 		$args       = array( $this->getDecoratorParamFrom( $reflection )->getName() => $this->resolved );
 
-		return $this->app->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
+		/** @var T */
+		$decorated = $this->app->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
+
+		return $decorated;
 	}
 
 	private function getDecoratorParamFrom( ReflectionClass $reflection ): ReflectionParameter {
