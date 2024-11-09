@@ -156,7 +156,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @throws ContainerError When concrete not found for given {@param $id}.
 	 */
 	public function getConcrete( string $id ): Closure|string {
-		if ( ( ! $binding = $this->getBinding( $id ) ) || $binding->isInstance() ) {
+		if ( ( ! $binding = $this->getBinding( $id ) ) ) {
 			return $id;
 		}
 
@@ -167,6 +167,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			$bound === $id            => $id,
 			is_array( $bound )        => isset( $bound[ $id ] ) ? $this->getEntryFrom( $bound[ $id ] ) : null,
 			$bound instanceof Closure => $bound,
+			$binding->isInstance()    => $id,
 		} ?? throw ContainerError::unResolvableEntry( $id );
 	}
 
@@ -464,10 +465,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param string $id The abstract or a concrete/alias.
 	 */
 	protected function rebound( string $id ): void {
-		$old = $this->get( $id );
+		$updated = $this->resolveWithoutEvents( $id );
 
-		foreach ( ( $this->rebounds[ $id ] ?? array() ) as $new ) {
-			$new( $old, $this );
+		foreach ( ( $this->rebounds[ $id ] ?? array() ) as $listener ) {
+			$listener( $updated, $this );
 		}
 	}
 
@@ -511,34 +512,44 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			}
 		}
 
-		$needsBuild = ! empty( $with ) || $this->hasContextualFor( entry: $id );
+		$hasNoDependencies = ! empty( $with ) || $this->hasContextualFor( entry: $id );
+		$binding           = $this->getBinding( $id );
 
-		if ( $this->isInstance( $id ) && ! $needsBuild ) {
-			$instance = $this->bindings[ $id ]->concrete;
-
-			if ( $dispatch ) {
-				$instance = $this->resolveFromAfterBuildEventWith( $reflector, $id, $instance );
-			}
-
-			return $instance;
+		if ( ! $hasNoDependencies && $binding?->isInstance() ) {
+			return ! $dispatch ? $binding->concrete : $this->resolveInstance( $id, $binding->concrete );
 		}
 
 		$this->dependencies->push( value: $with ?? array() );
 
 		[ $reflector, $resolved ] = $this->build( $bound, $dispatch, $reflector );
 
-		if ( true === $this->getBinding( $id )?->isSingleton() && ! $needsBuild ) {
-			$this->bindings->set( key: $id, value: new Binding( concrete: $resolved, instance: true ) );
+		$this->resolved->set( key: $id, value: true );
+		$this->dependencies->pull();
+
+		if ( ! $this->isResolvedAsObject( $entry, $resolved ) ) {
+			return $resolved;
 		}
 
 		if ( $dispatch ) {
-			$resolved = $this->resolveFromAfterBuildEventWith( $reflector, $entry, $resolved );
+			$resolved = $this->fromAfterBuildDispatcher( $entry, $resolved, $reflector );
 		}
 
-		$this->dependencies->pull();
-		$this->resolved->set( key: $id, value: true );
+		if ( ! $hasNoDependencies && $this->isBoundToShare( $id ) ) {
+			$this->eventManager->getDispatcher( EventType::AfterBuild )?->reset( $id );
+
+			$resolved = $this->setInstance( $id, $resolved );
+		}
 
 		return $resolved;
+	}
+
+	/** @phpstan-assert-if-true =object $resolved */
+	protected function isResolvedAsObject( string $entry, mixed $resolved ): bool {
+		return $resolved instanceof $entry;
+	}
+
+	protected function isBoundToShare( string $id ): bool {
+		return true === $this->getBinding( $id )?->isSingleton();
 	}
 
 	protected function fromContextual( string $context ): Closure|string|null {
@@ -547,12 +558,27 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			: null;
 	}
 
+	protected function resolveInstance( string $id, object $instance ): object {
+		$dispatcher = $this->eventManager->getDispatcher( EventType::AfterBuild );
+
+		if ( ! $dispatcher?->hasListeners( forEntry: $id ) ) {
+			return $instance;
+		}
+
+		$instance = $this->fromAfterBuildDispatcher( $id, $instance, reflector: null );
+
+		$dispatcher->reset( $id );
+		$this->setInstance( $id, $instance );
+
+		return $instance;
+	}
+
+	private function fromAfterBuildDispatcher( string $id, object $resolved, ?ReflectionClass $reflector ): object {
+		return AfterBuildHandler::handleWith( $this, $id, $resolved, $this->artefact, $reflector );
+	}
+
 	protected function maybePurgeIfAliasOrInstance( string $id ): void {
 		$this->removeInstance( $id );
 		$this->aliases->remove( $id );
-	}
-
-	private function resolveFromAfterBuildEventWith( ?ReflectionClass $reflector, string $id, mixed $resolved ): mixed {
-		return AfterBuildHandler::handleWith( $this, $id, $resolved, $this->artefact, $reflector );
 	}
 }

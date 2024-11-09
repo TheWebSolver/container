@@ -12,6 +12,7 @@
 declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\NotFoundExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
@@ -23,9 +24,11 @@ use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
+use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
-use TheWebSolver\Codegarage\Lib\Container\Attribute\UpdateOnReset;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
+use TheWebSolver\Codegarage\Lib\Container\Attribute\UpdateOnReset;
+use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
 
 class ContainerTest extends TestCase {
@@ -95,6 +98,10 @@ class ContainerTest extends TestCase {
 
 		// The singleton is resolved and bound as an instance thereafter.
 		$this->assertTrue( $this->app->isInstance( stdClass::class ) );
+
+		$this->app->setShared( 'aliasedClass', WeakMap::class );
+		$this->app->get( 'aliasedClass' );
+		$this->assertTrue( $this->app->isInstance( 'aliasedClass' ) );
 
 		$this->assertFalse( $this->app->isInstance( id: 'instance' ) );
 		$this->assertFalse( $this->app->resolved( id: 'instance' ) );
@@ -793,6 +800,55 @@ class ContainerTest extends TestCase {
 			array( parent::class, 'Unable to instantiate the target class: "%s"' ),
 			array( $withInvalidType::class, sprintf( $invalidTypeOrNoParam, $withInvalidType::class, $building ) ),
 			array( self::class, sprintf( $invalidTypeOrNoParam, self::class, $building ) ),
+		);
+	}
+
+	public function testEventListenersAfterBuildAreInvalidatedForAnInstance(): void {
+		/** @var EventManager&MockObject */
+		$manager     = $this->createMock( EventManager::class );
+		$dispatcher  = $this->createMock( EventDispatcher::class );
+		$beforeBuild = $this->createMock( BeforeBuildEvent::class );
+		$afterBuild  = $this->createMock( AfterBuildEvent::class );
+		$stack       = $this->createMock( Stack::class );
+		$app         = new Container( eventManager: $manager );
+
+		$manager->expects( $this->any() )->method( 'getDispatcher' )->willReturn( $dispatcher );
+
+		// 1: for base class, 2: for decorator class, 3: when resolving decorator class param.
+		$dispatcher->expects( $this->exactly( 3 ) )->method( 'hasListeners' )->willReturn( true, false, false );
+		$dispatcher->method( 'dispatch' )->willReturn( $beforeBuild, $afterBuild );
+		$dispatcher->expects( $this->once() )->method( 'reset' )->with( 'mock' );
+
+		$beforeBuild->expects( $this->once() )->method( 'getParams' )->willReturn( null );
+
+		$afterBuild->expects( $this->once() )->method( 'getDecorators' )->willReturn( $stack );
+
+		$stack
+			->expects( $this->exactly( 1 ) )
+			->method( 'get' )
+			->with( 'mock' )
+			->willReturn( array( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class ) );
+
+		$app->setInstance( 'mock', new _Stack__ContextualBindingWithArrayAccess__Stub( new WeakMap() ) );
+		$app->get( 'mock' );
+		$app->get( 'mock' );
+	}
+
+	public function testEventListenersAfterBuildAreInvalidatedForAnInstanceIntegration(): void {
+		$this->app->setInstance( 'test', new _Stack__ContextualBindingWithArrayAccess__Stub( new WeakMap() ) );
+
+		$this->app->when( EventType::AfterBuild )
+			->for( 'test' )
+			->listenTo(
+				static fn( AfterBuildEvent $e ) => $e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+			);
+
+		$this->assertTrue( $this->app->getEventManager()->getDispatcher( EventType::AfterBuild )->hasListeners( forEntry: 'test' ) );
+		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $this->app->get( 'test' ) );
+		$this->assertFalse( $this->app->getEventManager()->getDispatcher( EventType::AfterBuild )->hasListeners( forEntry: 'test' ) );
+		$this->assertInstanceOf(
+			_Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class,
+			$this->app->getBinding( 'test' )->concrete
 		);
 	}
 }
