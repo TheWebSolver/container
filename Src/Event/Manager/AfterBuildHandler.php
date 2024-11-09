@@ -106,11 +106,11 @@ class AfterBuildHandler {
 
 		$this->resolved = $resolved;
 
-		foreach ( $event->getDecorators()[ $this->entry ] ?? array() as $decorator ) {
+		foreach ( $event->getDecorators()->get( $this->entry ) ?? array() as $decorator ) {
 			$this->resolved = $this->decorateWith( $decorator );
 		}
 
-		foreach ( $event->getUpdaters()[ $this->entry ] ?? array() as $update ) {
+		foreach ( $event->getUpdaters()->get( $this->entry ) ?? array() as $update ) {
 			$update( $this->resolved, $this->app );
 		}
 
