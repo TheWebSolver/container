@@ -6,6 +6,7 @@
  *
  * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics typ-hint OK.
  * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics typ-hint OK.
+ * @phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType -- Param name of Closure OK.
  */
 
 declare( strict_types = 1 );
@@ -24,8 +25,8 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;
 
 	/**
-	 * @param Stack<?(class-string<TResolved>|(Closure(TResolved, Container): TResolved))[]> $decorators
-	 * @param Stack<?(Closure(TResolved, Container): void)[]>                                $updaters
+	 * @param Stack<?array<class-string<TResolved>|Closure(TResolved $resolved, Container $app): TResolved>> $decorators
+	 * @param Stack<?array<Closure(TResolved $resolved, Container $app): void>>                              $updaters
 	 */
 	public function __construct(
 		private readonly string $entry,
@@ -36,12 +37,12 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 		$updaters->asCollection();
 	}
 
-	/** @return Stack<?(class-string<TResolved>|(Closure(TResolved, Container): TResolved))[]> */
+	/** @return Stack<?array<class-string<TResolved>|(Closure(TResolved $resolved, Container $app): TResolved)>> */
 	public function getDecorators(): Stack {
 		return $this->decorators;
 	}
 
-	/** @return Stack<?(Closure(TResolved, Container): void)[]> */
+	/** @return Stack<?array<Closure(TResolved $resolved, Container $app): void>> */
 	public function getUpdaters(): Stack {
 		return $this->updaters;
 	}
@@ -49,7 +50,7 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	/**
 	 * Decorates resolved value with decorator currently being registered.
 	 *
-	 * @param class-string<TResolved>|(Closure(TResolved, Container): TResolved) $decorator The decorator can be:
+	 * @param class-string<TResolved>|(Closure(TResolved $resolved, Container $app): TResolved) $decorator The decorator can be:
 	 * - a Closure that accepts the resolved value as first argument and container as second, or
 	 * - a classname that accepts the resolved value as first argument.
 	 */
