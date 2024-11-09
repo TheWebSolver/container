@@ -14,7 +14,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
-final class EventManager {
+class EventManager {
 	/** @var WeakMap<EventType,(EventDispatcherInterface &ListenerRegistry)|false|null> */
 	private WeakMap $eventDispatchers;
 
