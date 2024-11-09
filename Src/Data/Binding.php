@@ -16,6 +16,7 @@ readonly class Binding {
 		public bool $instance = false
 	) {}
 
+	/** @phpstan-assert-if-true =object $this->concrete */
 	public function isInstance(): bool {
 		return $this->instance && ! $this->singleton;
 	}
