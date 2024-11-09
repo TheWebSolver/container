@@ -4,7 +4,6 @@
  *
  * @package TheWebSolver\Codegarage\Container
  *
- * @phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType -- Intersection param type OK.
  * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics & Closure type-hint OK.
  * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics & Closure type-hint OK.
  */
@@ -56,16 +55,16 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected EventManager $eventManager;
 
 	/**
-	 * @param Stack<Binding>                                               $bindings
-	 * @param Stack<array<string,Closure|string|null>>                     $contextual
-	 * @param Stack<array<int,string>>                                     $tags
-	 * @param Stack<Closure[]>                                             $rebounds
-	 * @param Stack<array<class-string|Closure>>                           $extenders
-	 * @param Stack<bool>                                                  $resolved
+	 * @param Stack<Binding>                           $bindings
+	 * @param Stack<array<string,Closure|string|null>> $contextual
+	 * @param Stack<array<int,string>>                 $tags
+	 * @param Stack<Closure[]>                         $rebounds
+	 * @param Stack<array<class-string|Closure>>       $extenders
+	 * @param Stack<bool>                              $resolved
 	 */
 	final public function __construct(
 		protected readonly Stack $bindings = new Stack(),
-		protected readonly Param $paramPool = new Param(),
+		protected readonly Param $dependencies = new Param(),
 		protected readonly Artefact $artefact = new Artefact(),
 		protected readonly Aliases $aliases = new Aliases(),
 		protected readonly Stack $resolved = new Stack(),
@@ -128,7 +127,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	protected function hasContextualFor( string $entry ): bool {
-		return ! empty( $this->contextual[ $entry ] );
+		return $this->contextual->has( $entry );
 	}
 
 	/*
@@ -353,7 +352,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 */
 	public function build( string|Closure $with, bool $dispatch = true, ?ReflectionClass $reflector = null ): array {
 		if ( $with instanceof Closure ) {
-			return array( $reflector, $with( $this, $this->paramPool->latest() ?? array() ) );
+			return array( $reflector, $with( $this, $this->dependencies->latest() ?? array() ) );
 		}
 
 		try {
@@ -370,7 +369,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		try {
 			$dispatcher = $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null;
-			$resolver   = new ParamResolver( $this, $this->paramPool, $dispatcher );
+			$resolver   = new ParamResolver( $this, $this->dependencies, $dispatcher );
 			$resolved   = $resolver->resolve( dependencies: $constructor->getParameters() );
 		} catch ( ContainerExceptionInterface $e ) {
 			$this->artefact->pull();
@@ -524,7 +523,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			return $instance;
 		}
 
-		$this->paramPool->push( value: $with ?? array() );
+		$this->dependencies->push( value: $with ?? array() );
 
 		[ $reflector, $resolved ] = $this->build( $bound, $dispatch, $reflector );
 
@@ -536,7 +535,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			$resolved = $this->resolveFromAfterBuildEventWith( $reflector, $entry, $resolved );
 		}
 
-		$this->paramPool->pull();
+		$this->dependencies->pull();
 		$this->resolved->set( key: $id, value: true );
 
 		return $resolved;
