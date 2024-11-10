@@ -70,18 +70,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		protected readonly Stack $rebounds = new Stack(),
 		EventManager $eventManager = null
 	) {
-		$this->polyfillEventDispatchersFor( $eventManager );
+		$this->eventManager = EventType::registerDispatchersTo( $eventManager ?? new EventManager() );
 		$this->extenders->asCollection();
 		$this->rebounds->asCollection();
 		$this->tags->asCollection();
-	}
-
-	private function polyfillEventDispatchersFor( ?EventManager $eventManager ): void {
-		$this->eventManager = $eventManager ?? new EventManager();
-
-		foreach ( EventType::cases() as $eventType ) {
-			$this->eventManager->setDispatcher( $eventType->getDispatcher(), $eventType );
-		}
 	}
 
 	public static function boot(): static {
