@@ -59,7 +59,7 @@ enum EventType {
 	}
 
 	private static function assertParamNameProvided( string $entry, ?string $paramName ): string {
-		return ! ! $paramName ? Stack::keyFrom( id: $entry, name: $paramName ) : throw new LogicException(
+		return $paramName ?: throw new LogicException(
 			"Parameter name is required when adding event listener during build for entry {$entry}."
 		);
 	}

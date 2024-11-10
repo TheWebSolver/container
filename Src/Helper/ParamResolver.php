@@ -85,7 +85,7 @@ class ParamResolver {
 			return null;
 		}
 
-		$id = Stack::keyFrom( id: $type, name: $param->getName() );
+		$id = $param->getName();
 
 		$this->maybeAddEventListenerFromAttributeOf( $param, $id );
 
