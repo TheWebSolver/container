@@ -25,7 +25,7 @@ use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
-/** @template T of object */
+/** @template TResolved of object */
 class AfterBuildHandler {
 	/** Placeholders: 1: Decorating classname 2: debug type of resolved value */
 	public const INVALID_TYPE_HINT_OR_NOT_FIRST_PARAM = 'Decorating class "%s" has invalid type-hint or not accepting the resolved object as first parameter when decorating "%2$s".';
@@ -35,7 +35,7 @@ class AfterBuildHandler {
 	/** @var (EventDispatcherInterface&ListenerRegistry<AfterBuildEvent>) */
 	public EventDispatcherInterface&ListenerRegistry $eventDispatcher;
 	private ?string $currentDecoratorClass = null;
-	/** @var T */
+	/** @var TResolved */
 	private object $resolved;
 
 	public function __construct( private readonly Container $app, private readonly string $entry ) {
@@ -45,10 +45,8 @@ class AfterBuildHandler {
 	}
 
 	/**
-	 * @param T $resolved
 	 * @throws BadResolverArgument When `$resolved` Parameter could not be determined in decorator class.
 	 * @throws ContainerError      When decorator class is not a valid class-string or not instantiable.
-	 * @return T
 	 */
 	// phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Actual number is vague.
 	public static function handleWith(
@@ -58,7 +56,7 @@ class AfterBuildHandler {
 		Artefact $artefact,
 		?ReflectionClass $reflector
 	): object {
-		/** @var self<T> */
+		/** @var self<TResolved> */
 		$handler = new self( $app, $entry );
 
 		try {
@@ -80,7 +78,19 @@ class AfterBuildHandler {
 	}
 
 	public function withListenerFromAttributeOf( ?ReflectionClass $reflection ): self {
-		if ( ! $this->hasDispatcher() || empty( $attrs = $reflection?->getAttributes( DecorateWith::class ) ) ) {
+		if ( ! $this->hasDispatcher() || ! $reflection ) {
+			return $this;
+		}
+
+		$attrs = array();
+
+		if ( ! $this->app->isAttributeCompiledFor( $this->entry, $attributeName = DecorateWith::class ) ) {
+			$attrs = $reflection->getAttributes( $attributeName );
+
+			$this->app->setCompiledAttributeFor( $this->entry, $attributeName );
+		}
+
+		if ( empty( $attrs ) ) {
 			return $this;
 		}
 
@@ -94,8 +104,8 @@ class AfterBuildHandler {
 	}
 
 	/**
-	 * @param T $resolved
-	 * @return T
+	 * @param TResolved $resolved
+	 * @return TResolved
 	 * @throws BadResolverArgument When `$resolved` Parameter could not be determined in decorator class.
 	 * @throws ReflectionException When decorator class is provided but it is not a valid class-string.
 	 * @throws LogicException      When decorator class is provided but it cannot be instantiated.
@@ -108,7 +118,7 @@ class AfterBuildHandler {
 			return $resolved;
 		}
 
-		/** @var ?AfterBuildEvent<T> */
+		/** @var ?AfterBuildEvent<TResolved> */
 		$event = $this->eventDispatcher->dispatch( event: new AfterBuildEvent( $this->entry ) );
 
 		if ( ! $event instanceof AfterBuildEvent ) {
@@ -127,8 +137,8 @@ class AfterBuildHandler {
 	}
 
 	/**
-	 * @param class-string<T>|Closure(T, Container): T $decorator
-	 * @return T
+	 * @param class-string<TResolved>|Closure(TResolved, Container): TResolved $decorator
+	 * @return TResolved
 	 */
 	private function decorateWith( string|Closure $decorator ): object {
 		if ( $decorator instanceof Closure ) {
@@ -141,7 +151,7 @@ class AfterBuildHandler {
 		$reflection = Unwrap::classReflection( $entry );
 		$args       = array( $this->getDecoratorParamFrom( $reflection )->getName() => $this->resolved );
 
-		/** @var T */
+		/** @var TResolved */
 		$decorated = $this->app->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
 
 		return $decorated;

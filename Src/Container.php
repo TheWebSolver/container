@@ -47,6 +47,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @var ?static */
 	protected static $instance;
 	protected EventManager $eventManager;
+	/** @var array<string,array<string,true>> */
+	protected array $compliedAttributesForEntry;
 
 	/**
 	 * @param Stack<Binding>                           $bindings
@@ -122,6 +124,14 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	protected function hasContextualFor( string $entry ): bool {
 		return $this->contextual->has( $entry );
+	}
+
+	/**
+	 * @param class-string $attributeName
+	 * @access private
+	 */
+	public function isAttributeCompiledFor( string $entry, string $attributeName ): bool {
+		return isset( $this->compliedAttributesForEntry[ $attributeName ][ $entry ] );
 	}
 
 	/*
@@ -311,6 +321,14 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 */
 	public function setMethod( Closure|string $entry, Closure $callback ): void {
 		$this->set( id: MethodResolver::keyFrom( id: $entry ), concrete: $callback );
+	}
+
+	/**
+	 * @param class-string $attributeName
+	 * @access private
+	 */
+	public function setCompiledAttributeFor( string $entry, string $attributeName ): void {
+		$this->compliedAttributesForEntry[ $attributeName ][ $entry ] = true;
 	}
 
 	/*

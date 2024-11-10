@@ -548,7 +548,7 @@ class ContainerTest extends TestCase {
 		/** @var _Main__EntryClass__Stub */
 		$instance = $this->app->get( _Main__EntryClass__Stub::class );
 
-		$this->assertTrue( $this->app->isInstance( id: _Primary__EntryClass__Stub::class . '||primary' ) );
+		$this->assertTrue( $this->app->isInstance( id: 'primary' ) );
 		$this->assertInstanceOf( _Primary__EntryClass__Stub_Child::class, actual: $instance->primary );
 
 		/** @var _Main__EntryClass__Stub_Child */
@@ -661,6 +661,29 @@ class ContainerTest extends TestCase {
 		$this->assertSame( 'Stack As ArrayAccess', actual: $instance->array['afterBuild'] );
 	}
 
+	private function getClassWithDecoratorAttribute(): JustTest__Stub {
+		return new #[DecorateWith( listener: array( self::class, 'useDecorator' ) )]
+		class() implements JustTest__Stub {
+			public function __construct( public ArrayAccess $stack = new Stack() ) {}
+
+			public function getStack(): ArrayAccess {
+				return $this->stack;
+			}
+
+			public function getStatus(): string {
+				return 'Base-Class:';
+			}
+
+			public static function useDecorator( AfterBuildEvent $e ): void {
+				$e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+					->update(
+						with: static fn ( JustTest__Stub $decorator ) =>
+							( $decorator->getStack()['updated'] = 'from attribute' )
+					);
+			}
+		};
+	}
+
 	public function testAllEvents(): void {
 		$this->app->setAlias( _Stack__ContextualBindingWithArrayAccess__Stub::class, 'decoratorTest' );
 		$this->app->set( JustTest__Stub::class, 'decoratorTest' );
@@ -691,26 +714,7 @@ class ContainerTest extends TestCase {
 		$this->tearDown();
 		$this->setUp();
 
-		$baseClass = new #[DecorateWith( listener: array( self::class, 'useDecorator' ) )]
-		class() implements JustTest__Stub {
-			public function __construct( public ArrayAccess $stack = new Stack() ) {}
-
-			public function getStack(): ArrayAccess {
-				return $this->stack;
-			}
-
-			public function getStatus(): string {
-				return 'Base-Class:';
-			}
-
-			public static function useDecorator( AfterBuildEvent $e ): void {
-				$e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
-					->update(
-						with: static fn ( JustTest__Stub $decorator ) =>
-							( $decorator->getStack()['updated'] = 'from attribute' )
-					);
-			}
-		};
+		$baseClass = $this->getClassWithDecoratorAttribute();
 
 		$this->app->setAlias( $baseClass::class, 'baseClass' );
 		$this->app->set( JustTest__Stub::class, 'baseClass' );
@@ -803,53 +807,70 @@ class ContainerTest extends TestCase {
 		);
 	}
 
-	public function testEventListenersAfterBuildAreInvalidatedForAnInstance(): void {
-		/** @var EventManager&MockObject */
-		$manager     = $this->createMock( EventManager::class );
-		$dispatcher  = $this->createMock( EventDispatcher::class );
-		$beforeBuild = $this->createMock( BeforeBuildEvent::class );
-		$afterBuild  = $this->createMock( AfterBuildEvent::class );
-		$stack       = $this->createMock( Stack::class );
-		$app         = new Container( eventManager: $manager );
+	public function testAfterBuildEventListenersAreInvalidatedForAnInstance(): void {
+		$dispatcher = $this->app->getEventManager()->getDispatcher( EventType::AfterBuild );
+		$base       = $this->getClassWithDecoratorAttribute();
 
-		$manager->expects( $this->any() )->method( 'getDispatcher' )->willReturn( $dispatcher );
-
-		// 1: for base class, 2: for decorator class, 3: when resolving decorator class param.
-		$dispatcher->expects( $this->exactly( 3 ) )->method( 'hasListeners' )->willReturn( true, false, false );
-		$dispatcher->method( 'dispatch' )->willReturn( $beforeBuild, $afterBuild );
-		$dispatcher->expects( $this->once() )->method( 'reset' )->with( 'mock' );
-
-		$beforeBuild->expects( $this->once() )->method( 'getParams' )->willReturn( null );
-
-		$afterBuild->expects( $this->once() )->method( 'getDecorators' )->willReturn( $stack );
-
-		$stack
-			->expects( $this->exactly( 1 ) )
-			->method( 'get' )
-			->with( 'mock' )
-			->willReturn( array( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class ) );
-
-		$app->setInstance( 'mock', new _Stack__ContextualBindingWithArrayAccess__Stub( new WeakMap() ) );
-		$app->get( 'mock' );
-		$app->get( 'mock' );
-	}
-
-	public function testEventListenersAfterBuildAreInvalidatedForAnInstanceIntegration(): void {
-		$this->app->setInstance( 'test', new _Stack__ContextualBindingWithArrayAccess__Stub( new WeakMap() ) );
+		// When already instantiated class is set as a shared instance.
+		$this->app->setInstance( 'test', $base );
 
 		$this->app->when( EventType::AfterBuild )
 			->for( 'test' )
 			->listenTo(
-				static fn( AfterBuildEvent $e ) => $e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+				static fn( AfterBuildEvent $e )
+					=> $e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
 			);
 
-		$this->assertTrue( $this->app->getEventManager()->getDispatcher( EventType::AfterBuild )->hasListeners( forEntry: 'test' ) );
-		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $this->app->get( 'test' ) );
-		$this->assertFalse( $this->app->getEventManager()->getDispatcher( EventType::AfterBuild )->hasListeners( forEntry: 'test' ) );
-		$this->assertInstanceOf(
-			_Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class,
-			$this->app->getBinding( 'test' )->concrete
-		);
+		// Because concrete is an instantiated class, "forEntry" will be the $id when set to container.
+		$this->assertTrue( $dispatcher->hasListeners( forEntry: 'test' ) );
+
+		$instance = $this->app->get( 'test' );
+
+		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $instance );
+		$this->assertFalse( $dispatcher->hasListeners( forEntry: 'test' ) );
+		$this->assertSame( $instance, $this->app->get( 'test' ) );
+
+		// When a classname is set as a shared instance.
+		$this->app->setShared( JustTest__Stub::class, _Stack__ContextualBindingWithArrayAccess__Stub::class );
+
+		$this->app->when( EventType::AfterBuild )
+			->for( JustTest__Stub::class )
+			->listenTo(
+				static fn( AfterBuildEvent $e )
+					=> $e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+			);
+
+		// Because concrete is a classname, "forEntry" will be the $concrete when set to container.
+		$this->assertTrue( $dispatcher->hasListeners( _Stack__ContextualBindingWithArrayAccess__Stub::class ) );
+
+		$instance = $this->app->get( JustTest__Stub::class, with: array( 'array' => new WeakMap() ) );
+
+		$this->assertFalse( $dispatcher->hasListeners( _Stack__ContextualBindingWithArrayAccess__Stub::class ) );
+		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $instance );
+		$this->assertSame( $instance, $this->app->get( JustTest__Stub::class ) );
+	}
+
+	public function testAttributeCompiledForEntry(): void {
+		$concrete = $this->getClassWithDecoratorAttribute();
+
+		$this->assertFalse( $this->app->isAttributeCompiledFor( $concrete::class, DecorateWith::class ) );
+
+		$this->app->setShared( JustTest__Stub::class, $concrete::class );
+
+		$this->assertFalse( $this->app->resolved( JustTest__Stub::class ) );
+
+		$this->app->get( JustTest__Stub::class );
+
+		$this->assertTrue( $this->app->resolved( JustTest__Stub::class ) );
+
+		$this->app->get( JustTest__Stub::class );
+		$this->app->get( JustTest__Stub::class );
+		$this->app->get( JustTest__Stub::class );
+
+		$singleton = $this->app->get( JustTest__Stub::class );
+
+		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $singleton );
+		$this->assertTrue( $this->app->isAttributeCompiledFor( $concrete::class, DecorateWith::class ) );
 	}
 }
 
