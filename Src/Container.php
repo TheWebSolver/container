@@ -322,7 +322,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/**
 	 * @param EventType|string|string[]|Closure $constraint
 	 * @return ($constraint is EventType ? EventBuilder : ContextBuilder)
-	 * @throws LogicException When unregistered Event Type provided to add event listener.
+	 * @throws LogicException When unregistered Event Dispatcher provided to add event listener.
 	 */
 	public function when( EventType|string|array|Closure $constraint ): ContextBuilder|EventBuilder {
 		if ( $constraint instanceof EventType ) {
@@ -474,7 +474,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		if ( ( $bound = $this->getBinding( $entry ) ) && $bound->isInstance() ) {
 			return $dispatch
-				? $this->dispatchAfterBuildEventForInstance( $entry, instance: $bound->concrete )
+				? $this->dispatchAfterBuildEventForInstance( $entry, $bound->concrete, $reflector )
 				: $bound->concrete;
 		}
 
@@ -485,16 +485,19 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		[ $reflector, $resolved ] = $this->build( $material, $dispatch, $reflector );
 
 		$this->dependencies->pull();
-		$this->resolved->set( key: $entry, value: true );
 
-		return ! $this->isResolvedAsObject( $concrete, $resolved )
+		$resolved = ! $this->isResolvedAsObject( $concrete, $resolved )
 			? $resolved
 			: match ( $this->isSingletonFor( $entry ) ) {
 				false => $dispatch ? $this->dispatchAfterBuildEvent( $concrete, $resolved, $reflector ) : $resolved,
 				true  => $dispatch
-					? $this->dispatchAfterBuildEventForInstance( $entry, $resolved, $concrete )
+					? $this->dispatchAfterBuildEventForInstance( $entry, $resolved, $reflector, $concrete )
 					: $this->setInstance( $entry, $resolved )
 			};
+
+		$this->resolved->set( key: $entry, value: true );
+
+		return $resolved;
 	}
 
 	/** @phpstan-assert-if-true =object $resolved */
@@ -536,18 +539,25 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	private function dispatchAfterBuildEventForInstance(
 		string $entry,
 		object $instance,
+		?ReflectionClass $reflector = null,
 		string $concreteName = null
 	): object {
-		$eventId    = $concreteName ?? $entry;
-		$dispatcher = $this->eventManager->getDispatcher( EventType::AfterBuild );
+		$eventId = $concreteName ?? $entry;
 
-		if ( ! $dispatcher?->hasListeners( forEntry: $eventId ) ) {
+		// The whole intent of a singleton pattern is to resolve same instance during the request lifecycle.
+		// We'll only listen for events one time and never bother to listen to them on subsequent calls.
+		if ( $this->resolved->has( $entry ) ) {
 			return $concreteName ? $this->setInstance( $entry, $instance ) : $instance;
 		}
 
-		$instance = $this->dispatchAfterBuildEvent( $eventId, $instance, reflector: null );
+		// User instantiated object already bound to container and not being built.
+		// It must be provided to the container using `Container::setInstance()`.
+		$isBoundInstance = ! $concreteName && ! $reflector;
+		$reflector       = $isBoundInstance ? new ReflectionClass( $instance ) : $reflector;
+		$instance        = $this->dispatchAfterBuildEvent( $eventId, $instance, $reflector );
 
-		$dispatcher->reset( $eventId );
+		$this->eventManager->getDispatcher( EventType::AfterBuild )?->reset( $eventId );
+		$this->resolved->set( key: $entry, value: true );
 
 		return $this->setInstance( $entry, $instance );
 	}
