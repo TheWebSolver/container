@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
 
 class AliasesTest extends TestCase {
-	private ?Aliases $aliases;
+	private Aliases $aliases;
 
 	/** @var array<string,string> */
 	private array $entryAliasMap = array(
@@ -26,7 +26,7 @@ class AliasesTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
-		$this->aliases = null;
+		$this->setUp();
 	}
 
 	public function testAddingAlias(): Aliases {
@@ -34,7 +34,10 @@ class AliasesTest extends TestCase {
 			$this->aliases->set( $entry, $alias );
 
 			$this->assertSame( expected: $entry, actual: $this->aliases->get( $alias ) );
-			$this->assertSame( expected: $alias, actual: $this->aliases->get( $entry, asEntry: true )[0] );
+
+			$asEntry = $this->aliases->get( $entry, asEntry: true );
+
+			$this->assertSame( expected: $alias, actual: reset( $asEntry ) );
 		}
 
 		return $this->aliases;

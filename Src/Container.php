@@ -34,6 +34,7 @@ use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
+use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
@@ -55,26 +56,24 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected array $compliedAttributesForEntry;
 
 	/**
-	 * @param Stack<Binding>                           $bindings
-	 * @param Stack<array<string,Closure|string|null>> $contextual
-	 * @param Stack<array<int,string>>                 $tags
-	 * @param Stack<Closure[]>                         $rebounds
+	 * @param Stack<Binding>                        $bindings
+	 * @param CollectionStack<Closure|class-string> $contextual
+	 * @param CollectionStack<string>               $tags
+	 * @param CollectionStack<Closure>              $rebounds
 	 */
 	final public function __construct(
 		protected readonly Stack $bindings = new Stack(),
 		protected readonly Param $dependencies = new Param(),
 		protected readonly Artefact $artefact = new Artefact(),
 		protected readonly Aliases $aliases = new Aliases(),
-		protected readonly Stack $contextual = new Stack(),
-		protected readonly Stack $tags = new Stack(),
-		protected readonly Stack $rebounds = new Stack(),
+		protected readonly CollectionStack $contextual = new CollectionStack(),
+		protected readonly CollectionStack $tags = new CollectionStack(),
+		protected readonly CollectionStack $rebounds = new CollectionStack(),
 		EventManager $eventManager = null
 	) {
 		$this->eventManager      = EventType::registerDispatchersTo( $eventManager ?? new EventManager() );
 		$this->resolvedInstances = new Stack();
 		$this->resolved          = new Stack();
-		$this->rebounds->asCollection();
-		$this->tags->asCollection();
 	}
 
 	public static function boot(): static {
@@ -209,7 +208,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	public function getContextual( string $for, string $context ): Closure|string|null {
-		return $this->contextual[ $this->getEntryFrom( alias: $for ) ][ $context ] ?? null;
+		return $this->contextual->get( $this->getEntryFrom( alias: $for ), $context );
 	}
 
 	/**
@@ -393,9 +392,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @return iterable<int,object> */
 	public function tagged( string $name ) {
 		return ! $this->tags->has( key: $name ) ? array() : new Generator(
-			count: $this->tags->withKey( $name ),
+			count: $this->tags->countFor( $name ),
 			generator: function () use ( $name ) {
-				foreach ( $this->tags[ $name ] ?? array() as $id ) {
+				foreach ( ( $this->tags->get( $name ) ?? array() ) as $id ) {
 					yield $this->get( $id );
 				}
 			},
@@ -453,7 +452,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected function rebound( string $id ): void {
 		$updated = $this->resolveWithoutEvents( $id );
 
-		foreach ( ( $this->rebounds[ $id ] ?? array() ) as $listener ) {
+		foreach ( ( $this->rebounds->get( $id ) ?? array() ) as $listener ) {
 			$listener( $updated, $this );
 		}
 	}

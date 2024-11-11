@@ -10,8 +10,8 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Data;
 
 use LogicException;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
+use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
 class Aliases implements Resettable {
@@ -20,10 +20,9 @@ class Aliases implements Resettable {
 		KeyStack::remove as remover;
 	}
 
-	/** @param Stack<string[]> $entryStack */
-	public function __construct( private readonly Stack $entryStack = new Stack() ) { // phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
-		$this->entryStack->asCollection();
-	}
+	/** @param CollectionStack<string> $entryStack */
+	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
+	public function __construct( private readonly CollectionStack $entryStack = new CollectionStack() ) {}
 
 	/** @throws LogicException When entry ID and alias is same. */
 	public function set( string $entry, string $alias ): void {
@@ -40,12 +39,9 @@ class Aliases implements Resettable {
 		return $asEntry ? $this->entryStack->has( key: $id ) : isset( $this->stack[ $id ] );
 	}
 
-	/**
-	 * @return string|array<int,string>
-	 * @phpstan-return ($asEntry is true ? array<int,string> : string)
-	 */
+	/** @return ($asEntry is true ? string[] : string) */
 	public function get( string $id, bool $asEntry = false ): string|array {
-		return $asEntry ? ( $this->entryStack[ $id ] ?? array() ) : ( $this->stack[ $id ] ?? $id );
+		return $asEntry ? ( $this->entryStack->get( $id ) ?? array() ) : ( $this->stack[ $id ] ?? $id );
 	}
 
 	public function remove( string $id ): bool {
@@ -57,7 +53,7 @@ class Aliases implements Resettable {
 	public function reset( ?string $collectionId = null ): void {
 		$this->stack = array();
 
-		$this->entryStack->reset();
+		$this->entryStack->reset( $collectionId );
 	}
 
 	private function removeEntryAlias( string $id ): void {
@@ -66,7 +62,7 @@ class Aliases implements Resettable {
 		}
 
 		foreach ( $this->entryStack->getItems() as $entry => $aliases ) {
-			$this->removeFromEntryStack( $aliases, (string) $entry, given: $id );
+			$this->removeFromEntryStack( $aliases, $entry, given: $id );
 		}
 	}
 
@@ -74,7 +70,7 @@ class Aliases implements Resettable {
 	private function removeFromEntryStack( array $aliases, string $entry, string $given ): void {
 		foreach ( $aliases as $index => $storedAlias ) {
 			if ( $storedAlias === $given ) {
-				$this->entryStack->remove( Stack::keyFrom( $entry, (string) $index ) );
+				$this->entryStack->remove( $entry, $index );
 			}
 		}
 	}

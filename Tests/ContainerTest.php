@@ -12,7 +12,6 @@
 declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\NotFoundExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
@@ -23,12 +22,11 @@ use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
+use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\UpdateOnReset;
-use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
 
 class ContainerTest extends TestCase {
@@ -480,11 +478,9 @@ class ContainerTest extends TestCase {
 
 	public function testReboundValueOfDependencyBindingUpdatedAtLaterTime(): void {
 		$this->app->set(
-			id: Stack::class,
+			id: CollectionStack::class,
 			concrete: function () {
-				$stack = new Stack();
-
-				$stack->asCollection();
+				$stack = new CollectionStack();
 
 				$stack->set( key: 'john', value: 'doe' );
 
@@ -495,7 +491,7 @@ class ContainerTest extends TestCase {
 		$this->app->set(
 			id: 'aliases',
 			concrete: fn ( Container $app ) => new Aliases(
-				entryStack: $app->useRebound( of: Stack::class, with: static fn ( Stack $obj ) => $obj )
+				entryStack: $app->useRebound( of: CollectionStack::class, with: static fn ( CollectionStack $obj ) => $obj )
 			)
 		);
 
@@ -505,9 +501,9 @@ class ContainerTest extends TestCase {
 		$this->assertSame( expected: 'doe', actual: $aliases->get( id: 'john', asEntry: true )[0] );
 
 		$this->app->set(
-			id: Stack::class,
+			id: CollectionStack::class,
 			concrete: function () {
-				$stack = new Stack();
+				$stack = new CollectionStack();
 
 				$stack->set( key: 'PHP', value: 'Developer' );
 
@@ -517,11 +513,9 @@ class ContainerTest extends TestCase {
 
 		/** @var Aliases */
 		$aliasWithReboundEntries = $this->app->get( id: 'aliases' );
+		$jobs                    = $aliasWithReboundEntries->get( id: 'PHP', asEntry: true );
 
-		$this->assertSame(
-			expected: 'Developer',
-			actual: $aliasWithReboundEntries->get( id: 'PHP', asEntry: true )
-		);
+		$this->assertSame( expected: 'Developer', actual: reset( $jobs ) );
 
 		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
 
@@ -920,6 +914,33 @@ class ContainerTest extends TestCase {
 
 		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $singleton );
 		$this->assertTrue( $this->app->isAttributeCompiledFor( $concrete::class, DecorateWith::class ) );
+	}
+
+	public function testResetBindingWithEachUpdate(): void {
+		// FIXME: Works even without attribute.
+		$test = new class() {
+			public function __construct( #[UpdateOnReset] public ?ArrayAccess $accessor = null ) {}
+		};
+
+		$this->app->set( ArrayAccess::class, Stack::class );
+
+		$this->assertInstanceOf( Stack::class, $this->app->get( $test::class )->accessor );
+
+		$this->app->set( ArrayAccess::class, WeakMap::class );
+
+		$this->assertInstanceOf( WeakMap::class, $this->app->get( $test::class )->accessor );
+
+		$test2 = new class() {
+			public ArrayAccess $accessor;
+
+			public function set( #[UpdateOnReset] ArrayAccess $accessor ) {
+				$this->accessor = $accessor;
+			}
+		};
+
+		$this->app->setInstance( $test2::class, $test2 );
+
+		$this->app->set( ArrayAccess::class, Container::class );
 	}
 }
 

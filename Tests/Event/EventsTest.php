@@ -18,18 +18,18 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\EventDispatcher\StoppableEventInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
 
 class EventsTest extends TestCase {
-	/** @return array{0:MockObject&Stack,1:MockObject&Stack} */
+	/** @return array{0:MockObject&CollectionStack,1:MockObject&CollectionStack} */
 	private function getDecoratorsAndUpdatersMock(): array {
-		return array( $this->createMock( Stack::class ), $this->createMock( Stack::class ) );
+		return array( $this->createMock( CollectionStack::class ), $this->createMock( CollectionStack::class ) );
 	}
 
 	public function testBeforeBuildEvent(): void {
@@ -65,10 +65,7 @@ class EventsTest extends TestCase {
 	}
 
 	public function testAfterBuildEvent(): void {
-		foreach ( $mocks = $this->getDecoratorsAndUpdatersMock() as $stack ) {
-			$stack->expects( $this->once() )->method( 'asCollection' );
-		}
-
+		$mocks = $this->getDecoratorsAndUpdatersMock();
 		$event = new AfterBuildEvent( 'entry', ...$mocks );
 
 		$this->assertSame( 'entry', $event->getEntry() );

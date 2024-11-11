@@ -12,14 +12,29 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 
 class StackWithArrayAccessTest extends TestCase {
-	private ?Stack $stack;
+	private Stack $stack;
 
 	protected function setUp(): void {
 		$this->stack = new Stack();
 	}
 
 	protected function tearDown(): void {
-		$this->stack = null;
+		$this->setUp();
+	}
+
+	public function testWithArrayAccess(): void {
+		foreach ( array( 'one', 'two', 'three', 'four' ) as $index => $value ) {
+			$this->stack->set( "i:$index", $value );
+		}
+
+		$this->stack['i:5'] = 'Intel';
+
+		$this->assertTrue( isset( $this->stack['i:5'] ) );
+		$this->assertSame( 'Intel', $this->stack['i:5'] );
+
+		unset( $this->stack['i:1'] );
+
+		$this->assertArrayNotHasKey( 'i:1', $this->stack );
 	}
 
 	public function testWithBindingDTO(): void {
@@ -42,122 +57,6 @@ class StackWithArrayAccessTest extends TestCase {
 				'singleton' => $singleton,
 				'instance'  => $instance,
 			),
-		);
-	}
-
-	public function testAsCollection(): void {
-		$this->stack->asCollection();
-
-		$this->stack->set( key: 'center', value: '1' );
-		$this->stack->set( key: 'center', value: '2' );
-		$this->stack->set( key: 'centre', value: '3' );
-
-		$this->assertSame( expected: array( '1', '2' ), actual: $this->stack['center'] );
-		$this->assertSame( expected: array( '3' ), actual: $this->stack['centre'] );
-		$this->assertCount( expectedCount: 2, haystack: $this->stack->withKey( 'center' ) );
-		$this->assertCount( expectedCount: 1, haystack: $this->stack->withKey( 'centre' ) );
-	}
-
-	public function testWithNestedKeyedValue(): void {
-		$this->stack->asCollection();
-
-		$key = Stack::keyFrom( id: 'key', name: 'john' );
-
-		$this->assertSame( expected: 'key||john', actual: $key );
-
-		$this->stack[ $key ] = array( 'doe' );
-
-		$this->assertSame( expected: array( 'john' => array( 'doe' ) ), actual: $this->stack['key'] );
-		$this->assertSame( expected: array( 'john' => array( 'doe' ) ), actual: $this->stack->get( 'key' ) );
-
-		$this->assertSame( expected: array( 'doe' ), actual: $this->stack->get( id: 'key||john' ) );
-		$this->assertSame( expected: array( 'doe' ), actual: $this->stack['key||john'] );
-
-		$this->assertSame( expected: 'doe', actual: $this->stack['key']['john'][0] );
-
-		$this->assertCount( expectedCount: 1, haystack: $this->stack );
-		$this->assertCount( expectedCount: 1, haystack: $this->stack->withKey( 'key||john' ) );
-	}
-
-	public function testGetterSetterWithKey(): void {
-		$this->stack->set( 'primary||first', 'value' );
-
-		$this->assertTrue( $this->stack->has( 'primary||first' ) );
-
-		$this->stack->set( key: 'primary||third', value: 'next value' );
-		$this->stack->set( key: 'primary||second', value: 'another' );
-
-		$this->assertSame(
-			actual: $this->stack->get( id: 'primary' ),
-			expected: array(
-				'first'  => 'value',
-				'third'  => 'next value',
-				'second' => 'another',
-			)
-		);
-
-		$this->assertSame( expected: 'next value', actual: $this->stack->get( 'primary||third' ) );
-
-		$this->assertTrue( condition: $this->stack->remove( 'primary||third' ) );
-		$this->assertArrayNotHasKey( key: 'third', array: $this->stack->get( 'primary' ) );
-		$this->assertCount( expectedCount: 2, haystack: $this->stack->withKey( 'primary' ) );
-
-		$this->stack->set( key: 'primary:second', value: 'update second' );
-		$this->assertSame(
-			actual: $this->stack->get( id: 'primary:second' ),
-			expected: 'update second'
-		);
-	}
-
-	public function testGetterSetterWithIndex(): void {
-		$this->stack->asCollection();
-
-		$this->stack->set( key: 'primary', value: 'value' );
-
-		$this->assertTrue( condition: $this->stack->has( 'primary' ) );
-
-		$this->stack->set( key: 'primary||2', value: 'next value' );
-		$this->stack->set( key: 'primary||1', value: 'another' );
-		$this->stack->set( key: 'primary', value: 'again without index in key' );
-
-		$this->assertSame(
-			actual: $this->stack->get( id: 'primary' ),
-			expected: array(
-				0 => 'value',
-				2 => 'next value',
-				1 => 'another',
-				3 => 'again without index in key',
-			)
-		);
-
-		$this->assertSame( expected: 'next value', actual: $this->stack->get( 'primary||2' ) );
-
-		$this->assertTrue( condition: $this->stack->remove( 'primary||0' ) );
-		$this->assertArrayNotHasKey( key: 0, array: $this->stack->get( 'primary' ) );
-		$this->assertCount( expectedCount: 3, haystack: $this->stack->withKey( 'primary' ) );
-
-		$this->stack->set( key: 'primary||1', value: 'update 1' );
-		$this->assertSame( expected: 'update 1', actual: $this->stack->get( id: 'primary||1' ) );
-
-		$this->stack->set( key: 'primary||collectionKey', value: 'with string key' );
-		$this->assertArrayHasKey( key: 'collectionKey', array: $this->stack->get( id: 'primary' ) );
-		$this->assertSame( expected: 'with string key', actual: $this->stack->get( 'primary||collectionKey' ) );
-
-		$this->stack->reset( 'primary' );
-		$this->assertArrayNotHasKey( key: 'primary', array: $this->stack->getItems() );
-
-		$this->stack->reset();
-		$this->assertEmpty( $this->stack->getItems() );
-	}
-
-	public function testGetterSetterWithIndexWithoutDeclaringAsCollection(): void {
-		$this->stack->set( key: 'primary||0', value: 'value' );
-		$this->stack->set( key: 'primary||1', value: 'another' );
-
-		$this->assertTrue( condition: $this->stack->has( key: 'primary||1' ) );
-		$this->assertSame(
-			actual: $this->stack->get( id: 'primary' ),
-			expected: array( 'value', 'another' )
 		);
 	}
 }

@@ -16,7 +16,7 @@ namespace TheWebSolver\Codegarage\Lib\Container\Event;
 use Closure;
 use Psr\EventDispatcher\StoppableEventInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 
@@ -25,25 +25,22 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;
 
 	/**
-	 * @param Stack<?array<class-string<TResolved>|Closure(TResolved $resolved, Container $app): TResolved>> $decorators
-	 * @param Stack<?array<Closure(TResolved $resolved, Container $app): void>>                              $updaters
+	 * @param CollectionStack<class-string<TResolved>|Closure(TResolved $resolved, Container $app): TResolved> $decorators
+	 * @param CollectionStack<Closure(TResolved $resolved, Container $app): void>                              $updaters
 	 */
 	public function __construct(
 		private readonly string $entry,
-		private readonly Stack $decorators = new Stack(),
-		private readonly Stack $updaters = new Stack()
-	) {
-		$decorators->asCollection();
-		$updaters->asCollection();
-	}
+		private readonly CollectionStack $decorators = new CollectionStack(),
+		private readonly CollectionStack $updaters = new CollectionStack()
+	) {}
 
-	/** @return Stack<?array<class-string<TResolved>|(Closure(TResolved $resolved, Container $app): TResolved)>> */
-	public function getDecorators(): Stack {
+	/** @return CollectionStack<class-string<TResolved>|(Closure(TResolved $resolved, Container $app): TResolved)> */
+	public function getDecorators(): CollectionStack {
 		return $this->decorators;
 	}
 
-	/** @return Stack<?array<Closure(TResolved $resolved, Container $app): void>> */
-	public function getUpdaters(): Stack {
+	/** @return CollectionStack<Closure(TResolved $resolved, Container $app): void> */
+	public function getUpdaters(): CollectionStack {
 		return $this->updaters;
 	}
 

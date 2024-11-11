@@ -28,7 +28,7 @@ class Stack implements ArrayAccess, Countable, Resettable {
 
 	/**
 	 * @param string $key
-	 * @return TValue
+	 * @return ?TValue
 	 */
 	public function offsetGet( $key ): mixed {
 		return $this->get( $key );
@@ -45,9 +45,5 @@ class Stack implements ArrayAccess, Countable, Resettable {
 	/** @param string $key */
 	public function offsetUnset( $key ): void {
 		$this->remove( $key );
-	}
-
-	public static function keyFrom( string $id, string $name ): string {
-		return implode( separator: '||', array: func_get_args() );
 	}
 }

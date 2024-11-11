@@ -15,20 +15,20 @@ use Closure;
 use Generator;
 use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 
 final class ContextBuilder {
 	protected string $constraint;
 
 	/**
-	 * @param string[]                                 $for
-	 * @param Stack<array<string,Closure|string|null>> $contextual
+	 * @param string[]                              $for
+	 * @param CollectionStack<Closure|class-string> $contextual
 	 */
 	public function __construct(
 		private readonly array $for,
 		private readonly Container $app,
-		private readonly Stack $contextual
+		private readonly CollectionStack $contextual
 	) {}
 
 	public function needs( string $constraint ): self {
@@ -40,8 +40,9 @@ final class ContextBuilder {
 	public function give( Closure|string $value ): void {
 		foreach ( $this->for as $id ) {
 			$this->contextual->set(
-				key: Stack::keyFrom( id: $this->app->getEntryFrom( alias: $id ), name: $this->getConstraint() ),
-				value: $value
+				key: $this->app->getEntryFrom( alias: $id ),
+				value: $value,
+				index: $this->getConstraint()
 			);
 		}
 	}
