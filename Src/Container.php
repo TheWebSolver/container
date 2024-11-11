@@ -46,6 +46,10 @@ use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
 class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @var ?static */
 	protected static $instance;
+	/** @var Stack<class-string> */
+	protected Stack $resolved;
+	/** @var Stack<array<class-string,class-string>> */
+	protected Stack $resolvedInstances;
 	protected EventManager $eventManager;
 	/** @var array<string,array<string,true>> */
 	protected array $compliedAttributesForEntry;
@@ -55,23 +59,20 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param Stack<array<string,Closure|string|null>> $contextual
 	 * @param Stack<array<int,string>>                 $tags
 	 * @param Stack<Closure[]>                         $rebounds
-	 * @param Stack<array<class-string|Closure>>       $extenders
-	 * @param Stack<bool>                              $resolved
 	 */
 	final public function __construct(
 		protected readonly Stack $bindings = new Stack(),
 		protected readonly Param $dependencies = new Param(),
 		protected readonly Artefact $artefact = new Artefact(),
 		protected readonly Aliases $aliases = new Aliases(),
-		protected readonly Stack $resolved = new Stack(),
 		protected readonly Stack $contextual = new Stack(),
-		protected readonly Stack $extenders = new Stack(),
 		protected readonly Stack $tags = new Stack(),
 		protected readonly Stack $rebounds = new Stack(),
 		EventManager $eventManager = null
 	) {
-		$this->eventManager = EventType::registerDispatchersTo( $eventManager ?? new EventManager() );
-		$this->extenders->asCollection();
+		$this->eventManager      = EventType::registerDispatchersTo( $eventManager ?? new EventManager() );
+		$this->resolvedInstances = new Stack();
+		$this->resolved          = new Stack();
 		$this->rebounds->asCollection();
 		$this->tags->asCollection();
 	}
@@ -108,10 +109,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->hasBinding( $id ) || $this->isAlias( $id );
 	}
 
-	public function resolved( string $id ): bool {
+	public function hasResolved( string $id ): bool {
 		$entry = $this->getEntryFrom( alias: $id );
 
-		return $this->resolved->has( key: $entry ) || $this->isInstance( id: $entry );
+		return $this->resolved->has( $entry ) || $this->resolvedInstances->has( $entry );
 	}
 
 	protected function hasContextualFor( string $entry ): bool {
@@ -238,9 +239,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return null;
 	}
 
-	/** @return Stack<bool> */
-	public function getResolved(): Stack {
-		return $this->resolved;
+	/** @return class-string|array<class-string,class-string>|null */
+	public function getResolved( string $id ): string|array|null {
+		$entry = $this->getEntryFrom( $id );
+
+		return $this->resolvedInstances[ $entry ] ?? $this->resolved[ $entry ];
 	}
 
 	public function getEventManager(): EventManager {
@@ -421,21 +424,21 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/** @param string $key */
 	public function offsetUnset( $key ): void {
-		unset( $this->bindings[ $key ], $this->resolved[ $key ] );
+		unset( $this->bindings[ $key ], $this->resolved[ $key ], $this->resolvedInstances[ $key ] );
 	}
 
-	public function removeExtenders( string $id ): void {
-		$this->extenders->remove( key: $this->getEntryFrom( $id ) );
+	public function removeInstance( string $entry ): bool {
+		return $this->isInstance( $entry ) && $this->bindings->remove( key: $entry );
 	}
 
-	public function removeInstance( string $id ): bool {
-		return $this->isInstance( $id ) && $this->bindings->remove( key: $id );
+	public function removeResolved( string $entry ): bool {
+		return $this->resolvedInstances->remove( $entry ) ?: $this->resolved->remove( $entry );
 	}
 
 	public function reset( ?string $collectionId = null ): void {
 		$props = get_object_vars( $this );
 
-		array_walk( $props, static fn( mixed $pool ) => $pool instanceof Resettable && $pool->reset() );
+		array_walk( $props, static fn( mixed $pool ) => $pool instanceof Resettable && $pool->reset( $collectionId ) );
 	}
 
 	/*
@@ -466,7 +469,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->bindings->set( key: $entry, value: new Binding( $material, $singleton ) );
 
-		if ( $this->resolved( $entry ) ) {
+		if ( $this->hasResolved( $entry ) ) {
 			$this->rebound( $entry );
 		}
 	}
@@ -496,16 +499,20 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->dependencies->pull();
 
-		$resolved = ! $this->isResolvedAsObject( $concrete, $resolved )
-			? $resolved
-			: match ( $this->isSingletonFor( $entry ) ) {
-				false => $dispatch ? $this->dispatchAfterBuildEvent( $concrete, $resolved, $reflector ) : $resolved,
-				true  => $dispatch
-					? $this->dispatchAfterBuildEventForInstance( $entry, $resolved, $reflector, $concrete )
-					: $this->setInstance( $entry, $resolved )
-			};
+		if ( ! $this->isResolvedAsObject( $concrete, $resolved ) ) {
+			return $resolved;
+		}
 
-		$this->resolved->set( key: $entry, value: true );
+		$resolved = match ( $shouldBeSingleTon = $this->isSingletonFor( $entry ) ) {
+			false => $dispatch ? $this->dispatchAfterBuildEvent( $concrete, $resolved, $reflector ) : $resolved,
+			true  => $dispatch
+				? $this->dispatchAfterBuildEventForInstance( $entry, $resolved, $reflector, $concrete )
+				: $this->setInstance( $entry, $resolved )
+		};
+
+		if ( ! $shouldBeSingleTon ) {
+			$this->resolved->set( key: $entry, value: $resolved::class );
+		}
 
 		return $resolved;
 	}
@@ -539,7 +546,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			->getDispatcher( EventType::BeforeBuild )
 			?->dispatch( new BeforeBuildEvent( $entry, $params ) );
 
-		return $event instanceof BeforeBuildEvent ? $event->getParams() ?? $params : $params;
+		return $event instanceof BeforeBuildEvent && ( $eventParams = $event->getParams() ) ? $eventParams : $params;
 	}
 
 	private function dispatchAfterBuildEvent( string $id, object $resolved, ?ReflectionClass $reflector ): object {
@@ -549,25 +556,22 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	private function dispatchAfterBuildEventForInstance(
 		string $entry,
 		object $instance,
-		?ReflectionClass $reflector = null,
-		string $concreteName = null
+		?ReflectionClass $reflector,
+		string $concrete = null
 	): object {
-		$eventId = $concreteName ?? $entry;
+		$eventId   = $concrete ?? $entry;
+		$baseClass = $instance::class;
 
-		// The whole intent of a singleton pattern is to resolve same instance during the request lifecycle.
-		// We'll only listen for events one time and never bother to listen to them on subsequent calls.
-		if ( $this->resolved->has( $entry ) ) {
-			return $concreteName ? $this->setInstance( $entry, $instance ) : $instance;
+		if ( $this->resolvedInstances->has( $entry ) ) {
+			return $concrete ? $this->setInstance( $entry, $instance ) : $instance;
 		}
 
-		// User instantiated object already bound to container and not being built.
-		// It must be provided to the container using `Container::setInstance()`.
-		$isBoundInstance = ! $concreteName && ! $reflector;
-		$reflector       = $isBoundInstance ? new ReflectionClass( $instance ) : $reflector;
-		$instance        = $this->dispatchAfterBuildEvent( $eventId, $instance, $reflector );
+		$isUserProvidedInstance = ! $concrete && ! $reflector;
+		$reflector              = $isUserProvidedInstance ? new ReflectionClass( $instance ) : $reflector;
+		$instance               = $this->dispatchAfterBuildEvent( $eventId, $instance, $reflector );
 
 		$this->eventManager->getDispatcher( EventType::AfterBuild )?->reset( $eventId );
-		$this->resolved->set( key: $entry, value: true );
+		$this->resolvedInstances->set( key: $entry, value: array( $baseClass => $instance::class ) );
 
 		return $this->setInstance( $entry, $instance );
 	}

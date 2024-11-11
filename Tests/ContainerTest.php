@@ -62,7 +62,7 @@ class ContainerTest extends TestCase {
 		$this->assertFalse( $this->app->has( id: self::class ) );
 		$this->assertFalse( $this->app->hasBinding( 'testClass' ) );
 		$this->assertFalse( $this->app->isAlias( 'testClass' ) );
-		$this->assertFalse( $this->app->resolved( id: 'testClass' ) );
+		$this->assertFalse( $this->app->hasResolved( id: 'testClass' ) );
 
 		$this->app->setAlias( entry: self::class, alias: 'testClass' );
 
@@ -80,12 +80,13 @@ class ContainerTest extends TestCase {
 		$this->assertTrue( $this->app->hasBinding( id: 'testClass' ) );
 		$this->assertFalse( $this->app->hasBinding( id: self::class ), 'Bound using alias.' );
 		$this->assertSame( 'testClass', $this->app->getEntryFrom( alias: 'testClass' ) );
-		// $this->assertInstanceOf( Closure::class, actual: $this->app->getBinding( 'testClass' )->concrete );
 		$this->assertSame( array( 'testClass' => self::class ), $this->app->getBinding( 'testClass' )->concrete );
 
 		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
-		$this->assertTrue( $this->app->resolved( id: 'testClass' ) );
-		$this->assertTrue( $this->app->resolved( id: self::class ) );
+		$this->assertTrue( $this->app->hasResolved( id: 'testClass' ) );
+		$this->assertTrue( $this->app->hasResolved( id: self::class ) );
+		$this->assertSame( self::class, $this->app->getResolved( self::class ) );
+		$this->assertTrue( $this->app->removeResolved( self::class ) );
 
 		$this->app->setShared( id: stdClass::class, concrete: null );
 
@@ -95,22 +96,57 @@ class ContainerTest extends TestCase {
 			expected: $this->app->get( id: stdClass::class ),
 			actual: $this->app->get( id: stdClass::class )
 		);
+		$this->assertSame(
+			array( stdClass::class => stdClass::class ),
+			$this->app->getResolved( stdClass::class )
+		);
 
 		// The singleton is resolved and bound as an instance thereafter.
 		$this->assertTrue( $this->app->isInstance( stdClass::class ) );
+		$this->assertTrue( $this->app->hasResolved( stdClass::class ) );
+
+		$this->assertFalse( $this->app->removeInstance( 'aliasedClass' ) );
 
 		$this->app->setShared( 'aliasedClass', WeakMap::class );
+
+		$this->assertFalse( $this->app->removeResolved( 'aliasedClass' ) );
+
 		$this->app->get( 'aliasedClass' );
 		$this->assertTrue( $this->app->isInstance( 'aliasedClass' ) );
+		$this->assertTrue( $this->app->hasResolved( 'aliasedClass' ) );
+		$this->assertSame(
+			array( WeakMap::class => WeakMap::class ),
+			$this->app->getResolved( 'aliasedClass' )
+		);
+		$this->assertNull(
+			actual: $this->app->getResolved( WeakMap::class ),
+			message: 'Cannot get resolved Stack value using concrete when alias was used when shared.'
+		);
+
+		$this->assertTrue( $this->app->removeResolved( 'aliasedClass' ) );
+		$this->assertTrue( $this->app->removeInstance( 'aliasedClass' ) );
+		$this->assertFalse( $this->app->isInstance( 'aliasedClass' ) );
 
 		$this->assertFalse( $this->app->isInstance( id: 'instance' ) );
-		$this->assertFalse( $this->app->resolved( id: 'instance' ) );
+		$this->assertFalse( $this->app->hasResolved( id: 'instance' ) );
 
 		$newClass = $this->app->setInstance( id: 'instance', instance: new class() {} );
 
 		$this->assertTrue( $this->app->isInstance( id: 'instance' ) );
 		$this->assertSame( $newClass, $this->app->get( id: 'instance' ) );
-		$this->assertTrue( $this->app->resolved( id: 'instance' ) );
+		$this->assertTrue( $this->app->hasResolved( id: 'instance' ) );
+		$this->assertSame(
+			array( $newClass::class => $newClass::class ),
+			$this->app->getResolved( 'instance' )
+		);
+
+		$this->app->setInstance( WeakMap::class, new WeakMap() );
+		$this->app->set( WeakMap::class, WeakMap::class );
+
+		$this->assertFalse(
+			condition: $this->app->isInstance( WeakMap::class ),
+			message: 'Instance must be purged if another binding created.'
+		);
 	}
 
 	public function testAliasAndGetWithoutBinding(): void {
@@ -215,7 +251,7 @@ class ContainerTest extends TestCase {
 		);
 
 		foreach ( $toBeResolved as $classname ) {
-			$this->assertTrue( $this->app->resolved( id: $classname ) );
+			$this->assertTrue( $this->app->hasResolved( id: $classname ) );
 		}
 	}
 
@@ -809,10 +845,13 @@ class ContainerTest extends TestCase {
 
 	public function testAfterBuildEventListenersAreInvalidatedForAnInstance(): void {
 		$dispatcher = $this->app->getEventManager()->getDispatcher( EventType::AfterBuild );
-		$base       = $this->getClassWithDecoratorAttribute();
+		$concrete   = $this->getClassWithDecoratorAttribute();
 
 		// When already instantiated class is set as a shared instance.
-		$this->app->setInstance( 'test', $base );
+		$this->app->setInstance( 'test', $concrete );
+		$this->assertNull( $this->app->getResolved( 'test' ) );
+		$this->assertFalse( $this->app->hasResolved( 'test' ) );
+		$this->assertTrue( $this->app->isInstance( 'test' ) );
 
 		$this->app->when( EventType::AfterBuild )
 			->for( 'test' )
@@ -826,12 +865,21 @@ class ContainerTest extends TestCase {
 
 		$instance = $this->app->get( 'test' );
 
+		$this->assertTrue( $this->app->hasResolved( 'test' ) );
+		$this->assertSame(
+			array( $concrete::class => _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class ),
+			$this->app->getResolved( 'test' )
+		);
+
 		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $instance );
 		$this->assertFalse( $dispatcher->hasListeners( forEntry: 'test' ) );
 		$this->assertSame( $instance, $this->app->get( 'test' ) );
 
 		// When a classname is set as a shared instance.
 		$this->app->setShared( JustTest__Stub::class, _Stack__ContextualBindingWithArrayAccess__Stub::class );
+
+		$this->assertFalse( $this->app->hasResolved( JustTest__Stub::class ) );
+		$this->assertFalse( $this->app->isInstance( JustTest__Stub::class ) );
 
 		$this->app->when( EventType::AfterBuild )
 			->for( JustTest__Stub::class )
@@ -845,6 +893,13 @@ class ContainerTest extends TestCase {
 
 		$instance = $this->app->get( JustTest__Stub::class, with: array( 'array' => new WeakMap() ) );
 
+		$this->assertTrue( $this->app->hasResolved( JustTest__Stub::class ) );
+		$this->assertTrue( $this->app->isInstance( JustTest__Stub::class ) );
+		$this->assertSame(
+			array( _Stack__ContextualBindingWithArrayAccess__Stub::class => _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class ),
+			$this->app->getResolved( JustTest__Stub::class )
+		);
+
 		$this->assertFalse( $dispatcher->hasListeners( _Stack__ContextualBindingWithArrayAccess__Stub::class ) );
 		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $instance );
 		$this->assertSame( $instance, $this->app->get( JustTest__Stub::class ) );
@@ -856,13 +911,7 @@ class ContainerTest extends TestCase {
 		$this->assertFalse( $this->app->isAttributeCompiledFor( $concrete::class, DecorateWith::class ) );
 
 		$this->app->setShared( JustTest__Stub::class, $concrete::class );
-
-		$this->assertFalse( $this->app->resolved( JustTest__Stub::class ) );
-
 		$this->app->get( JustTest__Stub::class );
-
-		$this->assertTrue( $this->app->resolved( JustTest__Stub::class ) );
-
 		$this->app->get( JustTest__Stub::class );
 		$this->app->get( JustTest__Stub::class );
 		$this->app->get( JustTest__Stub::class );
