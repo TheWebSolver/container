@@ -43,7 +43,7 @@ class EventManager {
 	}
 
 	public function getDispatcher( EventType $eventType ): (EventDispatcherInterface&ListenerRegistry)|null {
-		return ( $dispatcher = ( $this->eventDispatchers[ $eventType ] ?? null ) ) ? $dispatcher : null;
+		return ( $this->eventDispatchers[ $eventType ] ?? null ) ?: null;
 	}
 
 	/** @return WeakMap<EventType,(EventDispatcherInterface&ListenerRegistry)|false|null> */
