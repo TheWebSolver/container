@@ -61,6 +61,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param CollectionStack<Closure|class-string> $contextual
 	 * @param CollectionStack<string>               $tags
 	 * @param CollectionStack<Closure>              $rebounds
+	 * @param CollectionStack<bool>                 $fetchedListenerAttributes
 	 */
 	final public function __construct(
 		protected readonly Stack $bindings = new Stack(),
@@ -125,7 +126,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @access private
 	 */
 	public function isListenerFetchedFrom( string $entry, string $attributeName ): bool {
-		return $this->fetchedListenerAttributes->has( key: $attributeName, index: $entry );
+		return true === $this->fetchedListenerAttributes->get( key: $attributeName, index: $entry );
 	}
 
 	/*
