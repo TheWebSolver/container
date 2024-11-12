@@ -12,6 +12,7 @@
 declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\NotFoundExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
@@ -24,9 +25,11 @@ use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
+use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\UpdateOnReset;
+use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
 
 class ContainerTest extends TestCase {
@@ -837,6 +840,33 @@ class ContainerTest extends TestCase {
 		);
 	}
 
+	public function testAfterBuildEventForInstanceWithMock(): void {
+		/** @var EventManager&MockObject */
+		$eventManager = $this->createMock( EventManager::class );
+		$dispatcher   = $this->createMock( EventDispatcher::class );
+		$instance     = $this->getClassWithDecoratorAttribute();
+		$this->app    = new Container( eventManager: $eventManager );
+
+		$eventManager->expects( $this->exactly( 3 ) )
+			->method( 'getDispatcher' )
+			->with( EventType::AfterBuild )
+			->willReturn( $dispatcher );
+
+		$dispatcher->expects( $this->exactly( 1 ) )
+			->method( 'getPriorities' )
+			->willReturn( array( 'high' => 10, 'low' => 5 ) ); // phpcs:ignore
+
+		$dispatcher->expects( $this->once() )->method( 'reset' )->with( 'test' );
+		$dispatcher->expects( $this->once() )->method( 'addListener' );
+
+		$this->app->setInstance( 'test', $instance );
+
+		$this->app->get( 'test' );
+		$this->app->get( 'test' );
+		$this->app->get( 'test' );
+		$this->app->get( 'test' );
+	}
+
 	public function testAfterBuildEventListenersAreInvalidatedForAnInstance(): void {
 		$dispatcher = $this->app->getEventManager()->getDispatcher( EventType::AfterBuild );
 		$concrete   = $this->getClassWithDecoratorAttribute();
@@ -902,10 +932,13 @@ class ContainerTest extends TestCase {
 	public function testAttributeCompiledForEntry(): void {
 		$concrete = $this->getClassWithDecoratorAttribute();
 
-		$this->assertFalse( $this->app->isAttributeCompiledFor( $concrete::class, DecorateWith::class ) );
+		$this->assertFalse( $this->app->isListenerFetchedFrom( $concrete::class, DecorateWith::class ) );
 
 		$this->app->setShared( JustTest__Stub::class, $concrete::class );
 		$this->app->get( JustTest__Stub::class );
+
+		$this->assertTrue( $this->app->isListenerFetchedFrom( $concrete::class, DecorateWith::class ) );
+
 		$this->app->get( JustTest__Stub::class );
 		$this->app->get( JustTest__Stub::class );
 		$this->app->get( JustTest__Stub::class );
@@ -913,10 +946,9 @@ class ContainerTest extends TestCase {
 		$singleton = $this->app->get( JustTest__Stub::class );
 
 		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $singleton );
-		$this->assertTrue( $this->app->isAttributeCompiledFor( $concrete::class, DecorateWith::class ) );
 	}
 
-	public function testResetBindingWithEachUpdate(): void {
+	public function resetBindingWithEachUpdate(): void {
 		// FIXME: Works even without attribute.
 		$test = new class() {
 			public function __construct( #[UpdateOnReset] public ?ArrayAccess $accessor = null ) {}

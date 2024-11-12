@@ -6,8 +6,8 @@ parameters:
 
 	ignoreErrors:
 		-
-			path: Src/Container.php
-			message: '#^Parameter \#1 \$with of method TheWebSolver\\Codegarage\\Lib\\Container\\Container\:\:build\(\) expects class\-string\|Closure, Closure\|string given\.$#'
+			path: Src/Event/BeforeBuildEvent.php
+			message: '#^Possibly invalid array key type object\|string\.$#'
 		-
 			path: Src/Helper/Unwrap.php
 			message: '#^Parameter \#1 \$objectOrClass of class ReflectionClass constructor expects class\-string\<T of object\>\|T of object, string given\.$#'
