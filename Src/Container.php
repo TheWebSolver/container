@@ -53,8 +53,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @var Stack<array<class-string,class-string>> */
 	protected Stack $resolvedInstances;
 	protected EventManager $eventManager;
-	/** @var array<string,array<string,true>> */
-	protected array $compliedAttributesForEntry;
 
 	private ?ReflectionClass $reflector;
 
@@ -72,6 +70,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		protected readonly CollectionStack $contextual = new CollectionStack(),
 		protected readonly CollectionStack $tags = new CollectionStack(),
 		protected readonly CollectionStack $rebounds = new CollectionStack(),
+		protected readonly CollectionStack $fetchedListenerAttributes = new CollectionStack(),
 		EventManager $eventManager = null
 	) {
 		$this->eventManager      = EventType::registerDispatchersTo( $eventManager ?? new EventManager() );
@@ -126,7 +125,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @access private
 	 */
 	public function isListenerFetchedFrom( string $entry, string $attributeName ): bool {
-		return isset( $this->compliedAttributesForEntry[ $attributeName ][ $entry ] );
+		return $this->fetchedListenerAttributes->has( key: $attributeName, index: $entry );
 	}
 
 	/*
@@ -326,7 +325,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @access private
 	 */
 	public function setListenerFetchedFrom( string $entry, string $attributeName ): void {
-		$this->compliedAttributesForEntry[ $attributeName ][ $entry ] = true;
+		$this->fetchedListenerAttributes->set( key: $attributeName, value: true, index: $entry );
 	}
 
 	/*
