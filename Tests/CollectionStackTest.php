@@ -89,4 +89,29 @@ class CollectionStackTest extends TestCase {
 		$this->assertCount( 0, $this->stack );
 		$this->assertCount( 0, $this->stack->countFor( 'name' ) );
 	}
+
+	public function testCollectionStackWithCompiledArray(): void {
+		$compiledData = array(
+			'name'   => array(
+				'writer'    => 'Lorem Ipsum',
+				'developer' => 'John Doe',
+			),
+			'flower' => array(
+				'land'  => 'lily',
+				'water' => 'lotus',
+			),
+		);
+
+		$stack = CollectionStack::fromCompiledArray( $compiledData );
+
+		$this->assertTrue( $stack->has( 'name', 'developer' ) );
+		$this->assertSame( 'lily', $stack->get( 'flower', 'land' ) );
+	}
+
+	public function testCollectionStackWithCompiledFile(): void {
+		$stack = CollectionStack::fromCompiledFile( path: __DIR__ . '/File/compiledForCollectionStack.php' );
+
+		$this->assertTrue( $stack->has( 'name', 'developer' ) );
+		$this->assertSame( 'lily', $stack->get( 'flower', 'land' ) );
+	}
 }
