@@ -1,6 +1,6 @@
 <?php
 /**
- * Stack of keyed stored items.
+ * Stack of items.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -12,14 +12,21 @@ namespace TheWebSolver\Codegarage\Lib\Container\Pool;
 use Countable;
 use ArrayAccess;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
+use TheWebSolver\Codegarage\Lib\Container\Traits\StackCompiler;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
+
 /**
  * @template TValue
  * @template-implements ArrayAccess<string,TValue>
+ * @template-implements Compilable<string,TValue>
  */
-class Stack implements ArrayAccess, Countable, Resettable {
-	/** @use KeyStack<TValue> */
-	use KeyStack;
+class Stack implements ArrayAccess, Countable, Resettable, Compilable {
+	/**
+	 * @use KeyStack<TValue>
+	 * @use StackCompiler<string,TValue>
+	*/
+	use KeyStack, StackCompiler;
 
 	/** @param string $key */
 	public function offsetExists( $key ): bool {
@@ -45,5 +52,9 @@ class Stack implements ArrayAccess, Countable, Resettable {
 	/** @param string $key */
 	public function offsetUnset( $key ): void {
 		$this->remove( $key );
+	}
+
+	public function count(): int {
+		return count( $this->stack );
 	}
 }

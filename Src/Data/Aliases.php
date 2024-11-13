@@ -20,7 +20,7 @@ class Aliases implements Resettable {
 		KeyStack::remove as remover;
 	}
 
-	/** @param CollectionStack<string> $entryStack */
+	/** @param CollectionStack<string,string> $entryStack */
 	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function __construct( private readonly CollectionStack $entryStack = new CollectionStack() ) {}
 

@@ -3,8 +3,6 @@
  * Contextual bindings for the container during the entry's build process.
  *
  * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics Type-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -22,8 +20,9 @@ final class ContextBuilder {
 	protected string $constraint;
 
 	/**
-	 * @param string[]                              $for
-	 * @param CollectionStack<Closure|class-string> $contextual
+	 * @param string[]                                     $for
+	 * @param Container                                    $app
+	 * @param CollectionStack<string,Closure|class-string> $contextual
 	 */
 	public function __construct(
 		private readonly array $for,

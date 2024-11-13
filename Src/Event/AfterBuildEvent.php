@@ -25,8 +25,8 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;
 
 	/**
-	 * @param CollectionStack<class-string<TResolved>|Closure(TResolved $resolved, Container $app): TResolved> $decorators
-	 * @param CollectionStack<Closure(TResolved $resolved, Container $app): void>                              $updaters
+	 * @param CollectionStack<string,class-string<TResolved>|Closure(TResolved $resolved, Container $app): TResolved> $decorators
+	 * @param CollectionStack<string,Closure(TResolved $resolved, Container $app): void>                              $updaters
 	 */
 	public function __construct(
 		private readonly string $entry,
@@ -34,12 +34,12 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 		private readonly CollectionStack $updaters = new CollectionStack()
 	) {}
 
-	/** @return CollectionStack<class-string<TResolved>|(Closure(TResolved $resolved, Container $app): TResolved)> */
+	/** @return CollectionStack<string,class-string<TResolved>|(Closure(TResolved $resolved, Container $app): TResolved)> */
 	public function getDecorators(): CollectionStack {
 		return $this->decorators;
 	}
 
-	/** @return CollectionStack<Closure(TResolved $resolved, Container $app): void> */
+	/** @return CollectionStack<string,Closure(TResolved $resolved, Container $app): void> */
 	public function getUpdaters(): CollectionStack {
 		return $this->updaters;
 	}

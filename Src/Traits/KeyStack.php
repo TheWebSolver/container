@@ -1,6 +1,6 @@
 <?php
 /**
- * Stack that stores data in a key/value pair.
+ * Stack of items indexed by string key.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -13,8 +13,6 @@ namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 trait KeyStack {
 	/** @use Stack<string,TValue> */
 	use Stack;
-
-	private string $useKey;
 
 	/** @phpstan-assert-if-true !null $this->get() */
 	public function has( string $key ): bool {
@@ -38,15 +36,5 @@ trait KeyStack {
 		unset( $this->stack[ $key ] );
 
 		return true;
-	}
-
-	public function withKey( string $key ): static {
-		$this->useKey = $key;
-
-		return $this;
-	}
-
-	public function count(): int {
-		return count( $this->stack );
 	}
 }

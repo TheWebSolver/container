@@ -57,11 +57,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	private ?ReflectionClass $reflector;
 
 	/**
-	 * @param Stack<Binding>                        $bindings
-	 * @param CollectionStack<Closure|class-string> $contextual
-	 * @param CollectionStack<string>               $tags
-	 * @param CollectionStack<Closure>              $rebounds
-	 * @param CollectionStack<bool>                 $fetchedListenerAttributes
+	 * @param Stack<Binding>                               $bindings
+	 * @param CollectionStack<string,Closure|class-string> $contextual
+	 * @param CollectionStack<string,string>               $tags
+	 * @param CollectionStack<int,Closure>                 $rebounds
+	 * @param CollectionStack<string,bool>                 $fetchedListenerAttributes
 	 */
 	final public function __construct(
 		protected readonly Stack $bindings = new Stack(),

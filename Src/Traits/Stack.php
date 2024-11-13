@@ -14,8 +14,8 @@ namespace TheWebSolver\Codegarage\Lib\Container\Traits;
  * @template TValue
 */
 trait Stack {
-	/** @var array<TKey,TValue> */
-	private array $stack = array();
+	/** @param array<TKey,TValue> $stack */
+	final public function __construct( private array $stack = array() ) {}
 
 	/** @return array<TKey,TValue> */
 	public function getItems(): array {

@@ -3,6 +3,9 @@
  * Stack of keyed stored items.
  *
  * @package TheWebSolver\Codegarage\Container
+ *
+ * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
+ * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
  */
 
 declare( strict_types = 1 );
@@ -10,43 +13,32 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Pool;
 
 use Countable;
-use RuntimeException;
 use TheWebSolver\Codegarage\Lib\Container\Traits\Stack;
+use TheWebSolver\Codegarage\Lib\Container\Traits\StackCompiler;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
 /**
+ * @template TKey of array-key
  * @template TValue
- * @template-implements Compilable<string,array<string|int,TValue>>
+ * @template-implements Compilable<string,array<TKey,TValue>>
  */
 class CollectionStack implements Countable, Resettable, Compilable {
-	/** @use Stack<string,array<string|int,TValue>> */
-	use Stack;
+	/**
+	 * @use Stack<string,array<TKey,TValue>>
+	 * @use StackCompiler<string,array<TKey,TValue>>
+	*/
+	use Stack, StackCompiler;
 
 	private int $currentIndex = 0;
 	private ?string $countKey = null;
 
-	final public function __construct() {}
-
-	/** @param array<string,array<string|int,TValue>> $data */
-	public static function fromCompiledArray( array $data ): static {
-		$self        = new static();
-		$self->stack = $data;
-
-		return $self;
-	}
-
-	public static function fromCompiledFile( string $path ): static {
-		return ( $realpath = realpath( $path ) )
-			? static::fromCompiledArray( require $realpath )
-			: throw new RuntimeException( "Could not find compiled data from filepath {$path}." );
-	}
-
-	public function set( string $key, mixed $value, ?string $index = null ): void {
+	/** @param ?TKey $index */
+	public function set( string $key, mixed $value, string|int|null $index = null ): void {
 		$this->stack[ $key ][ $index ?? $this->currentIndex++ ] = $value;
 	}
 
-	/** @return ($index is null ? ?array<string|int,TValue> : ?TValue) */
+	/** @return ($index is null ? ?array<TKey,TValue> : ?TValue) */
 	public function get( string $key, string|int|null $index = null ): mixed {
 		return null !== $index ? $this->stack[ $key ][ $index ] ?? null : $this->stack[ $key ] ?? null;
 	}
@@ -81,6 +73,7 @@ class CollectionStack implements Countable, Resettable, Compilable {
 		}
 	}
 
+	/** @param ?TKey $index */
 	public function remove( string $key, string|int|null $index = null ): bool {
 		if ( ! isset( $this->stack[ $key ] ) ) {
 			return false;

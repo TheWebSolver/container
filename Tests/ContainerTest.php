@@ -12,6 +12,7 @@
 declare( strict_types = 1 );
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\NotFoundExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
@@ -259,33 +260,20 @@ class ContainerTest extends TestCase {
 	public function testResolvingParamDuringBuildEventIntegration(): void {
 		$this->app->when( EventType::Building )
 			->for( entry: ArrayAccess::class, paramName: 'array' )
-			->listenTo(
-				function ( BuildingEvent $event ) {
-					$stack = new Stack();
-					$stack->set( 'key', 'value' );
+			->listenTo( fn ( BuildingEvent $event ) => $event->setBinding( new Binding( concrete: new WeakMap() ) ) );
 
-					$event->setBinding( new Binding( concrete: $stack ) );
-				}
-			);
-
-		$this->assertSame(
-			expected: 'value',
-			actual: $this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class )->array->get( 'key' )
+		$this->assertInstanceOf(
+			expected: WeakMap::class,
+			actual: $this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class )->array
 		);
 
-		$AutoWiredClass = new class() extends Stack {
-			public function __construct() {
-				$this->set( 'key', 'withParams' );
-			}
-		};
-
-		$this->assertSame(
+		$this->assertInstanceOf(
 			message: 'The injected param value when resolving entry must override event value.',
-			expected: 'withParams',
+			expected: Stub::class,
 			actual: $this->app->get(
 				id: _Stack__ContextualBindingWithArrayAccess__Stub::class,
-				with: array( 'array' => $AutoWiredClass )
-			)->array->get( 'key' )
+				with: array( 'array' => $this->createStub( ArrayAccess::class ) )
+			)->array
 		);
 	}
 
