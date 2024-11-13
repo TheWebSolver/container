@@ -828,24 +828,27 @@ class ContainerTest extends TestCase {
 		);
 	}
 
-	public function testAfterBuildEventForInstanceWithMock(): void {
+	public function testAfterBuildEventForInstanceShouldInvokeDispatcherMethodsOnlyOnce(): void {
 		/** @var EventManager&MockObject */
 		$eventManager = $this->createMock( EventManager::class );
 		$dispatcher   = $this->createMock( EventDispatcher::class );
 		$instance     = $this->getClassWithDecoratorAttribute();
 		$this->app    = new Container( eventManager: $eventManager );
 
-		$eventManager->expects( $this->exactly( 3 ) )
+		// Not checking behavior of event manager here. Only interested in dispatcher.
+		$eventManager->expects( $this->any() )
 			->method( 'getDispatcher' )
 			->with( EventType::AfterBuild )
 			->willReturn( $dispatcher );
 
-		$dispatcher->expects( $this->exactly( 1 ) )
+		$dispatcher->expects( $this->once() )
 			->method( 'getPriorities' )
 			->willReturn( array( 'high' => 10, 'low' => 5 ) ); // phpcs:ignore
 
 		$dispatcher->expects( $this->once() )->method( 'reset' )->with( 'test' );
-		$dispatcher->expects( $this->once() )->method( 'addListener' );
+		$dispatcher->expects( $this->once() )
+			->method( 'addListener' )
+			->with( static function () {}, 'test', 4 );
 
 		$this->app->setInstance( 'test', $instance );
 
