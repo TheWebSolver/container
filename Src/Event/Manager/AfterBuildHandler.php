@@ -135,8 +135,7 @@ class AfterBuildHandler {
 
 		$this->currentDecoratorClass = $decorator;
 
-		$entry      = $this->app->getEntryFrom( $decorator );
-		$reflection = Unwrap::classReflection( $entry );
+		$reflection = Unwrap::classReflection( $decorator );
 		$args       = array( $this->getDecoratorParamFrom( $reflection )->getName() => $this->resolved );
 
 		/** @var TResolved */

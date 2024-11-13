@@ -118,10 +118,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->resolved->has( $entry ) || $this->resolvedInstances->has( $entry );
 	}
 
-	protected function hasContextualFor( string $entry ): bool {
-		return $this->contextual->has( $entry );
-	}
-
 	/**
 	 * @param class-string $attributeName
 	 * @access private
@@ -161,13 +157,13 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			return $id;
 		}
 
-		$material = $bound->concrete;
+		$concrete = $bound->concrete;
 
 		return match ( true ) {
 			default                      => null,
-			$material === $id            => $id,
-			is_array( $material )        => isset( $material[ $id ] ) ? $this->getEntryFrom( $material[ $id ] ) : null,
-			$material instanceof Closure => $material,
+			$concrete === $id            => $id,
+			is_array( $concrete )        => isset( $concrete[ $id ] ) ? $this->getEntryFrom( $concrete[ $id ] ) : null,
+			$concrete instanceof Closure => $concrete,
 			$bound->isInstance()         => $id,
 		} ?? throw ContainerError::unResolvableEntry( $id );
 	}
@@ -218,12 +214,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/**
 	 * @access private
-	 * @internal This should never be used as an API to get the contextual data. Contextual
-	 *           data becomes invalidated as soon as entry is resolved coz the respective
-	 *           entry (artefact) is pulled immediately from the stack which makes the
-	 *           contextual data stored to the pool to be orphaned & non-retrievable.
-	 *           (unless same contextual data is used again to resolve an entry).
-	 *           Use `Container::getContextual()` to get stored context data.
+	 * @internal This should never be used as an API to get the contextual
+	 *           data except when resolving the current artefact.
 	 */
 	public function getContextualFor( string $context ): Closure|string|null {
 		if ( null !== ( $bound = $this->fromContextual( $context ) ) ) {
@@ -386,8 +378,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			$resolver   = new ParamResolver( $this, $this->dependencies, $dispatcher );
 			$resolved   = $resolver->resolve( dependencies: $constructor->getParameters() );
 		} catch ( ContainerExceptionInterface $e ) {
-			$this->artefact->pull();
-
 			throw $e;
 		}
 
@@ -397,7 +387,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/** @return iterable<int,object> */
-	public function tagged( string $name ) {
+	public function tagged( string $name ): iterable {
 		return ! $this->tags->has( key: $name ) ? array() : new Generator(
 			count: $this->tags->countFor( $name ),
 			generator: function () use ( $name ) {

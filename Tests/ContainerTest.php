@@ -259,7 +259,7 @@ class ContainerTest extends TestCase {
 
 	public function testResolvingParamDuringBuildEventIntegration(): void {
 		$this->app->when( EventType::Building )
-			->for( entry: ArrayAccess::class, paramName: 'array' )
+			->for( ArrayAccess::class, paramName: 'array' )
 			->listenTo( fn ( BuildingEvent $event ) => $event->setBinding( new Binding( concrete: new WeakMap() ) ) );
 
 		$this->assertInstanceOf(
@@ -310,7 +310,7 @@ class ContainerTest extends TestCase {
 		};
 
 		$this->app->when( EventType::Building )
-			->for( entry: _Secondary__EntryClass__Stub::class, paramName: 'secondary' )
+			->for( _Secondary__EntryClass__Stub::class, paramName: 'secondary' )
 			->listenTo(
 				function ( BuildingEvent $event ) use ( $eventualClass ) {
 					$event->setBinding( new Binding( concrete: $eventualClass ) );
@@ -463,7 +463,7 @@ class ContainerTest extends TestCase {
 
 	private function withEventListenerValue( int $value ): void {
 		$this->app->when( EventType::Building )
-			->for( entry: 'int', paramName: 'val' )
+			->for( 'int', paramName: 'val' )
 			->listenTo( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: $value ) ) );
 	}
 
@@ -544,7 +544,7 @@ class ContainerTest extends TestCase {
 		$app = new Container();
 
 		$app->when( EventType::BeforeBuild )
-			->for( entry: _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->for( _Stack__ContextualBindingWithArrayAccess__Stub::class )
 			->listenTo( static fn ( BeforeBuildEvent $e ) => $e->setParam( 'array', new WeakMap() ) );
 
 		$this->assertInstanceOf(
@@ -560,7 +560,7 @@ class ContainerTest extends TestCase {
 		$this->assertInstanceOf( _Primary__EntryClass__Stub::class, $instance->primary );
 
 		$this->app->when( EventType::Building )
-			->for( entry: _Primary__EntryClass__Stub::class, paramName: 'primary' )
+			->for( _Primary__EntryClass__Stub::class, paramName: 'primary' )
 			->listenTo(
 				static fn( BuildingEvent $e )
 					=> $e->setBinding( new Binding( 'attribute listener stops propagation and this is never listened.' ) )
@@ -583,7 +583,7 @@ class ContainerTest extends TestCase {
 
 		$this->expectException( LogicException::class );
 
-		$this->app->when( EventType::Building )->for( entry: JustTest__Stub::class )->listenTo( static function ( $e ) {} );
+		$this->app->when( EventType::Building )->for( JustTest__Stub::class )->listenTo( static function ( $e ) {} );
 	}
 
 	public function testEventListenerFromParamAttributeAndUserDefinedListener(): void {
@@ -645,7 +645,7 @@ class ContainerTest extends TestCase {
 
 	public function testEventOverridesPreviousListenerBindingDuringBuild(): void {
 		$this->app->when( EventType::Building )
-			->for( entry: ArrayAccess::class, paramName: 'array' )
+			->for( ArrayAccess::class, paramName: 'array' )
 			->listenTo(
 				static fn ( BuildingEvent $event ) => $event->setBinding(
 					new Binding( $event->app()->get( Stack::class ), instance: true )
@@ -653,7 +653,7 @@ class ContainerTest extends TestCase {
 			);
 
 		$this->app->when( EventType::Building )
-			->for( entry: ArrayAccess::class, paramName: 'array' )
+			->for( ArrayAccess::class, paramName: 'array' )
 			->listenTo(
 				static fn ( BuildingEvent $event ) => $event->setBinding(
 					new Binding( $event->app()->get( Stack::class ), instance: false )
@@ -714,7 +714,7 @@ class ContainerTest extends TestCase {
 			->listenTo( static fn ( BeforeBuildEvent $e ) => $e->setParam( name: 'array', value: new Stack() ) );
 
 		$this->app->when( EventType::Building )
-			->for( entry: 'string', paramName: 'name' )
+			->for( 'string', paramName: 'name' )
 			->listenTo( static fn( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: 'hello!' ) ) );
 
 		$this->app->when( EventType::AfterBuild )
@@ -770,21 +770,30 @@ class ContainerTest extends TestCase {
 			}
 		};
 
-		$this->app->setAlias( $firstDecorator::class, 'firstDecorator' );
-		$this->app->setAlias( $finalDecorator::class, 'finalDecorator' );
-
 		$this->app->when( EventType::AfterBuild )
 			->for( 'baseClass' )
-			->listenTo( static fn ( AfterBuildEvent $e ) => $e->decorateWith( 'finalDecorator' ), priority: 20 );
+			->listenTo( static fn ( AfterBuildEvent $e ) => $e->decorateWith( $finalDecorator::class ), priority: 20 );
 
 			$this->app->when( EventType::AfterBuild )
 			->for( 'baseClass' )
-			->listenTo( static fn ( AfterBuildEvent $e ) => $e->decorateWith( 'firstDecorator' ), priority: -10 );
+			->listenTo( static fn ( AfterBuildEvent $e ) => $e->decorateWith( $firstDecorator::class ), priority: -10 );
 
 		$stub = $this->app->get( JustTest__Stub::class );
 
 		$this->assertSame( 'Base-Class:Main-Decorator:First-Decorator:Final-Decorator:', $stub->getStatus() );
 		$this->assertInstanceOf( $finalDecorator::class, $stub );
+
+		$this->app->when( EventType::AfterBuild )
+			->for( 'baseClass' )
+			->listenTo(
+				priority: 99,
+				listener: static fn( AfterBuildEvent $e )
+					=> $e->decorateWith(
+						static fn( JustTest__Stub $stub ) => new _Stack__ContextualBindingWithArrayAccess__Decorator__Stub( $stub, 'asCallable' )
+					),
+			);
+
+			$this->assertSame( 'asCallable', $this->app->get( JustTest__Stub::class )->name );
 	}
 
 	/** @dataProvider provideVariousExceptionTypesForAfterBuildEvent */

@@ -30,15 +30,15 @@ final class EventBuilder {
 	 * @throws LogicException When param name not passed for `EventType::Building`, or
 	 *                        when concrete is a Closure for `EventType::AfterBuild`.
 	 */
-	public function for( string $entry, ?string $paramName = null ): self {
-		$this->key = $this->type->getKeyFrom( $this->app, $entry, $paramName );
+	public function for( string $id, ?string $paramName = null ): self {
+		$this->key = $this->type->getKeyFrom( $this->app, $id, $paramName );
 
 		return $this;
 	}
 
 	/**
 	 * @param Closure(object): void $listener
-	 * @throws LogicException When this method is invoked before setting entry and/or param name.
+	 * @throws LogicException When this method is invoked before setting id and/or param name.
 	 */
 	public function listenTo( Closure $listener, int $priority = ListenerRegistry::DEFAULT_PRIORITY ): void {
 		$forEntry = $this->key ?? throw new LogicException(

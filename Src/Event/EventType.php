@@ -24,10 +24,6 @@ enum EventType {
 	case Building;
 	case AfterBuild;
 
-	public function dispatcherId(): string {
-		return $this->name . 'EventDispatcher';
-	}
-
 	public static function registerDispatchersTo( EventManager $manager ): EventManager {
 		foreach ( self::cases() as $eventType ) {
 			$manager->setDispatcher( $eventType->getDispatcher(), $eventType );
@@ -46,18 +42,18 @@ enum EventType {
 
 	/**
 	 * @param Container $app
-	 * @param string    $entry      Entry can be one of the following based on `EventType`:
+	 * @param string    $id         The id can be one of the following based on `EventType`:
 	 * - `EventType::BeforeBuild`
 	 * - `EventType::AfterBuild` -> The `$id` value of `Container::get()` method if no container binding.
 	 *                              Entry/alias of `Container::set()` method if has container binding.
 	 * - `EventType::Building`   -> The parameter type-hint (string, EventBuilder, etc).
 	 * @param string    $paramName  The type-hinted parameter name to auto-wire the param value
-	 *                              when `EventType::Building` the given {@param $entry} type.
+	 *                              when `EventType::Building` the given {@param $id} type.
 	 * @throws LogicException       When param name not passed for `EventType::Building`, or
 	 *                              when concrete is a Closure for `EventType::AfterBuild`.
 	 */
-	public function getKeyFrom( Container $app, string $entry, ?string $paramName ): string {
-		$entry = $app->getEntryFrom( $entry );
+	public function getKeyFrom( Container $app, string $id, ?string $paramName ): string {
+		$entry = $app->getEntryFrom( $id );
 
 		return match ( $this ) {
 			EventType::BeforeBuild => $entry,
