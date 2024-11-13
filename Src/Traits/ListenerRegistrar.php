@@ -3,9 +3,6 @@
  * Registers event listeners.
  *
  * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics type-hint OK.
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics & Closure type-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -19,9 +16,9 @@ use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
 /** @template TEvent of object */
 trait ListenerRegistrar {
-	/** @var array<string,array<int,array<int,Closure(TEvent $event): void>>> */
+	/** @var array<string,array<int,array<int,callable(TEvent $event): void>>> */
 	protected array $listenersForEntry = array();
-	/** @var array<int,array<int,Closure(TEvent $event): void>> */
+	/** @var array<int,array<int,callable(TEvent $event): void>> */
 	protected array $listeners   = array();
 	protected bool $needsSorting = false;
 	/** @var array{low:int,high:int} */
@@ -29,7 +26,6 @@ trait ListenerRegistrar {
 		'low'  => ListenerRegistry::DEFAULT_PRIORITY,
 		'high' => ListenerRegistry::DEFAULT_PRIORITY,
 	);
-
 
 	/**
 	 * Validates whether current event is valid for listeners to be registered.
@@ -40,6 +36,7 @@ trait ListenerRegistrar {
 	 * @param TEvent $event
 	 * @phpstan-assert-if-true TEvent $event
 	 */
+	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	abstract protected function isValid( object $event ): bool;
 
 	/**
@@ -119,10 +116,12 @@ trait ListenerRegistrar {
 		}
 	}
 
+	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
 	/**
-	 * @param array<int,array<int,Closure(TEvent $event): void>> $listeners
-	 * @return array<int,array<int,Closure(TEvent $event): void>>
+	 * @param array<int,array<int,callable(TEvent $event): void>> $listeners
+	 * @return array<int,array<int,callable(TEvent $event): void>>
 	 */
+	// phpcs:enable
 	protected function getSorted( array $listeners ): array {
 		ksort( $listeners, flags: SORT_NUMERIC );
 

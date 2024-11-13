@@ -3,9 +3,6 @@
  * Interface for registering listeners.
  *
  * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics & Closure typ-hint OK.
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics & Closure typ-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -21,8 +18,9 @@ interface ListenerRegistry extends Resettable {
 	/**
 	 * Adds event listener to the registry.
 	 *
-	 * @param Closure(TEvent $event): void $listener
+	 * @param Closure(TEvent): void $listener
 	 */
+	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function addListener( Closure $listener, ?string $forEntry, int $priority ): void;
 
 	/**
@@ -36,7 +34,7 @@ interface ListenerRegistry extends Resettable {
 	 * This should not return event listeners sorted by their priority and
 	 * should return event listeners in order they were registered.
 	 *
-	 * @return array<int,array<int,Closure(TEvent $event): void>>
+	 * @return array<int,array<int,callable(TEvent): void>>
 	 */
 	public function getListeners( ?string $forEntry = null ): array;
 

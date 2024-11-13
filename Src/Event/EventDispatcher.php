@@ -3,9 +3,6 @@
  * The event dispatcher.
  *
  * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics typ-hint OK.
- * @Phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics typ-hint OK.
  */
 
 declare( strict_types = 1 );
@@ -16,20 +13,22 @@ use Closure;
 use Psr\EventDispatcher\StoppableEventInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\EventDispatcher\ListenerProviderInterface;
+use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
-/** @template TEvent of object */
+/**
+ * @template TEvent of object
+ * @template-implements ListenerRegistry<TEvent>
+ */
 class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
-	// phpcs:ignore Squiz.Commenting.FunctionComment.SpacingAfterParamType
 	/** @param ListenerProviderInterface&ListenerRegistry<TEvent> $provider */
+	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function __construct( private readonly ListenerProviderInterface&ListenerRegistry $provider ) {}
 
-	/** @param Closure(TEvent $event): void $listener */
 	public function addListener( Closure $listener, ?string $forEntry, int $priority = self::DEFAULT_PRIORITY ): void {
 		$this->provider->addListener( $listener, $forEntry, $priority );
 	}
 
-	/** @return array<int,array<int,Closure(TEvent $event): void>> */
 	public function getListeners( ?string $forEntry = null ): array {
 		return $this->provider->getListeners( $forEntry );
 	}
@@ -47,17 +46,16 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 	}
 
 	/** @param TEvent $event */
+	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function dispatch( object $event ) {
-		foreach ( $this->provider->getListenersForEvent( $event ) as $listeners ) {
-			foreach ( $listeners as $listener ) {
-				$callbacks = $listener instanceof Closure ? array( $listener ) : $listener;
-
-				foreach ( $callbacks as $callback ) {
+		foreach ( $this->provider->getListenersForEvent( $event ) as $yielded => $iterables ) {
+			foreach ( $iterables as $sorted => $listeners ) {
+				foreach ( Unwrap::asArray( $listeners ) as $registered => $listener ) {
 					if ( $event instanceof StoppableEventInterface && $event->isPropagationStopped() ) {
 						break 3;
 					}
 
-					$callback( $event );
+					$listener( $event );
 				}
 			}
 		}

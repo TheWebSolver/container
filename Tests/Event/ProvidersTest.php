@@ -13,12 +13,15 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Tests\Event;
 
 use Generator;
+use RuntimeException;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\EventDispatcher\ListenerProviderInterface;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
+use TheWebSolver\Codegarage\Lib\Container\Traits\ListenerCompiler;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 use TheWebSolver\Codegarage\Lib\Container\Traits\ListenerRegistrar;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
@@ -155,10 +158,10 @@ class ProvidersTest extends TestCase {
 
 		$listeners = $registrar->getListenersForEvent( $event );
 
-		foreach ( $listeners as $sortedListeners ) {  // Collection of Both generators: global and scoped.
-			foreach ( $sortedListeners as $listener ) { // Collection by sorting number.
-				foreach ( $listener as $invoke ) {        // Collection inside each sortable collection.
-					$invoke( $event );
+		foreach ( $listeners as $yielded => $generators ) {
+			foreach ( $generators as $sorted => $listeners ) {
+				foreach ( $listeners as $listener ) {
+					$listener( $event );
 				}
 			}
 		}
@@ -172,5 +175,74 @@ class ProvidersTest extends TestCase {
 		$invalidListeners = $registrar->getListenersForEvent( $this );
 
 		$this->assertEmpty( $invalidListeners->current() );
+	}
+
+	public function testListenerProviderWithCompiledListenersAsArray(): void {
+		$provider        = $this->getListenerProviderStub();
+		$withNoListeners = $provider::fromCompiledArray( array() );
+
+		$this->assertEmpty( $withNoListeners->getListeners() );
+		$this->assertEmpty( $withNoListeners->getListeners( 'test' ) );
+
+		$nonEntryListeners = array(
+			'listeners' => array(
+				10 => array( $this->any( ... ), array( self::class, 'assertTrue' ), self::class . '::assertNull' ),
+				20 => array( self::assertContains( ... ) ),
+			),
+		);
+
+		$withNonEntryListeners = $provider::fromCompiledArray( $nonEntryListeners );
+
+		$this->assertEmpty( $withNonEntryListeners->getListeners( 'test' ) );
+		$this->assertCount( 2, $withNonEntryListeners->getListeners() );
+		$this->assertCount( 3, $listeners = $withNonEntryListeners->getListeners()[10] );
+
+		foreach ( $listeners as $listener ) {
+			$this->assertIsCallable( $listener );
+		}
+
+		$allListeners = array(
+			...$nonEntryListeners,
+			'listenersForEntry' => array(
+				'test' => array(
+					5  => array( $this->exactly( ... ), array( self::class, 'assertContains' ), self::class . '::assertTrue' ),
+					15 => array( self::assertCount( ... ) ),
+				),
+			),
+		);
+
+		$withAllListeners = $provider::fromCompiledArray( $allListeners );
+
+		$this->assertCount( 2, $testListeners = $withAllListeners->getListeners( 'test' ) );
+		$this->assertCount( 1, $testListeners[15] );
+
+		foreach ( $testListeners[5] as $listener ) {
+			$this->assertIsCallable( $listener );
+		}
+	}
+
+	public function testListenerProviderWithCompiledListenersFromFile(): void {
+		$provider      = $this->getListenerProviderStub();
+		$withListeners = $provider::fromCompiledFile( dirname( __DIR__ ) . '/File/compiledForListenerProvider.php' );
+
+		$this->assertCount( 3, $withNoEntry = $withListeners->getListeners()[10] );
+		$this->assertCount( 3, $withEntry = $withListeners->getListeners( 'test' )[5] );
+
+		$listeners = array( ...$withNoEntry, ...$withEntry );
+
+		array_walk( $listeners, fn( $listener ) => self::assertIsCallable( $listener ) );
+
+		$this->expectException( RuntimeException::class );
+		$provider::fromCompiledFile( 'non-existing-compiled-file.php' );
+	}
+
+	private function getListenerProviderStub(): ListenerProviderInterface&ListenerRegistry&Compilable {
+		return new class() implements ListenerProviderInterface, ListenerRegistry, Compilable {
+			use ListenerRegistrar, ListenerCompiler;
+
+			protected function isValid( object $event ): bool {
+				return true;
+			}
+		};
 	}
 }
