@@ -16,10 +16,9 @@ use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
 /** @template TEvent of object */
 trait ListenerRegistrar {
-	/** @var array<string,array<int,array<int,callable(TEvent $event): void>>> */
-	protected array $listenersForEntry = array();
-	/** @var array<int,array<int,callable(TEvent $event): void>> */
-	protected array $listeners   = array();
+	/** @use EventListeners<TEvent> */
+	use EventListeners;
+
 	protected bool $needsSorting = false;
 	/** @var array{low:int,high:int} */
 	protected array $priorities = array(

@@ -13,21 +13,8 @@ use RuntimeException;
 
 /** @template TEvent of object */
 trait ListenerCompiler {
-	/** @var array<string,array<int,array<int,callable(TEvent $event): void>>> */
-	protected array $listenersForEntry = array();
-	/** @var array<int,array<int,callable(TEvent $event): void>> */
-	protected array $listeners = array();
-
-	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
-	/**
-	 * @param array<string,array<int,array<int,callable(TEvent $event): void>>> $listenersForEntry
-	 * @param array<int,array<int,callable(TEvent              $event): void>>  $listeners
-	 */
-	// phpcs:enable
-	final public function __construct( array $listenersForEntry = array(), array $listeners = array() ) {
-		$this->listenersForEntry = $listenersForEntry;
-		$this->listeners         = $listeners;
-	}
+	/** @use EventListeners<TEvent> */
+	use EventListeners;
 
 	// phpcs:disable Squiz.Commenting.FunctionComment.MissingParamName
 	/**
