@@ -50,11 +50,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected static $instance;
 	/** @var Stack<class-string> */
 	protected Stack $resolved;
+	protected Artefact $artefact;
+	protected Param $dependencies;
 	/** @var Stack<array<class-string,class-string>> */
 	protected Stack $resolvedInstances;
-	protected EventManager $eventManager;
-
 	private ?ReflectionClass $reflector;
+	protected EventManager $eventManager;
 
 	/**
 	 * @param Stack<Binding>                               $bindings
@@ -64,19 +65,19 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param CollectionStack<string,bool>                 $fetchedListenerAttributes
 	 */
 	final public function __construct(
-		protected readonly Stack $bindings = new Stack(),
-		protected readonly Param $dependencies = new Param(),
-		protected readonly Artefact $artefact = new Artefact(),
-		protected readonly Aliases $aliases = new Aliases(),
-		protected readonly CollectionStack $contextual = new CollectionStack(),
-		protected readonly CollectionStack $tags = new CollectionStack(),
-		protected readonly CollectionStack $rebounds = new CollectionStack(),
-		protected readonly CollectionStack $fetchedListenerAttributes = new CollectionStack(),
+		protected Stack $bindings = new Stack(),
+		protected Aliases $aliases = new Aliases(),
+		protected CollectionStack $contextual = new CollectionStack(),
+		protected CollectionStack $tags = new CollectionStack(),
+		protected CollectionStack $rebounds = new CollectionStack(),
+		protected CollectionStack $fetchedListenerAttributes = new CollectionStack(),
 		EventManager $eventManager = null
 	) {
 		$this->eventManager      = EventType::registerDispatchersTo( $eventManager ?? new EventManager() );
 		$this->resolvedInstances = new Stack();
 		$this->resolved          = new Stack();
+		$this->dependencies      = new Param();
+		$this->artefact          = new Artefact();
 	}
 
 	public static function boot(): static {
