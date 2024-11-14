@@ -10,7 +10,7 @@
 
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Tests\Event;
+namespace TheWebSolver\Codegarage\Tests\Event;
 
 use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;

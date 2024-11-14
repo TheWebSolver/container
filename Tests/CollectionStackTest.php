@@ -7,7 +7,7 @@
 
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Container\Tests;
+namespace TheWebSolver\Codegarage\Tests;
 
 use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;

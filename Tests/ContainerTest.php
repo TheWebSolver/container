@@ -11,6 +11,12 @@
 
 declare( strict_types = 1 );
 
+namespace TheWebSolver\Codegarage\Tests;
+
+use WeakMap;
+use stdClass;
+use ArrayAccess;
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\MockObject\MockObject;

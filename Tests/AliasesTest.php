@@ -7,6 +7,9 @@
 
 declare( strict_types = 1 );
 
+namespace TheWebSolver\Codegarage\Tests;
+
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
 

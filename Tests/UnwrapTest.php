@@ -9,6 +9,15 @@
 
 declare( strict_types = 1 );
 
+namespace TheWebSolver\Codegarage\Tests;
+
+use Closure;
+use WeakMap;
+use stdClass;
+use TypeError;
+use LogicException;
+use ReflectionException;
+use ReflectionParameter;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
@@ -151,10 +160,10 @@ class UnwrapTest extends TestCase {
 			),
 			array( 'PHPUnit\Framework\Assert::assertTrue', self::assertTrue( ... ), false ),
 			array( array( $staticM, 'assertTrue' ), $staticM, true ),
-			array( self::class . '::{closure}', function () {}, false ),
-			array( array( $this, '{closure}' ), function () {}, true ),
-			array( self::class . '::{closure}', static function () {}, false ),
-			array( array( $staticF, '{closure}' ), $staticF, true ),
+			array( self::class . '::' . __NAMESPACE__ . '\\{closure}', function () {}, false ),
+			array( array( $this, __NAMESPACE__ . '\\{closure}' ), function () {}, true ),
+			array( self::class . '::' . __NAMESPACE__ . '\\{closure}', static function () {}, false ),
+			array( array( $staticF, __NAMESPACE__ . '\\{closure}' ), $staticF, true ),
 			array( 'phpinfo', $phpinfo, false ),
 			array( array( 'phpinfo' ), $phpinfo, true ),
 			array( null, _wrapped__Lambda(), false ),

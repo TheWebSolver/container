@@ -7,6 +7,10 @@
 
 declare( strict_types = 1 );
 
+namespace TheWebSolver\Codegarage\Tests;
+
+use ReflectionMethod;
+use ReflectionParameter;
 use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 

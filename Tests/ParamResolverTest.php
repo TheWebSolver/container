@@ -7,6 +7,12 @@
 
 declare( strict_types = 1 );
 
+namespace TheWebSolver\Codegarage\Tests;
+
+use Closure;
+use Exception;
+use ReflectionFunction;
+use ReflectionParameter;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\MockObject\MockObject;

@@ -24,6 +24,11 @@
       "TheWebSolver\\Codegarage\\Lib\\Container\\": "Src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "TheWebSolver\\Codegarage\\Tests\\": "Tests/"
+    }
+  },
   "minimum-stability": "dev",
   "prefer-stable": true
 }

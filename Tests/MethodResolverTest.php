@@ -7,6 +7,8 @@
 
 declare( strict_types = 1 );
 
+namespace TheWebSolver\Codegarage\Tests;
+
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use TheWebSolver\Codegarage\Lib\Container\Container;
@@ -149,7 +151,7 @@ class MethodResolverTest extends TestCase {
 
 	/** @dataProvider provideInvalidClassMethod */
 	public function testInvalidClassOrMethodThrowsException( string $cls, ?string $method ): void {
-		$msg                = "/Unable to find method for class: {$cls}./";
+		$msg                = "Unable to find method for class: {$cls}.";
 		$validNonResolvable = str_contains( haystack: $cls, needle: '::' );
 
 		if ( $method || $validNonResolvable ) {
@@ -157,11 +159,11 @@ class MethodResolverTest extends TestCase {
 
 			$this->app->expects( $this->once() )->method( 'get' )->with( $pre );
 
-			$msg = "/Unable to instantiate entry: {$pre}./";
+			$msg = "Unable to instantiate entry: {$pre}.";
 		}
 
 		$this->expectException( BadResolverArgument::class );
-		$this->expectExceptionMessageMatches( $msg );
+		$this->expectExceptionMessage( $msg );
 
 		$this->resolver->resolve( $cls, $method );
 	}
