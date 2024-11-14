@@ -61,7 +61,7 @@ class EventsTest extends TestCase {
 		$this->assertSame( 'string $id', $event->getEntry() );
 		$this->assertSame( $app, $event->app() );
 		$this->assertNull( $event->getBinding() );
-		$this->assertSame( 'test', $event->setBinding( new Binding( 'test' ) )->getBinding()->concrete );
+		$this->assertSame( 'test', $event->setBinding( new Binding( 'test' ) )->getBinding()->material );
 	}
 
 	public function testAfterBuildEvent(): void {

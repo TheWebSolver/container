@@ -40,7 +40,7 @@ class StackWithArrayAccessTest extends TestCase {
 	public function testWithBindingDTO(): void {
 		$concrete = new class() {};
 
-		$singleton                = new Binding( concrete: $concrete, singleton: true );
+		$singleton                = new Binding( $concrete, singleton: true );
 		$this->stack['singleton'] = $singleton;
 
 		$this->assertTrue( condition: $this->stack['singleton']->isSingleton() );

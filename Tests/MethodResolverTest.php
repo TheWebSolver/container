@@ -70,7 +70,7 @@ class MethodResolverTest extends TestCase {
 			->expects( $this->exactly( 2 ) )
 			->method( 'getBinding' )
 			->with( $instanceId )
-			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John' ) ), null );
+			->willReturn( new Binding( static fn( $class ) => $class->get( 'John' ) ), null );
 
 		$this->dispatcher->expects( $this->once() )
 			->method( 'hasListeners' )
@@ -99,7 +99,7 @@ class MethodResolverTest extends TestCase {
 			->expects( $this->exactly( 2 ) )
 			->method( 'getBinding' )
 			->with( $instanceId )
-			->willReturn( new Binding( concrete: static fn( $class ) => $class->get( 'John' ) ), null );
+			->willReturn( new Binding( static fn( $class ) => $class->get( 'John' ) ), null );
 
 		$this->assertSame(
 			expected: 'Name: John',
@@ -163,7 +163,7 @@ class MethodResolverTest extends TestCase {
 		$this->expectException( BadResolverArgument::class );
 		$this->expectExceptionMessageMatches( $msg );
 
-		$this->resolver->resolve( ...func_get_args() );
+		$this->resolver->resolve( $cls, $method );
 	}
 
 	/** @return array<string[]> */
@@ -241,7 +241,7 @@ class MethodResolverTest extends TestCase {
 		$eventWithValue
 			->expects( $this->once() )
 			->method( 'getBinding' )
-			->willReturn( new Binding( concrete: 'Eventual' ) );
+			->willReturn( new Binding( 'Eventual' ) );
 
 		$eventWithoutValue = $this->createMock( BuildingEvent::class );
 		$eventWithValue->expects( $this->once() )->method( 'getBinding' )->willReturn( null );

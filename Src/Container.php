@@ -113,9 +113,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	public function hasResolved( string $id ): bool {
-		$entry = $this->getEntryFrom( alias: $id );
+		$entry = $this->getEntryFrom( $id );
 
-		return $this->resolved->has( $entry ) || $this->resolvedInstances->has( $entry );
+		return $this->resolvedInstances->has( $entry ) ?: $this->resolved->has( $entry );
 	}
 
 	/**
@@ -138,9 +138,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->get( $key );
 	}
 
-	/** @return string Returns alias itself if cannot find any entry related to the given alias. */
-	public function getEntryFrom( string $alias ): string {
-		return $this->aliases->get( id: $alias, asEntry: false );
+	/** @return string Returns $id itself if $id is not an alias. */
+	public function getEntryFrom( string $id ): string {
+		return $this->aliases->get( id: $id, asEntry: false );
 	}
 
 	public function getBinding( string $id ): ?Binding {
@@ -148,23 +148,22 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/**
-	 * @see Container::register() For details on how entry is bound to the container.
-	 * @throws ContainerError When concrete not found for given {@param $id}.
 	 * @return Closure|class-string|string Alias if not a class-string.
+	 * @throws ContainerError When concrete not found for given {@param $id}.
+	 * @see Container::register() For details on how entry is bound to the container.
 	 */
 	public function getConcrete( string $id ): Closure|string {
 		if ( ( ! $bound = $this->getBinding( $id ) ) ) {
 			return $id;
 		}
 
-		$concrete = $bound->concrete;
+		$material = $bound->material;
 
 		return match ( true ) {
-			default                      => null,
-			$concrete === $id            => $id,
-			is_array( $concrete )        => isset( $concrete[ $id ] ) ? $this->getEntryFrom( $concrete[ $id ] ) : null,
-			$concrete instanceof Closure => $concrete,
-			$bound->isInstance()         => $id,
+			default                                   => null,
+			$material === $id || $bound->isInstance() => $id,
+			is_array( $material )                     => $material[ $id ] ?? null,
+			$material instanceof Closure              => $material,
 		} ?? throw ContainerError::unResolvableEntry( $id );
 	}
 
@@ -208,8 +207,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 	}
 
-	public function getContextual( string $for, string $context ): Closure|string|null {
-		return $this->contextual->get( $this->getEntryFrom( alias: $for ), $context );
+	public function getContextual( string $id, string $typeHintOrParamName ): Closure|string|null {
+		return $this->contextual->get( $this->getEntryFrom( $id ), $typeHintOrParamName );
 	}
 
 	/**
@@ -217,17 +216,17 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @internal This should never be used as an API to get the contextual
 	 *           data except when resolving the current artefact.
 	 */
-	public function getContextualFor( string $context ): Closure|string|null {
-		if ( null !== ( $bound = $this->fromContextual( $context ) ) ) {
+	public function getContextualFor( string $typeHintOrParamName ): Closure|string|null {
+		if ( null !== ( $bound = $this->fromContextual( $typeHintOrParamName ) ) ) {
 			return $bound;
 		}
 
-		if ( ! $this->aliases->has( id: $context, asEntry: true ) ) {
+		if ( ! $this->aliases->has( id: $typeHintOrParamName, asEntry: true ) ) {
 			return null;
 		}
 
-		foreach ( $this->aliases->get( id: $context, asEntry: true ) as $alias ) {
-			if ( null !== ( $bound = $this->fromContextual( context: $alias ) ) ) {
+		foreach ( $this->aliases->get( id: $typeHintOrParamName, asEntry: true ) as $alias ) {
+			if ( null !== ( $bound = $this->fromContextual( $alias ) ) ) {
 				return $bound;
 			}
 		}
@@ -253,8 +252,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	*/
 
 	/**
-	 * @param string              $key
-	 * @param Closure|string|null $value
+	 * @param string               $key
+	 * @param callable|string|null $value
 	 */
 	public function offsetSet( $key, $value ): void {
 		$this->set( id: $key, concrete: $value );
@@ -274,16 +273,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 	}
 
-	/**
-	 * If a classname was previously aliased, it is recommended to pass that classname
-	 * instead of an alias as {@param `$id`} to prevent that alias from being purged.
-	 */
-	public function set( string $id, Closure|string|null $concrete = null ): void {
-		$this->register( $id, $concrete, singleton: false );
+	public function set( string $id, callable|string|null $concrete = null ): void {
+		$this->register( $id, concreteOrItsAlias: $concrete ?? $id, singleton: false );
 	}
 
-	public function setShared( string $id, Closure|string|null $concrete = null ): void {
-		$this->register( $id, $concrete, singleton: true );
+	public function setShared( string $id, callable|string|null $concrete = null ): void {
+		$this->register( $id, concreteOrItsAlias: $concrete ?? $id, singleton: true );
 	}
 
 	/**
@@ -296,7 +291,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->aliases->remove( $id );
 
-		$this->bindings->set( key: $id, value: new Binding( concrete: $instance, instance: true ) );
+		$this->bindings->set( key: $id, value: new Binding( material: $instance, instance: true ) );
 
 		if ( $hasEntry ) {
 			$this->rebound( $id );
@@ -329,49 +324,49 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	*/
 
 	/**
-	 * @param EventType|string|string[]|Closure $constraint
-	 * @return ($constraint is EventType ? EventBuilder : ContextBuilder)
+	 * @param EventType|string|string[]|Closure $concrete Closure for instantiated class method binding.
+	 * @return ($concrete is EventType ? EventBuilder : ContextBuilder)
 	 * @throws LogicException When unregistered Event Dispatcher provided to add event listener.
 	 */
-	public function when( EventType|string|array|Closure $constraint ): ContextBuilder|EventBuilder {
-		if ( $constraint instanceof EventType ) {
-			return ( $registry = $this->eventManager->getDispatcher( $constraint ) )
-				? new EventBuilder( app: $this, type: $constraint, registry: $registry )
+	public function when( EventType|string|array|Closure $concrete ): ContextBuilder|EventBuilder {
+		if ( $concrete instanceof EventType ) {
+			return ( $registry = $this->eventManager->getDispatcher( $concrete ) )
+				? new EventBuilder( app: $this, type: $concrete, registry: $registry )
 				: throw new LogicException(
-					message: sprintf( 'Cannot add Event Listener for the "%s" Event Type.', $constraint->name )
+					message: sprintf( 'Cannot add Event Listener for the "%s" Event Type.', $concrete->name )
 				);
 		}
 
-		$constraint = $constraint instanceof Closure ? Unwrap::forBinding( $constraint ) : $constraint;
-		$ids        = array_map( $this->getEntryFrom( ... ), array: Unwrap::asArray( $constraint ) );
+		$concrete = $concrete instanceof Closure ? Unwrap::forBinding( $concrete ) : $concrete;
+		$ids      = array_map( $this->getEntryFrom( ... ), array: Unwrap::asArray( $concrete ) );
 
 		return new ContextBuilder( for: $ids, app: $this, contextual: $this->contextual );
 	}
 
 	/**
-	 * @param class-string<T>|Closure $with
-	 * @return ($with is class-string ? T : mixed)
-	 * @throws ContainerExceptionInterface When cannot build `$with`.
-	 * @throws ContainerError              When non-instantiable class-string `$with` given.
+	 * @param class-string<T>|Closure $concrete
+	 * @return ($concrete is class-string ? T : mixed)
+	 * @throws ContainerExceptionInterface When cannot build `$concrete`.
+	 * @throws ContainerError              When non-instantiable class-string `$concrete` given.
 	 * @template T
 	 */
-	public function build( string|Closure $with, bool $dispatch = true ): mixed {
-		if ( $with instanceof Closure ) {
-			return $with( $this, $this->dependencies->latest() ?? array() );
+	public function build( string|Closure $concrete, bool $dispatch = true ): mixed {
+		if ( $concrete instanceof Closure ) {
+			return $concrete( $this, $this->dependencies->latest() ?? array() );
 		}
 
 		try {
-			$reflector       = $this->reflector ?? Unwrap::classReflection( $with );
+			$reflector       = $this->reflector ?? Unwrap::classReflection( $concrete );
 			$this->reflector = $reflector;
 		} catch ( ReflectionException | LogicException $e ) {
-			throw ContainerError::whenResolving( entry: $with, exception: $e, artefact: $this->artefact );
+			throw ContainerError::whenResolving( entry: $concrete, exception: $e, artefact: $this->artefact );
 		}
 
 		if ( null === ( $constructor = $reflector->getConstructor() ) ) {
-			return new $with();
+			return new $concrete();
 		}
 
-		$this->artefact->push( value: $with );
+		$this->artefact->push( value: $concrete );
 
 		try {
 			$dispatcher = $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null;
@@ -399,17 +394,16 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/**
-	 * Invokes `$with` callback when bound `$id` is updated again using any of the binding methods
-	 * such as `Container::set()`, `Container::singleton()` & `Container::instance()`.
+	 * Invokes `$callback` when bound `$id` is updated again using any of the binding methods.
 	 *
-	 * @param Closure(object $obj, Container $app): ?object $with
+	 * @param Closure(object $obj, Container $app): ?object $callback
 	 * @return mixed The resolved data, `null` if nothing was bound before.
-	 * @throws EntryNotFound When binding not found for the given id `$of`.
+	 * @throws EntryNotFound When binding not found for the given id `$id`.
 	 */
-	public function useRebound( string $of, Closure $with ): mixed {
-		$this->rebounds->set( key: $of, value: $with );
+	public function useRebound( string $id, Closure $callback ): mixed {
+		$this->rebounds->set( key: $id, value: $callback );
 
-		return $this->has( $of ) ? $this->get( $of ) : throw EntryNotFound::forRebound( $of );
+		return $this->has( $id ) ? $this->get( $id ) : throw EntryNotFound::forRebound( $id );
 	}
 
 	/*
@@ -454,13 +448,13 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 	}
 
-	protected function register( string $id, Closure|string|null $concrete, bool $singleton ): void {
+	protected function register( string $id, callable|string $concreteOrItsAlias, bool $singleton ): void {
 		$this->maybePurgeIfAliasOrInstance( $id );
 
 		$material = match ( true ) {
-			! $concrete || $concrete === $id => $id,
-			$concrete instanceof Closure     => $concrete,
-			default                          => array( $id => $concrete )
+			$concreteOrItsAlias === $id        => $id,
+			is_callable( $concreteOrItsAlias ) => $concreteOrItsAlias( ... ),
+			default                            => array( $id => $this->getEntryFrom( $concreteOrItsAlias ) )
 		};
 
 		$this->bindings->set( key: $id, value: new Binding( $material, $singleton ) );
@@ -477,17 +471,17 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		bool $dispatch,
 		?ReflectionClass $reflector = null
 	): mixed {
-		$entry           = $this->getEntryFrom( alias: $id );
+		$entry           = $this->getEntryFrom( $id );
 		$this->reflector = $reflector;
 
 		if ( ( $bound = $this->getBinding( $entry ) ) && $bound->isInstance() ) {
 			if ( ! $dispatch ) {
-				return $bound->concrete;
+				return $bound->material;
 			}
 
-			$this->prepareReflectorForAfterBuildEvent( $entry, $bound->concrete );
+			$this->prepareReflectorAfterBuilding( $entry, $bound->material );
 
-			return $this->dispatchAfterBuildEventForInstance( $entry, $bound->concrete, resolved: false );
+			return $this->dispatchAfterBuildingInstance( $entry, $bound->material, resolved: false );
 		}
 
 		/** @var class-string|Closure At this point, it can only be a class-string or a closure. */
@@ -495,49 +489,49 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$concrete = $material instanceof Closure ? $entry : $material;
 
 		$this->dependencies->push(
-			value: $dispatch ? $this->dispatchBeforeBuildEvent( entry: $concrete, params: $with ) : $with
+			value: $dispatch ? $this->dispatchBeforeBuilding( entry: $concrete, params: $with ) : $with
 		);
 
-		$resolved = $this->build( $material, $dispatch );
+		$built = $this->build( $material, $dispatch );
 
 		$this->dependencies->pull();
 
-		if ( ! $this->isResolvedAsObject( $concrete, $resolved ) ) {
-			return $resolved;
+		if ( ! $this->isResolvedAsObject( $concrete, $built ) ) {
+			return $built;
 		}
 
 		if ( $dispatch ) {
-			$this->prepareReflectorForAfterBuildEvent( $concrete, $resolved );
+			$this->prepareReflectorAfterBuilding( $concrete, $built );
 		}
 
-		$resolved = match ( $shouldBeSingleton = $this->isSingletonFor( $entry ) ) {
-			false => $dispatch ? $this->dispatchAfterBuildEvent( $concrete, $resolved ) : $resolved,
+		$object = match ( $shared = $this->shouldBeSingleton( $entry ) ) {
+			false => $dispatch ? $this->dispatchAfterBuilding( $concrete, $built ) : $built,
 			true  => $dispatch
-				? $this->dispatchAfterBuildEventForInstance( $entry, $resolved, resolved: true )
-				: $this->setInstance( $entry, $resolved )
+				? $this->dispatchAfterBuildingInstance( $entry, $built, resolved: true )
+				: $this->setInstance( $entry, $built )
 		};
 
-		if ( ! $shouldBeSingleton ) {
-			$this->resolved->set( key: $entry, value: $resolved::class );
+		if ( ! $shared ) {
+			$this->resolved->set( key: $entry, value: $object::class );
 		}
 
 		unset( $this->reflector );
 
-		return $resolved;
+		return $object;
 	}
 
-	/** @phpstan-assert-if-true =object $resolved */
-	protected function isResolvedAsObject( string $concrete, mixed $resolved ): bool {
-		return $resolved instanceof $concrete;
+	/** @phpstan-assert-if-true =object $built */
+	protected function isResolvedAsObject( string $concrete, mixed $built ): bool {
+		return $built instanceof $concrete;
 	}
 
-	protected function isSingletonFor( string $entry ): bool {
+	protected function shouldBeSingleton( string $entry ): bool {
 		return true === $this->getBinding( $entry )?->isSingleton();
 	}
 
-	protected function fromContextual( string $context ): Closure|string|null {
+	protected function fromContextual( string $constraint ): Closure|string|null {
 		return ( $artefact = $this->artefact->latest() )
-			? $this->getContextual( for: $artefact, context: $context )
+			? $this->getContextual( $artefact, $constraint )
 			: null;
 	}
 
@@ -550,7 +544,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param array<string,mixed>|ArrayAccess<object|string,mixed> $params
 	 * @return array<string,mixed>|ArrayAccess<object|string,mixed>
 	 */
-	private function dispatchBeforeBuildEvent( string $entry, array|ArrayAccess $params ): array|ArrayAccess {
+	private function dispatchBeforeBuilding( string $entry, array|ArrayAccess $params ): array|ArrayAccess {
 		$event = $this->eventManager
 			->getDispatcher( EventType::BeforeBuild )
 			?->dispatch( new BeforeBuildEvent( $entry, $params ) );
@@ -558,28 +552,28 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $event instanceof BeforeBuildEvent && ( $eventParams = $event->getParams() ) ? $eventParams : $params;
 	}
 
-	private function dispatchAfterBuildEvent( string $id, object $resolved ): object {
+	private function dispatchAfterBuilding( string $id, object $resolved ): object {
 		return AfterBuildHandler::handleWith( $this, $id, $resolved, $this->artefact, $this->reflector );
 	}
 
-	private function dispatchAfterBuildEventForInstance( string $entry, object $instance, bool $resolved ): object {
-		$baseClass = $instance::class;
+	private function dispatchAfterBuildingInstance( string $entry, object $built, bool $resolved ): object {
+		$baseClass = $built::class;
 		$eventId   = $resolved ? $baseClass : $entry;
 
 		if ( $this->resolvedInstances->has( key: $entry ) ) {
-			return $resolved ? $this->setInstance( $entry, $instance ) : $instance;
+			return $resolved ? $this->setInstance( $entry, $built ) : $built;
 		}
 
-		$instance = $this->dispatchAfterBuildEvent( $eventId, $instance );
+		$built = $this->dispatchAfterBuilding( $eventId, $built );
 
 		$this->eventManager->getDispatcher( EventType::AfterBuild )?->reset( $eventId );
-		$this->resolvedInstances->set( key: $entry, value: array( $baseClass => $instance::class ) );
+		$this->resolvedInstances->set( key: $entry, value: array( $baseClass => $built::class ) );
 
-		return $this->setInstance( $entry, $instance );
+		return $this->setInstance( $entry, $built );
 	}
 
 	/** @param class-string|object $concrete */
-	private function prepareReflectorForAfterBuildEvent( string $entry, string|object $concrete ): ?ReflectionClass {
+	private function prepareReflectorAfterBuilding( string $entry, string|object $concrete ): ?ReflectionClass {
 		return $this->isListenerFetchedFrom( $entry, attributeName: DecorateWith::class )
 			? $this->reflector   = null
 			: $this->reflector ??= new ReflectionClass( $concrete );

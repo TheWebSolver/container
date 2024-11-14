@@ -51,7 +51,7 @@ class ParamResolver {
 
 	/** @throws ContainerError When resolving dependencies fails. */
 	public function fromUntypedOrBuiltin( ReflectionParameter $param ): mixed {
-		$value = $this->app->getContextualFor( context: "\${$param->getName()}" );
+		$value = $this->app->getContextualFor( typeHintOrParamName: "\${$param->getName()}" );
 
 		return null === $value
 			? static::defaultFrom( $param, error: BadResolverArgument::noParam( ref: $param ) )
@@ -60,7 +60,7 @@ class ParamResolver {
 
 	/** @throws ContainerError When resolving dependencies fails. */
 	public function fromTyped( ReflectionParameter $param, string $type ): mixed {
-		$context = $this->app->getContextualFor( context: $type );
+		$context = $this->app->getContextualFor( typeHintOrParamName: $type );
 
 		try {
 			return match ( true ) {
@@ -106,12 +106,12 @@ class ParamResolver {
 		$binding = $event->getBinding();
 
 		if ( $binding?->isInstance() ) {
-			$value = $binding->concrete;
+			$value = $binding->material;
 
 			$this->app->setInstance( $id, instance: $this->ensureObject( $value, $type, $param->name, $id ) );
 		}
 
-		return $binding?->concrete;
+		return $binding?->material;
 	}
 
 	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {

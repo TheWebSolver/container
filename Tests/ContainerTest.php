@@ -34,14 +34,14 @@ use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
 
 class ContainerTest extends TestCase {
-	private ?Container $app;
+	private Container $app;
 
 	protected function setUp(): void {
 		$this->app = new Container();
 	}
 
 	protected function tearDown(): void {
-		$this->app = null;
+		$this->setUp();
 	}
 
 	public function testSingleton(): void {
@@ -69,7 +69,7 @@ class ContainerTest extends TestCase {
 		$this->app->setAlias( entry: self::class, alias: 'testClass' );
 
 		$this->assertTrue( $this->app->isAlias( id: 'testClass' ) );
-		$this->assertSame( self::class, $this->app->getEntryFrom( alias: 'testClass' ) );
+		$this->assertSame( self::class, $this->app->getEntryFrom( 'testClass' ) );
 		$this->assertInstanceOf( self::class, $this->app->get( 'testClass' ) );
 
 		$this->app->set( id: 'testClass', concrete: self::class );
@@ -81,8 +81,8 @@ class ContainerTest extends TestCase {
 		$this->assertFalse( $this->app->has( id: self::class ), 'Bound with alias.' );
 		$this->assertTrue( $this->app->hasBinding( id: 'testClass' ) );
 		$this->assertFalse( $this->app->hasBinding( id: self::class ), 'Bound using alias.' );
-		$this->assertSame( 'testClass', $this->app->getEntryFrom( alias: 'testClass' ) );
-		$this->assertSame( array( 'testClass' => self::class ), $this->app->getBinding( 'testClass' )->concrete );
+		$this->assertSame( 'testClass', $this->app->getEntryFrom( 'testClass' ) );
+		$this->assertSame( array( 'testClass' => self::class ), $this->app->getBinding( 'testClass' )->material );
 
 		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
 		$this->assertTrue( $this->app->hasResolved( id: 'testClass' ) );
@@ -90,7 +90,7 @@ class ContainerTest extends TestCase {
 		$this->assertSame( self::class, $this->app->getResolved( self::class ) );
 		$this->assertTrue( $this->app->removeResolved( self::class ) );
 
-		$this->app->setShared( id: stdClass::class, concrete: null );
+		$this->app->setShared( id: stdClass::class );
 
 		$this->assertFalse( $this->app->isInstance( stdClass::class ) );
 
@@ -160,12 +160,12 @@ class ContainerTest extends TestCase {
 
 	public function testKeepingBothAliasAndBinding(): void {
 		$this->app->setAlias( entry: self::class, alias: 'test' );
-		$this->app->set( id: self::class, concrete: null );
+		$this->app->set( id: self::class );
 
 		$this->assertTrue( $this->app->isAlias( id: 'test' ) );
 		$this->assertTrue( $this->app->hasBinding( id: self::class ) );
-		$this->assertSame( self::class, $this->app->getEntryFrom( alias: 'test' ) );
-		$this->assertSame( self::class, $this->app->getEntryFrom( alias: self::class ) );
+		$this->assertSame( self::class, $this->app->getEntryFrom( 'test' ) );
+		$this->assertSame( self::class, $this->app->getEntryFrom( self::class ) );
 	}
 
 	public function testPurgeAliasWhenInstanceIsBoundAndPerformRebound(): void {
@@ -173,40 +173,40 @@ class ContainerTest extends TestCase {
 
 		$this->assertTrue( $this->app->isAlias( id: 'test' ) );
 
-		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
+		$this->app->set( id: Binding::class, concrete: fn() => new Binding( 'original' ) );
 
 		$this->app->setInstance(
 			id: 'test',
 			instance: ( new _Rebound__SetterGetter__Stub() )->set(
 				binding: $this->app->useRebound(
-					of: Binding::class,
+					Binding::class,
 					// Get the "test" instantiated class & update it with rebounded Binding instance.
-					with: fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
+					fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
 				)
 			)
 		);
 
 		$this->assertFalse( condition: $this->app->isAlias( id: 'test' ) );
 
-		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->concrete );
+		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->material );
 
-		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'updated' ) );
+		$this->app->set( id: Binding::class, concrete: fn() => new Binding( 'updated' ) );
 
-		$this->assertSame( expected: 'updated', actual: $this->app->get( 'test' )->get()->concrete );
+		$this->assertSame( expected: 'updated', actual: $this->app->get( 'test' )->get()->material );
 	}
 
 	public function testContextualBinding(): void {
 		$this->app->when( Binding::class )
-			->needs( '$concrete' )
+			->needs( '$material' )
 			->give( 'With Builder' );
 
-		$this->assertSame( 'With Builder', $this->app->get( id: Binding::class )->concrete );
+		$this->assertSame( 'With Builder', $this->app->get( id: Binding::class )->material );
 
 		$this->app->when( Binding::class )
-			->needs( '$concrete' )
+			->needs( '$material' )
 			->give( static fn (): string => 'With Builder from closure' );
 
-		$this->assertSame( 'With Builder from closure', $this->app->get( id: Binding::class )->concrete );
+		$this->assertSame( 'With Builder from closure', $this->app->get( id: Binding::class )->material );
 
 		$class          = _Stack__ContextualBindingWithArrayAccess__Stub::class;
 		$implementation = static function ( Container $app ) {
@@ -232,14 +232,20 @@ class ContainerTest extends TestCase {
 
 	public function testContextualBindingWithAliasing(): void {
 		$this->app->setAlias( entry: Binding::class, alias: 'test' );
-		$this->app->when( 'test' )->needs( '$concrete' )->give( static fn() => 'update' );
+		$this->app->when( 'test' )->needs( '$material' )->give( static fn() => 'update' );
 
-		$this->assertSame(
-			actual: $this->app->getContextual( for: 'test', context: '$concrete' )(),
-			expected: 'update'
-		);
+		$this->assertSame( 'update', $this->app->getContextual( 'test', '$material' )() );
+		$this->assertSame( 'update', $this->app->get( 'test' )->material );
 
-		$this->assertSame( 'update', $this->app->get( 'test' )->concrete );
+		$this->app->setAlias( entry: _Stack__ContextualBindingWithArrayAccess__Stub::class, alias: 'stack' );
+		$this->app->set( JustTest__Stub::class, 'stack' );
+
+		$stub = $this->createStub( ArrayAccess::class );
+
+		$this->app->when( 'stack' )->needs( ArrayAccess::class )->give( static fn() => $stub );
+
+		$this->assertSame( $stub, $this->app->getContextual( 'stack', ArrayAccess::class )() );
+		$this->assertSame( $stub, $this->app->get( JustTest__Stub::class )->array );
 	}
 
 	public function testAutoWireDependenciesRecursively(): void {
@@ -260,7 +266,7 @@ class ContainerTest extends TestCase {
 	public function testResolvingParamDuringBuildEventIntegration(): void {
 		$this->app->when( EventType::Building )
 			->for( ArrayAccess::class, paramName: 'array' )
-			->listenTo( fn ( BuildingEvent $event ) => $event->setBinding( new Binding( concrete: new WeakMap() ) ) );
+			->listenTo( fn ( BuildingEvent $event ) => $event->setBinding( new Binding( new WeakMap() ) ) );
 
 		$this->assertInstanceOf(
 			expected: WeakMap::class,
@@ -313,7 +319,7 @@ class ContainerTest extends TestCase {
 			->for( _Secondary__EntryClass__Stub::class, paramName: 'secondary' )
 			->listenTo(
 				function ( BuildingEvent $event ) use ( $eventualClass ) {
-					$event->setBinding( new Binding( concrete: $eventualClass ) );
+					$event->setBinding( new Binding( $eventualClass ) );
 				}
 			);
 
@@ -464,7 +470,7 @@ class ContainerTest extends TestCase {
 	private function withEventListenerValue( int $value ): void {
 		$this->app->when( EventType::Building )
 			->for( 'int', paramName: 'val' )
-			->listenTo( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: $value ) ) );
+			->listenTo( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( $value ) ) );
 	}
 
 	public function testReboundValueOfDependencyBindingUpdatedAtLaterTime(): void {
@@ -482,7 +488,7 @@ class ContainerTest extends TestCase {
 		$this->app->set(
 			id: 'aliases',
 			concrete: fn ( Container $app ) => new Aliases(
-				entryStack: $app->useRebound( of: CollectionStack::class, with: static fn ( CollectionStack $obj ) => $obj )
+				entryStack: $app->useRebound( CollectionStack::class, static fn ( CollectionStack $obj ) => $obj )
 			)
 		);
 
@@ -508,23 +514,23 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 'Developer', actual: reset( $jobs ) );
 
-		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'original' ) );
+		$this->app->set( id: Binding::class, concrete: fn() => new Binding( 'original' ) );
 
 		$this->app->setShared(
 			id: 'test',
 			concrete: fn ( Container $app ) => ( new _Rebound__SetterGetter__Stub() )->set(
 				binding: $app->useRebound(
-					of: Binding::class,
-					with: fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
+					Binding::class,
+					fn( Binding $obj, Container $app ) => $app->get( id: 'test' )->set( binding: $obj )
 				)
 			)
 		);
 
-		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->concrete );
+		$this->assertSame( expected: 'original', actual: $this->app->get( id: 'test' )->get()->material );
 
-		$this->app->set( id: Binding::class, concrete: fn() => new Binding( concrete: 'mutated' ) );
+		$this->app->set( id: Binding::class, concrete: fn() => new Binding( 'mutated' ) );
 
-		$this->assertSame( expected: 'mutated', actual: $this->app->get( 'test' )->get()->concrete );
+		$this->assertSame( expected: 'mutated', actual: $this->app->get( 'test' )->get()->material );
 
 		$this->expectException( exception: NotFoundExceptionInterface::class );
 		$this->expectExceptionMessage(
@@ -534,7 +540,7 @@ class ContainerTest extends TestCase {
 		$this->app->set(
 			id: 'noDependencyBound',
 			concrete: fn( Container $app ) => ( new _Rebound__SetterGetter__Stub() )
-				->set( binding: $app->useRebound( of: 'notBoundYet', with: function () {} ) )
+				->set( binding: $app->useRebound( 'notBoundYet', function () {} ) )
 		);
 
 		$this->app->get( id: 'noDependencyBound' );
@@ -609,7 +615,7 @@ class ContainerTest extends TestCase {
 
 		$stoppableListener = static function ( BuildingEvent $e ): void {
 			// Use binding from previous listener.
-			$concrete = $e->getBinding()->concrete;
+			$concrete = $e->getBinding()->material;
 
 			$concrete[ EventType::Building ] = 'halted attribute listener';
 
@@ -715,7 +721,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( EventType::Building )
 			->for( 'string', paramName: 'name' )
-			->listenTo( static fn( BuildingEvent $e ) => $e->setBinding( new Binding( concrete: 'hello!' ) ) );
+			->listenTo( static fn( BuildingEvent $e ) => $e->setBinding( new Binding( 'hello!' ) ) );
 
 		$this->app->when( EventType::AfterBuild )
 			->for( JustTest__Stub::class )
@@ -1033,7 +1039,7 @@ class _Main__EntryClass__Stub {
 
 	public static function resolvePrimaryChild( BuildingEvent $event ): void {
 		$event->stopPropagation()->setBinding(
-			new Binding( concrete: $event->app()->get( _Primary__EntryClass__Stub_Child::class ), instance: true )
+			new Binding( $event->app()->get( _Primary__EntryClass__Stub_Child::class ), instance: true )
 		);
 	}
 }

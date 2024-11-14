@@ -66,7 +66,7 @@ class MethodResolver {
 	}
 
 	protected function resolveFrom( string $id, callable $cb, object $obj ): mixed {
-		return ( $bound = $this->app->getBinding( $id )?->concrete )
+		return ( $bound = $this->app->getBinding( $id )?->material )
 			? Unwrap::andInvoke( $bound, $obj, $this->app )
 			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $cb ) );
 	}

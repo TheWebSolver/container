@@ -11,12 +11,12 @@ namespace TheWebSolver\Codegarage\Lib\Container\Data;
 
 readonly class Binding {
 	public function __construct(
-		public mixed $concrete,
+		public mixed $material,
 		public bool $singleton = false,
 		public bool $instance = false
 	) {}
 
-	/** @phpstan-assert-if-true =object $this->concrete */
+	/** @phpstan-assert-if-true =object $this->material */
 	public function isInstance(): bool {
 		return $this->instance && ! $this->singleton;
 	}

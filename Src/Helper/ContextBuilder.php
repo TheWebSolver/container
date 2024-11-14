@@ -38,11 +38,7 @@ final class ContextBuilder {
 
 	public function give( Closure|string $value ): void {
 		foreach ( $this->for as $id ) {
-			$this->contextual->set(
-				key: $this->app->getEntryFrom( alias: $id ),
-				value: $value,
-				index: $this->getConstraint()
-			);
+			$this->contextual->set( $this->app->getEntryFrom( $id ), $value, index: $this->getConstraint() );
 		}
 	}
 
