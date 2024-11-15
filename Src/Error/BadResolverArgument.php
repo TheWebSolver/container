@@ -40,7 +40,7 @@ class BadResolverArgument extends ContainerError implements ContainerExceptionIn
 		return new self(
 			sprintf(
 				'The bound instance from Event Listener is not a valid type. Expected an instance of'
-				. ' "%1$s" for parameter "%2$s" while building "%3$s".',
+				. ' "%1$s" for parameter "$%2$s" while building "%3$s".',
 				$type,
 				$name,
 				$id

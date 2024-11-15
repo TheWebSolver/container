@@ -103,7 +103,9 @@ class ParamResolver {
 			return null;
 		}
 
-		$material = $binding->material;
+		if ( ( $material = $binding->material ) instanceof Closure ) {
+			return $material();
+		}
 
 		if ( $binding->isInstance() ) {
 			$this->app->setInstance( $entry, $this->ensureObject( $material, $type, $param->name, $entry ) );
@@ -111,7 +113,9 @@ class ParamResolver {
 			return $this->app->get( $entry );
 		}
 
-		return $material instanceof Closure ? $material() : $material;
+		return is_string( $material )
+			? $this->app->get( $material )
+			: $this->ensureObject( $material, $type, $param->name, $entry );
 	}
 
 	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {

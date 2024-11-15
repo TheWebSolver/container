@@ -243,7 +243,7 @@ class MethodResolverTest extends TestCase {
 		$eventWithValue
 			->expects( $this->once() )
 			->method( 'getBinding' )
-			->willReturn( new Binding( 'Eventual' ) );
+			->willReturn( new Binding( fn() => 'Eventual' ) );
 
 		$eventWithoutValue = $this->createMock( BuildingEvent::class );
 		$eventWithValue->expects( $this->once() )->method( 'getBinding' )->willReturn( null );
