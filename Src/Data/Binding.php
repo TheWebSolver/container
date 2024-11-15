@@ -10,8 +10,9 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Data;
 
 readonly class Binding {
+	/** @param class-string|object $material */
 	public function __construct(
-		public mixed $material,
+		public string|object $material,
 		public bool $singleton = false,
 		public bool $instance = false
 	) {}
