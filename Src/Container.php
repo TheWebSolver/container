@@ -138,9 +138,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->get( $key );
 	}
 
-	/** @return string Returns $id itself if $id is not an alias. */
+	/**
+	 * @param string|class-string $id
+	 * @return class-string
+	 */
 	public function getEntryFrom( string $id ): string {
-		return $this->aliases->get( id: $id, asEntry: false );
+		return $this->aliases->has( $id ) ? $this->aliases->get( $id ) : $id;
 	}
 
 	public function getBinding( string $id ): ?Binding {
@@ -148,11 +151,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/**
-	 * @return Closure|class-string|string Alias if not a class-string.
+	 * @param string|class-string $id
+	 * @return object|class-string|string Alias if not a class-string.
 	 * @throws ContainerError When concrete not found for given {@param $id}.
 	 * @see Container::register() For details on how entry is bound to the container.
 	 */
-	public function getConcrete( string $id ): Closure|string {
+	public function getConcrete( string $id ): object|string {
 		if ( ( ! $bound = $this->getBinding( $id ) ) ) {
 			return $id;
 		}
@@ -160,10 +164,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$material = $bound->material;
 
 		return match ( true ) {
-			default                                   => null,
-			$material === $id || $bound->isInstance() => $id,
-			is_array( $material )                     => $material[ $id ] ?? null,
-			$material instanceof Closure              => $material,
+			default                                                => null,
+			$material === $id || $bound->isInstance()              => $id,
+			is_string( $material ) || $material instanceof Closure => $material,
 		} ?? throw ContainerError::unResolvableEntry( $id );
 	}
 
@@ -259,7 +262,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->set( id: $key, concrete: $value );
 	}
 
-	/** @throws LogicException When entry ID and alias is same. */
+	/**
+	 * @param class-string $entry
+	 * @throws LogicException When entry ID and alias is same.
+	 */
 	public function setAlias( string $entry, string $alias ): void {
 		$this->aliases->set( $entry, $alias );
 	}
@@ -273,10 +279,18 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 	}
 
+	/**
+	 * @param string|class-string               $id
+	 * @param string|class-string|callable|null $concrete
+	 */
 	public function set( string $id, callable|string|null $concrete = null ): void {
 		$this->register( $id, concreteOrItsAlias: $concrete ?? $id, singleton: false );
 	}
 
+	/**
+	 * @param class-string               $id
+	 * @param class-string|callable|null $concrete
+	 */
 	public function setShared( string $id, callable|string|null $concrete = null ): void {
 		$this->register( $id, concreteOrItsAlias: $concrete ?? $id, singleton: true );
 	}
@@ -448,14 +462,16 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 	}
 
+	/**
+	 * @param string|class-string          $id
+	 * @param string|class-string|callable $concreteOrItsAlias
+	 */
 	protected function register( string $id, callable|string $concreteOrItsAlias, bool $singleton ): void {
 		$this->maybePurgeIfAliasOrInstance( $id );
 
-		$material = match ( true ) {
-			$concreteOrItsAlias === $id        => $id,
-			is_callable( $concreteOrItsAlias ) => $concreteOrItsAlias( ... ),
-			default                            => array( $id => $this->getEntryFrom( $concreteOrItsAlias ) )
-		};
+		$material = is_callable( $concreteOrItsAlias )
+			? $concreteOrItsAlias( ... )
+			: $this->getEntryFrom( $id === $concreteOrItsAlias ? $id : $concreteOrItsAlias );
 
 		$this->bindings->set( key: $id, value: new Binding( $material, $singleton ) );
 

@@ -38,6 +38,7 @@ use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\UpdateOnReset;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
 
 class ContainerTest extends TestCase {
 	private Container $app;
@@ -88,7 +89,7 @@ class ContainerTest extends TestCase {
 		$this->assertTrue( $this->app->hasBinding( id: 'testClass' ) );
 		$this->assertFalse( $this->app->hasBinding( id: self::class ), 'Bound using alias.' );
 		$this->assertSame( 'testClass', $this->app->getEntryFrom( 'testClass' ) );
-		$this->assertSame( array( 'testClass' => self::class ), $this->app->getBinding( 'testClass' )->material );
+		$this->assertSame( self::class, $this->app->getBinding( 'testClass' )->material );
 
 		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
 		$this->assertTrue( $this->app->hasResolved( id: 'testClass' ) );
@@ -476,33 +477,10 @@ class ContainerTest extends TestCase {
 	private function withEventListenerValue( int $value ): void {
 		$this->app->when( EventType::Building )
 			->for( 'int', paramName: 'val' )
-			->listenTo( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( $value ) ) );
+			->listenTo( fn ( BuildingEvent $e ) => $e->setBinding( new Binding( fn() => $value ) ) );
 	}
 
 	public function testReboundValueOfDependencyBindingUpdatedAtLaterTime(): void {
-		$this->app->set(
-			id: CollectionStack::class,
-			concrete: function () {
-				$stack = new CollectionStack();
-
-				$stack->set( key: 'john', value: 'doe' );
-
-				return $stack;
-			}
-		);
-
-		$this->app->set(
-			id: 'aliases',
-			concrete: fn ( Container $app ) => new Aliases(
-				entryStack: $app->useRebound( CollectionStack::class, static fn ( CollectionStack $obj ) => $obj )
-			)
-		);
-
-		/** @var Aliases */
-		$aliases = $this->app->get( id: 'aliases' );
-
-		$this->assertSame( expected: 'doe', actual: $aliases->get( id: 'john', asEntry: true )[0] );
-
 		$this->app->set(
 			id: CollectionStack::class,
 			concrete: function () {
@@ -513,12 +491,6 @@ class ContainerTest extends TestCase {
 				return $stack;
 			}
 		);
-
-		/** @var Aliases */
-		$aliasWithReboundEntries = $this->app->get( id: 'aliases' );
-		$jobs                    = $aliasWithReboundEntries->get( id: 'PHP', asEntry: true );
-
-		$this->assertSame( expected: 'Developer', actual: reset( $jobs ) );
 
 		$this->app->set( id: Binding::class, concrete: fn() => new Binding( 'original' ) );
 
@@ -581,7 +553,7 @@ class ContainerTest extends TestCase {
 		/** @var _Main__EntryClass__Stub */
 		$instance = $this->app->get( _Main__EntryClass__Stub::class );
 
-		$this->assertTrue( $this->app->isInstance( id: 'primary' ) );
+		$this->assertTrue( $this->app->isInstance( id: _Primary__EntryClass__Stub::class . ':primary' ) );
 		$this->assertInstanceOf( _Primary__EntryClass__Stub_Child::class, actual: $instance->primary );
 
 		/** @var _Main__EntryClass__Stub_Child */
@@ -727,7 +699,7 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( EventType::Building )
 			->for( 'string', paramName: 'name' )
-			->listenTo( static fn( BuildingEvent $e ) => $e->setBinding( new Binding( 'hello!' ) ) );
+			->listenTo( static fn( BuildingEvent $e ) => $e->setBinding( new Binding( fn() => 'hello!' ) ) );
 
 		$this->app->when( EventType::AfterBuild )
 			->for( JustTest__Stub::class )
@@ -941,7 +913,7 @@ class ContainerTest extends TestCase {
 		$this->assertSame( $instance, $this->app->get( JustTest__Stub::class ) );
 	}
 
-	public function testAttributeCompiledForEntry(): void {
+	public function testEventListenerAttributeCompiledForEntry(): void {
 		$concrete = $this->getClassWithDecoratorAttribute();
 
 		$this->assertFalse( $this->app->isListenerFetchedFrom( $concrete::class, DecorateWith::class ) );
@@ -960,31 +932,98 @@ class ContainerTest extends TestCase {
 		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $singleton );
 	}
 
-	public function resetBindingWithEachUpdate(): void {
-		// FIXME: Works even without attribute.
-		$test = new class() {
-			public function __construct( #[UpdateOnReset] public ?ArrayAccess $accessor = null ) {}
+	public function testBuildingParamIsDecoratedWithAfterBuildEvent(): void {
+		$typeWithParamName = JustTest__Stub::class . ':stub';
+		$class             = new class() {
+			public function __construct( public ?JustTest__Stub $stub = null ) {}
 		};
 
-		$this->app->set( ArrayAccess::class, Stack::class );
+		$this->app->when( _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->needs( ArrayAccess::class )
+			->give( WeakMap::class );
 
-		$this->assertInstanceOf( Stack::class, $this->app->get( $test::class )->accessor );
+		$this->app->when( EventType::Building )
+			->for( JustTest__Stub::class, 'stub' )
+			->listenTo(
+				static fn( BuildingEvent $e )
+					=> $e->setBinding( new Binding( _Stack__ContextualBindingWithArrayAccess__Stub::class ) )
+			);
 
-		$this->app->set( ArrayAccess::class, WeakMap::class );
+		$this->app->get( $class::class );
 
-		$this->assertInstanceOf( WeakMap::class, $this->app->get( $test::class )->accessor );
+		$this->assertFalse( $this->app->isInstance( $typeWithParamName ) );
 
-		$test2 = new class() {
-			public ArrayAccess $accessor;
+		$this->app->when( EventType::AfterBuild )
+			->for( _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->listenTo(
+				static fn( AfterBuildEvent $e )
+					=> $e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+			);
 
-			public function set( #[UpdateOnReset] ArrayAccess $accessor ) {
-				$this->accessor = $accessor;
-			}
-		};
+		$classInstance = $this->app->get( $class::class );
 
-		$this->app->setInstance( $test2::class, $test2 );
+		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $classInstance->stub );
 
-		$this->app->set( ArrayAccess::class, Container::class );
+		$this->setUp();
+
+		$this->app->when( _Stack__ContextualBindingWithArrayAccess__Stub::class )
+			->needs( ArrayAccess::class )
+			->give( WeakMap::class );
+
+		$this->app->when( EventType::Building )
+			->for( JustTest__Stub::class, 'stub' )
+			->listenTo(
+				static fn( BuildingEvent $e )
+					=> $e->setBinding(
+						new Binding( $e->app()->get( _Stack__ContextualBindingWithArrayAccess__Stub::class ), instance: true )
+					)
+			);
+
+		$this->app->when( EventType::AfterBuild )
+			->for( $typeWithParamName )
+			->listenTo(
+				static fn( AfterBuildEvent $e )
+					=> $e->decorateWith( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class )
+			);
+
+		$classInstance = $this->app->get( $class::class );
+
+		$this->assertTrue( $this->app->isInstance( $typeWithParamName ) );
+		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Decorator__Stub::class, $classInstance->stub );
+	}
+
+	public function testWithCompiledContainer(): void {
+		$interfaceStub = $this->createStub( Compilable::class )::class;
+		$concreteStub  = $this->createStub( Stack::class )::class;
+
+		$bindings = array(
+			'usingAlias'          => new Binding( new stdClass(), instance: true ),
+			self::class           => new Binding( $this, instance: true ),
+			Compilable::class     => new Binding( $interfaceStub, singleton: true ),
+			'stack'               => new Binding( $concreteStub, singleton: true ),
+			JustTest__Stub::class => new Binding( _Stack__ContextualBindingWithArrayAccess__Stub::class ),
+		);
+
+		$contextual = array(
+			_Stack__ContextualBindingWithArrayAccess__Stub::class => array(
+				ArrayAccess::class => WeakMap::class,
+			),
+		);
+
+		$app = new Container(
+			bindings: Stack::fromCompiledArray( $bindings ),
+			contextual: CollectionStack::fromCompiledArray( $contextual )
+		);
+
+		$this->assertInstanceOf( stdClass::class, $app->get( 'usingAlias' ) );
+		$this->assertSame( $this, $app->get( self::class ) );
+
+		$stub = $app->get( JustTest__Stub::class );
+
+		$this->assertInstanceOf( _Stack__ContextualBindingWithArrayAccess__Stub::class, $stub );
+
+		$this->assertSame( $app->get( Compilable::class ), $app->get( Compilable::class ) );
+		$this->assertSame( $app->get( 'stack' ), $app->get( 'stack' ) );
 	}
 }
 
