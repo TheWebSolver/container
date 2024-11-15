@@ -13,7 +13,7 @@ use Throwable;
 use Psr\Container\NotFoundExceptionInterface;
 
 class EntryNotFound extends ContainerError implements NotFoundExceptionInterface {
-	public static function for( string $id, Throwable $previous ): self {
+	public static function for( string $id, ?Throwable $previous ): self {
 		return new self(
 			message: "Unable to find entry for the given id: \"{$id}\".",
 			previous: $previous
