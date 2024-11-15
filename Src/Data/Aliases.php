@@ -11,20 +11,28 @@ namespace TheWebSolver\Codegarage\Lib\Container\Data;
 
 use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
+use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
 use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 
 class Aliases implements Resettable {
-	/** @use KeyStack<string> */
+	/** @use KeyStack<class-string> */
 	use KeyStack {
 		KeyStack::remove as remover;
 	}
 
-	/** @param CollectionStack<string,string> $entryStack */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
-	public function __construct( private readonly CollectionStack $entryStack = new CollectionStack() ) {}
+	/** @var CollectionStack<int,string>*/
+	private CollectionStack $entryStack;
 
-	/** @throws LogicException When entry ID and alias is same. */
+	/** @param array<string,class-string> $stack */
+	final public function __construct( private array $stack = array() ) {
+		$this->entryStack = new CollectionStack();
+	}
+
+	/**
+	 * @param class-string $entry
+	 * @throws LogicException When entry ID and alias is same.
+	 */
 	public function set( string $entry, string $alias ): void {
 		if ( $alias === $entry ) {
 			throw new LogicException( "[{$entry}] cannot be aliased by same name." );
@@ -35,13 +43,20 @@ class Aliases implements Resettable {
 		$this->entryStack->set( key: $entry, value: $alias );
 	}
 
+	/** @phpstan-assert-if-false =class-string $id */
 	public function has( string $id, bool $asEntry = false ): bool {
 		return $asEntry ? $this->entryStack->has( key: $id ) : isset( $this->stack[ $id ] );
 	}
 
-	/** @return ($asEntry is true ? string[] : string) */
+	/**
+	 * @return ($asEntry is true ? array<int,string> : class-string)
+	 * @throws EntryNotFound When could not find entry for the given $id.
+	 * @phpstan-assert class-string $id
+	 */
 	public function get( string $id, bool $asEntry = false ): string|array {
-		return $asEntry ? ( $this->entryStack->get( $id ) ?? array() ) : ( $this->stack[ $id ] ?? $id );
+		return $asEntry
+			? ( $this->entryStack->get( $id ) ?? array() )
+			: ( $this->stack[ $id ] ?? throw EntryNotFound::for( $id, previous: null ) );
 	}
 
 	public function remove( string $id ): bool {
