@@ -9,7 +9,6 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Event;
 
-use Closure;
 use LogicException;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
@@ -63,13 +62,13 @@ enum EventType {
 	}
 
 	private static function assertParamNameProvided( string $entry, ?string $paramName ): string {
-		return $paramName ?: throw new LogicException(
+		return $paramName ? "$entry:$paramName" : throw new LogicException(
 			"Parameter name is required when adding event listener during build for entry {$entry}."
 		);
 	}
 
-	private static function assertConcreteIsString( string|Closure $concrete, string $entry ): string {
-		return ! $concrete instanceof Closure ? $concrete : throw new LogicException(
+	private static function assertConcreteIsString( string|object $concrete, string $entry ): string {
+		return is_string( $concrete ) ? $concrete : throw new LogicException(
 			"The concrete must be a string when adding event listener after build for entry {$entry}."
 		);
 	}

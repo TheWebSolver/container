@@ -165,13 +165,17 @@ class ParamResolverTest extends TestCase {
 		$eventWithStringValue
 			->expects( $this->once() )
 			->method( 'getBinding' )
-			->willReturn( new Binding( 'event' ) );
+			->willReturn( new Binding( fn() => 'event' ) );
 
 		$eventWithArrayValue = $this->createMock( BuildingEvent::class );
 		$eventWithArrayValue
 			->expects( $this->once() )
 			->method( 'getBinding' )
-			->willReturn( new Binding( array( 2, array( 3 ), array( 4 ) ) ) );
+			->willReturn( new Binding( fn() => array( 2, array( 3 ), array( 4 ) ) ) );
+
+		$app->expects( $this->exactly( 2 ) )
+			->method( 'isListenerFetchedFrom' )
+			->willReturn( true, true );
 
 		$dispatcher->expects( $this->exactly( 2 ) )
 			->method( 'hasListeners' )

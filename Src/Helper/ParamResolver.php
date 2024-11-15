@@ -85,33 +85,33 @@ class ParamResolver {
 			return null;
 		}
 
-		$id = $param->getName();
+		$entry = "{$type}:{$param->name}";
 
-		$this->maybeAddEventListenerFromAttributeOf( $param, $id );
+		$this->maybeAddEventListenerFromAttributeOf( $param, $entry );
 
-		if ( ! $this->dispatcher?->hasListeners( forEntry: $id ) ) {
+		if ( ! $this->dispatcher?->hasListeners( forEntry: $entry ) ) {
 			return null;
 		}
 
-		if ( $this->app->isInstance( $id ) ) {
-			return $this->app->get( $id );
+		if ( $this->app->isInstance( $entry ) ) {
+			return $this->app->get( $entry );
 		}
 
-		$event = $this->dispatcher->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $id ) );
+		$event = $this->dispatcher->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $entry ) );
 
-		if ( ! $event instanceof BuildingEvent ) {
+		if ( ! $event instanceof BuildingEvent || ! ( $binding = $event->getBinding() ) ) {
 			return null;
 		}
 
-		$binding = $event->getBinding();
+		$material = $binding->material;
 
-		if ( $binding?->isInstance() ) {
-			$value = $binding->material;
+		if ( $binding->isInstance() ) {
+			$this->app->setInstance( $entry, $this->ensureObject( $material, $type, $param->name, $entry ) );
 
-			$this->app->setInstance( $id, instance: $this->ensureObject( $value, $type, $param->name, $id ) );
+			return $this->app->get( $entry );
 		}
 
-		return $binding?->material;
+		return $material instanceof Closure ? $material() : $material;
 	}
 
 	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {
@@ -126,12 +126,20 @@ class ParamResolver {
 		return ContainerInterface::class === $type || Container::class === $type;
 	}
 
-	private function maybeAddEventListenerFromAttributeOf( ReflectionParameter $param, string $id ): void {
-		if ( ! $this->dispatcher instanceof ListenerRegistry ) {
+	private function maybeAddEventListenerFromAttributeOf( ReflectionParameter $param, string $entry ): void {
+		$scopeName     = $param->getDeclaringClass()?->getName() ?? $param->getDeclaringFunction()->getName();
+		$listenerScope = "{$scopeName}:{$entry}";
+
+		if (
+			! $this->dispatcher instanceof ListenerRegistry
+				|| $this->app->isListenerFetchedFrom( $listenerScope, ListenTo::class )
+		) {
 			return;
 		}
 
-		if ( empty( $attributes = $param->getAttributes( name: ListenTo::class ) ) ) {
+		$this->app->setListenerFetchedFrom( $listenerScope, ListenTo::class );
+
+		if ( empty( $attributes = $param->getAttributes( ListenTo::class ) ) ) {
 			return;
 		}
 
@@ -139,34 +147,16 @@ class ParamResolver {
 		$dispatcher = $this->dispatcher;
 		$attribute  = $attributes[0]->newInstance();
 		$priorities = $dispatcher->getPriorities();
+		$priority   = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
 
-		/*
-		| Prioritize the Event Listener based on whether it should be treated as final or not.
-		|
-		| When it is set as final:
-		|  - user-defined Event Listeners will be listened before it.
-		|  - user-defined Event Listeners may halt this Event Listener.
-		|
-		| When it is not set as final:
-		|  - it will be listened before user-defined Event Listeners.
-		|  - it may halt the user-defined Event Listeners.
-		*/
-		$priority = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
-
-		$dispatcher->addListener( listener: ( $attribute->listener )( ... ), forEntry: $id, priority: $priority );
+		$dispatcher->addListener( ( $attribute->listener )( ... ), $entry, $priority );
 	}
 
-	private function ensureObject( mixed $value, string $type, string $name, string $id ): object {
-		return is_object( $value ) && is_a( $value, $type )
-			? $value
-			: throw new BadResolverArgument(
-				sprintf(
-					'The bound instance from Event Listener is not a valid type. Expected an instance of'
-					. ' "%1$s" for parameter "%2$s" while building "%3$s".',
-					$type,
-					$name,
-					$id
-				)
-			);
+	/**
+	 * @return object
+	 * @throws BadResolverArgument When param is not of value type.
+	 */
+	private function ensureObject( mixed $value, string $type, string $name, string $id ) {
+		return $value instanceof $type ? $value : throw BadResolverArgument::forBuildingParam( $type, $name, $id );
 	}
 }
