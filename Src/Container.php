@@ -573,14 +573,13 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	private function dispatchAfterBuildingInstance( string $entry, object $built, bool $resolved ): object {
-		$baseClass = $built::class;
-		$eventId   = $resolved ? $baseClass : $entry;
-
 		if ( $this->resolvedInstances->has( key: $entry ) ) {
-			return $resolved ? $this->setInstance( $entry, $built ) : $built;
+			return $built;
 		}
 
-		$built = $this->dispatchAfterBuilding( $eventId, $built );
+		$baseClass = $built::class;
+		$eventId   = $resolved ? $baseClass : $entry;
+		$built     = $this->dispatchAfterBuilding( $eventId, $built );
 
 		$this->eventManager->getDispatcher( EventType::AfterBuild )?->reset( $eventId );
 		$this->resolvedInstances->set( key: $entry, value: array( $baseClass => $built::class ) );
