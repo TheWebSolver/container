@@ -131,17 +131,14 @@ class ParamResolver {
 	}
 
 	private function maybeAddEventListenerFromAttributeOf( ReflectionParameter $param, string $entry ): void {
-		$scopeName     = $param->getDeclaringClass()?->getName() ?? $param->getDeclaringFunction()->getName();
-		$listenerScope = "{$scopeName}:{$entry}";
-
 		if (
 			! $this->dispatcher instanceof ListenerRegistry
-				|| $this->app->isListenerFetchedFrom( $listenerScope, ListenTo::class )
+				|| $this->app->isListenerFetchedFrom( $entry, ListenTo::class )
 		) {
 			return;
 		}
 
-		$this->app->setListenerFetchedFrom( $listenerScope, ListenTo::class );
+		$this->app->setListenerFetchedFrom( $entry, ListenTo::class );
 
 		if ( empty( $attributes = $param->getAttributes( ListenTo::class ) ) ) {
 			return;

@@ -543,6 +543,8 @@ class ContainerTest extends TestCase {
 
 		$this->assertInstanceOf( _Primary__EntryClass__Stub::class, $instance->primary );
 
+		$this->app = new Container( eventManager: $eventManager = new EventManager() );
+
 		$this->app->when( EventType::Building )
 			->for( _Primary__EntryClass__Stub::class, paramName: 'primary' )
 			->listenTo(
@@ -555,6 +557,12 @@ class ContainerTest extends TestCase {
 
 		$this->assertTrue( $this->app->isInstance( id: _Primary__EntryClass__Stub::class . ':primary' ) );
 		$this->assertInstanceOf( _Primary__EntryClass__Stub_Child::class, actual: $instance->primary );
+		$this->assertCount(
+			expectedCount: 2,
+			haystack: $eventManager->getDispatcher( EventType::Building )->getListeners(
+				forEntry: _Primary__EntryClass__Stub::class . ':primary'
+			)
+		);
 
 		/** @var _Main__EntryClass__Stub_Child */
 		$instance = $this->app->get( _Main__EntryClass__Stub_Child::class );
