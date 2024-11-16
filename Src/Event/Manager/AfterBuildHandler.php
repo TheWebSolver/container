@@ -18,15 +18,18 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Lib\Container\Traits\EventDispatcherSetter;
 
 /** @template TResolved of object */
 class AfterBuildHandler {
+	/** @use EventDispatcherSetter<AfterBuildEvent> */
+	use EventDispatcherSetter;
+
 	/** Placeholders: 1: Decorating classname 2: debug type of resolved value */
 	public const INVALID_TYPE_HINT_OR_NOT_FIRST_PARAM = 'Decorating class "%s" has invalid type-hint or not accepting the resolved object as first parameter when decorating "%2$s".';
 	/** Placeholder: %s: Decorating classname */
@@ -35,8 +38,7 @@ class AfterBuildHandler {
 	private ?string $currentDecoratorClass = null;
 	/** @var TResolved */
 	private object $resolved;
-	/** @var (EventDispatcherInterface&ListenerRegistry<AfterBuildEvent>)|null */
-	private (EventDispatcherInterface&ListenerRegistry)|null $dispatcher = null;
+
 
 	public function __construct( private readonly Container $app, private readonly string $entry ) {}
 
@@ -75,12 +77,6 @@ class AfterBuildHandler {
 
 	public function getLastDecorator(): ?string {
 		return $this->currentDecoratorClass;
-	}
-
-	public function usingEventDispatcher( (EventDispatcherInterface&ListenerRegistry)|null $dispatcher ): self {
-		$this->dispatcher = $dispatcher;
-
-		return $this;
 	}
 
 	public function withListenerFromAttributeOf( ?ReflectionClass $reflection ): self {
