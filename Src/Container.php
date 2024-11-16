@@ -189,10 +189,17 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		array $params = array(),
 		?string $defaultMethod = null
 	): mixed {
-		$dispatcher = $this->eventManager->getDispatcher( EventType::Building );
+		$this->dependencies->push( $params );
 
-		return ( new MethodResolver( $this, $dispatcher, $this->artefact ) )
-			->resolve( $callback, $defaultMethod, $params );
+		$resolved = ( new MethodResolver( $this, $this->artefact ) )
+			->usingEventDispatcher( $this->eventManager->getDispatcher( EventType::Building ) )
+			->withParameterStack( $this->dependencies )
+			->withCallback( $callback, $defaultMethod )
+			->resolve();
+
+		$this->dependencies->pull();
+
+		return $resolved;
 	}
 
 	/**
@@ -539,8 +546,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		try {
 			$dispatcher = $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null;
-			$resolver   = new ParamResolver( $this, $this->dependencies, $dispatcher );
-			$resolved   = $resolver->resolve( dependencies: $constructor->getParameters() );
+			$resolved   = ( new ParamResolver( $this ) )
+				->withReflectionParameters( $constructor->getParameters() )
+				->withParameterStack( $this->dependencies )
+				->usingEventDispatcher( $dispatcher )
+				->resolve();
 		} catch ( ContainerExceptionInterface $e ) {
 			throw $e;
 		}

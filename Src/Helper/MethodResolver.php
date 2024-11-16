@@ -1,6 +1,6 @@
 <?php
 /**
- * Method resolver for DI & Auto-wiring method calls.
+ * Resolves Dependency Injection of either class methods or functions.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -14,47 +14,53 @@ use ReflectionFunction;
 use ReflectionFunctionAbstract;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Container\ContainerExceptionInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
+use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Lib\Container\Traits\DependencySetter;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Lib\Container\Traits\EventDispatcherSetter;
 
 class MethodResolver {
+	/** @use EventDispatcherSetter<BuildingEvent> */
+	use EventDispatcherSetter, DependencySetter;
+
+	protected ?string $default;
 	protected string $context;
+	/** @var callable|string */
+	protected $callback;
 
 	public function __construct(
 		protected readonly Container $app,
-		protected (EventDispatcherInterface&ListenerRegistry)|null $dispatcher,
-		protected readonly Artefact $artefact = new Artefact(),
-		protected readonly Param $pool = new Param(),
+		protected readonly Artefact $artefact = new Artefact()
 	) {}
 
 	/**
-	 * @param callable|string     $cb      The callable or a string representation of invoked method.
-	 * @param ?string             $default The default method name. Defaults to `__invoke()`.
-	 * @param array<string,mixed> $params  The method's injected parameters.
-	 * @throws BadResolverArgument When method cannot be resolved or no `$default`.
+	 * @param callable|string $callback      The callable or a string representation of invoked method.
+	 * @param ?string         $defaultMethod The default method name. Defaults to `__invoke()`.
 	 */
-	public function resolve( callable|string $cb, ?string $default, array $params = array() ): mixed {
-		$this->pool->push( value: $params );
+	public function withCallback( callable|string $callback, ?string $defaultMethod = null ): static {
+		$this->callback = $callback;
+		$this->default  = $defaultMethod;
 
-		if ( is_string( $cb ) ) {
-			$this->context = static::artefactFrom( $cb );
+		return $this;
+	}
 
-			return $this->instantiateFrom( $cb, method: $default );
+	/** @throws BadResolverArgument When method cannot be resolved or no `$default`. */
+	public function resolve(): mixed {
+		if ( is_string( $this->callback ) ) {
+			$this->context = static::artefactFrom( $this->callback );
+
+			return $this->instantiateFrom( $this->callback );
 		}
 
 		/** @var array{0:object|string,1:string} $unwrapped */
-		$unwrapped        = Unwrap::callback( $cb, asArray: true );
-		$this->context    = static::artefactFrom( $unwrapped );
-		[ $cls, $method ] = $unwrapped;
-		$resolved         = is_string( $cls ) // The $cls is obj: at this point. Ensure just in case...
-			? $this->instantiateFrom( $cls, $method )
-			: $this->resolveFrom( id: $this->context, cb: $unwrapped, obj: $cls ); // @phpstan-ignore-line
-
-		$this->pool->pull();
+		$unwrapped              = Unwrap::callback( $this->callback, asArray: true );
+		$this->context          = static::artefactFrom( $unwrapped );
+		[ $cb, $this->default ] = $unwrapped;
+		$resolved               = is_string( $cb )
+			? $this->instantiateFrom( $cb )
+			: $this->resolveFrom( $this->context, cb: $unwrapped, obj: $cb ); // @phpstan-ignore-line
 
 		return $resolved;
 	}
@@ -71,9 +77,9 @@ class MethodResolver {
 			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $cb ) );
 	}
 
-	protected function instantiateFrom( string $cb, ?string $method ): mixed {
+	protected function instantiateFrom( string $cb ): mixed {
 		$parts  = Unwrap::partsFrom( string: $cb );
-		$method = $parts[1] ?? $method ?? ( method_exists( $cb, '__invoke' ) ? '__invoke' : null );
+		$method = $parts[1] ?? $this->default ?? ( method_exists( $cb, '__invoke' ) ? '__invoke' : null );
 
 		if ( null === $method ) {
 			throw BadResolverArgument::noMethod( class: $parts[0] );
@@ -92,8 +98,11 @@ class MethodResolver {
 			$this->artefact->push( value: $this->context );
 		}
 
-		$resolved = ( new ParamResolver( $this->app, $this->pool, $this->dispatcher ) )
-			->resolve( dependencies: static::reflector( of: $cb )->getParameters() );
+		$resolved = ( new ParamResolver( $this->app ) )
+			->withReflectionParameters( static::reflector( of: $cb )->getParameters() )
+			->usingEventDispatcher( $this->dispatcher )
+			->withParameterStack( $this->stack )
+			->resolve();
 
 		if ( $this->artefact->has( value: $this->context ) ) {
 			$this->artefact->pull();

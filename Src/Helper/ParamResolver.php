@@ -1,6 +1,6 @@
 <?php
 /**
- * Parameter Resolver for either class or method during auto-wiring.
+ * Resolves either constructor or method/function parameters during auto-wiring.
  *
  * @package TheWebSolver\Codegarage\Container
  */
@@ -12,31 +12,31 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 use Closure;
 use ReflectionParameter;
 use Psr\Container\ContainerInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use Psr\Container\ContainerExceptionInterface as ContainerError;
+use TheWebSolver\Codegarage\Lib\Container\Traits\DependencySetter;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Lib\Container\Traits\EventDispatcherSetter;
 
 class ParamResolver {
+	/** @use EventDispatcherSetter<BuildingEvent> */
+	use EventDispatcherSetter, DependencySetter;
+
 	public function __construct(
 		protected readonly Container $app,
-		protected readonly Param $stack,
-		protected (EventDispatcherInterface&ListenerRegistry)|null $dispatcher,
 		protected readonly Stack $result = new Stack(),
 	) {}
 
 	/**
-	 * @param ReflectionParameter[] $dependencies
 	 * @return mixed[]
 	 * @throws ContainerError When resolving dependencies fails.
 	 */
-	public function resolve( array $dependencies ): array {
-		foreach ( $dependencies as $param ) {
+	public function resolve(): array {
+		foreach ( $this->dependencies as $param ) {
 			$result = match ( true ) {
 				$this->stack->has( $param->name )              => $this->stack->get( $param->name ),
 				null !== ( $val = $this->fromEvent( $param ) ) => $val,

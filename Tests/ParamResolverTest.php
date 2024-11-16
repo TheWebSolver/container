@@ -25,10 +25,10 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 
 class ParamResolverTest extends TestCase {
-	private ?ParamResolver $resolve;
-
+	private ParamResolver $resolver;
 	/** @var array{0:Container&MockObject,1:Param&MockObject,2:EventDispatcher&MockObject} */
-	private ?array $mockedArgs;
+	private array $mockedArgs;
+	private Param $stack;
 
 	protected function setUp(): void {
 		$this->mockedArgs = array(
@@ -37,17 +37,20 @@ class ParamResolverTest extends TestCase {
 			$this->createMock( EventDispatcher::class ),
 		);
 
-		$this->resolve = new ParamResolver( ...$this->mockedArgs );
+		$this->stack    = new Param();
+		$this->resolver = ( new ParamResolver( $this->mockedArgs[0] ) )
+			->withParameterStack( $this->mockedArgs[1] )
+			->usingEventDispatcher( $this->mockedArgs[2] )
+			->withParameterStack( $this->stack );
 	}
 
 	protected function tearDown(): void {
-		$this->resolve    = null;
-		$this->mockedArgs = null;
+		$this->setUp();
 	}
 
 	public function testParamResolveForUntypedParam(): void {
 		[ $app ]    = $this->mockedArgs;
-		$resolve    = $this->resolve;
+		$resolver   = $this->resolver;
 		$param      = new ReflectionParameter( static function ( string $value = 'test' ) {}, param: 0 );
 		$contextual = static function ( $app ): string {
 			self::assertInstanceOf( Container::class, actual: $app );
@@ -62,14 +65,14 @@ class ParamResolverTest extends TestCase {
 			->with( '$value' )
 			->willReturn( 'paramVal', $contextual, null, $variadicContextual, null, null );
 
-		$this->assertSame( expected: 'paramVal', actual: $resolve->fromUntypedOrBuiltin( $param ) );
-		$this->assertSame( expected: 'from closure', actual: $resolve->fromUntypedOrBuiltin( $param ) );
-		$this->assertSame( expected: 'test', actual: $resolve->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( expected: 'paramVal', actual: $resolver->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( expected: 'from closure', actual: $resolver->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( expected: 'test', actual: $resolver->fromUntypedOrBuiltin( $param ) );
 
 		$param = new ReflectionParameter( function: static function ( ...$value ) {}, param: 0 );
 
-		$this->assertSame( array( 'one', 'two' ), actual: $resolve->fromUntypedOrBuiltin( $param ) );
-		$this->assertSame( expected: array(), actual: $resolve->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( array( 'one', 'two' ), actual: $resolver->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( expected: array(), actual: $resolver->fromUntypedOrBuiltin( $param ) );
 
 		$param = new ReflectionParameter( function: function ( $value ) {}, param: 0 );
 
@@ -78,7 +81,7 @@ class ParamResolverTest extends TestCase {
 			"Unable to resolve dependency parameter: {$param} in class: " . self::class . '.'
 		);
 
-		$resolve->fromUntypedOrBuiltin( $param );
+		$resolver->fromUntypedOrBuiltin( $param );
 	}
 
 	/** @dataProvider provideVariousTypeHintedFunction */
@@ -121,7 +124,7 @@ class ParamResolverTest extends TestCase {
 			}
 		}//end if
 
-		$this->assertSame( $expectedValue, actual: $this->resolve->fromTyped( $param, $type ) );
+		$this->assertSame( $expectedValue, actual: $this->resolver->fromTyped( $param, $type ) );
 	}
 
 	/** @return array<array{0:Closure,1:?string,2:mixed}> */
@@ -146,9 +149,8 @@ class ParamResolverTest extends TestCase {
 		[ $app, $p, $dispatcher ] = $this->mockedArgs;
 		$testFn                   = static function ( TestCase $class, ?string $text, ...$other ) {};
 		$ref                      = new ReflectionFunction( $testFn );
-		$pool                     = new Param();
 
-		$pool->push(
+		$this->stack->push(
 			value: array(
 				'text'  => 'injected value',
 				'class' => $this->createStub( self::class ),
@@ -186,7 +188,11 @@ class ParamResolverTest extends TestCase {
 			->method( 'dispatch' )
 			->willReturn( $eventWithStringValue, $eventWithArrayValue );
 
-		$resolved = ( new ParamResolver( $app, $pool, $dispatcher ) )->resolve( $ref->getParameters() );
+		$resolved = ( new ParamResolver( $app ) )
+			->usingEventDispatcher( $dispatcher )
+			->withParameterStack( $this->stack )
+			->withReflectionParameters( $ref->getParameters() )
+			->resolve();
 
 		$this->assertCount( expectedCount: 3, haystack: $resolved );
 		$this->assertInstanceOf( expected: self::class, actual: $resolved['class'] );
@@ -195,9 +201,14 @@ class ParamResolverTest extends TestCase {
 		$testFn2 = static function ( TestCase $class, string $text, int ...$other ) {};
 		$ref2    = new ReflectionFunction( $testFn2 );
 
-		$pool->push( value: array( 'class' => $this->createStub( self::class ) ) );
+		$this->stack->pull();
+		$this->stack->push( value: array( 'class' => $this->createStub( self::class ) ) );
 
-		$resolved2 = ( new ParamResolver( $app, $pool, $dispatcher ) )->resolve( $ref2->getParameters() );
+		$resolved2 = ( new ParamResolver( $app ) )
+			->usingEventDispatcher( $dispatcher )
+			->withParameterStack( $this->stack )
+			->withReflectionParameters( $ref2->getParameters() )
+			->resolve();
 
 		$this->assertCount( expectedCount: 3, haystack: $resolved2 ); // Variadic is an array.
 		$this->assertInstanceOf( expected: self::class, actual: $resolved2['class'] );
@@ -209,13 +220,13 @@ class ParamResolverTest extends TestCase {
 		$expected    = $this->mockedArgs[0];
 		$asInterface = static function ( ContainerInterface $app ) {};
 		$param       = new ReflectionParameter( function: $asInterface, param: 0 );
-		$actual      = $this->resolve->fromTyped( $param, type: $param->getType()->getName() );
+		$actual      = $this->resolver->fromTyped( $param, type: $param->getType()->getName() );
 
 		$this->assertSame( $expected, $actual );
 
 		$asConcrete = static function ( Container $app ) {};
 		$param      = new ReflectionParameter( function: $asConcrete, param: 0 );
-		$actual     = $this->resolve->fromTyped( $param, type: $param->getType()->getName() );
+		$actual     = $this->resolver->fromTyped( $param, type: $param->getType()->getName() );
 
 		$this->assertSame( $expected, $actual );
 	}

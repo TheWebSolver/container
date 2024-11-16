@@ -12,6 +12,7 @@ namespace TheWebSolver\Codegarage\Tests;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
@@ -19,23 +20,25 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
 use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
 
 class MethodResolverTest extends TestCase {
-	private EventDispatcher|MockObject|null $dispatcher;
-	private Container|MockObject|null $app;
-	private ?MethodResolver $resolver;
+	private EventDispatcher|MockObject $dispatcher;
+	private Container|MockObject $app;
+	private MethodResolver $resolver;
+	private Param $param;
 
 	protected function setUp(): void {
 		/** @var Container&MockObject */
 		$this->app = $this->createMock( Container::class );
 		/** @var EventDispatcher&MockObject */
 		$this->dispatcher = $this->createMock( EventDispatcher::class );
+		$this->param      = new Param();
 
-		$this->resolver = new MethodResolver( $this->app, $this->dispatcher );
+		$this->resolver = ( new MethodResolver( $this->app ) )
+			->usingEventDispatcher( $this->dispatcher )
+			->withParameterStack( $this->param );
 	}
 
 	protected function tearDown(): void {
-		$this->app        = null;
-		$this->dispatcher = null;
-		$this->resolver   = null;
+		$this->setUp();
 	}
 
 	/** @return array{0:object,1:string,2:string} */
@@ -85,12 +88,12 @@ class MethodResolverTest extends TestCase {
 
 		$this->assertSame(
 			expected: 'Name: John',
-			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: 'no effect' )
+			actual: $this->resolver->withCallback( array( $test, 'get' ), 'no effect' )->resolve()
 		);
 
 		$this->assertSame(
 			expected: 'Name: Default',
-			actual: $this->resolver->resolve( cb: array( $test, 'get' ), default: 'no effect' )
+			actual: $this->resolver->withCallback( array( $test, 'get' ), 'no effect' )->resolve()
 		);
 	}
 
@@ -105,12 +108,12 @@ class MethodResolverTest extends TestCase {
 
 		$this->assertSame(
 			expected: 'Name: John',
-			actual: $this->resolver->resolve( cb: $test->get( ... ), default: null )
+			actual: $this->resolver->withCallback( $test->get( ... ) )->resolve()
 		);
 
 		$this->assertSame(
 			expected: 'Name: Default',
-			actual: $this->resolver->resolve( cb: $test->get( ... ), default: null )
+			actual: $this->resolver->withCallback( $test->get( ... ) )->resolve()
 		);
 	}
 
@@ -129,12 +132,12 @@ class MethodResolverTest extends TestCase {
 
 		$this->assertSame(
 			expected: 'Name: From Binding',
-			actual: $this->resolver->resolve( cb: $normalId, default: 'no effect if null or valid method' )
+			actual: $this->resolver->withCallback( $normalId, 'no effect if null or valid method' )->resolve()
 		);
 
 		$this->assertSame(
 			expected: 'Name: Default',
-			actual: $this->resolver->resolve( cb: $normalId, default: 'no effect if null or valid method' )
+			actual: $this->resolver->withCallback( $normalId, 'no effect if null or valid method' )->resolve()
 		);
 	}
 
@@ -146,7 +149,7 @@ class MethodResolverTest extends TestCase {
 			message: 'Cannot resolve instantiated class method "' . $normalId . '()".'
 		);
 
-		$this->resolver->resolve( $instanceId, default: null );
+		$this->resolver->withCallback( $instanceId )->resolve();
 	}
 
 	/** @dataProvider provideInvalidClassMethod */
@@ -165,7 +168,7 @@ class MethodResolverTest extends TestCase {
 		$this->expectException( BadResolverArgument::class );
 		$this->expectExceptionMessage( $msg );
 
-		$this->resolver->resolve( $cls, $method );
+		$this->resolver->withCallback( $cls, $method )->resolve();
 	}
 
 	/** @return array<string[]> */
@@ -189,29 +192,28 @@ class MethodResolverTest extends TestCase {
 			->willReturn( new $test() );
 
 		$this->assertSame(
-			actual: $this->resolver->resolve( cb: $test::class, default: null /* defaults to "__invoke */ ),
+			actual: $this->resolver->withCallback( $test::class /* defaults to "__invoke */ )->resolve(),
 			expected: 'Name: Invocable'
 		);
 
 		$this->assertSame(
-			actual: $this->resolver->resolve( cb: $test::class, default: 'alt' ),
+			actual: $this->resolver->withCallback( $test::class, 'alt' )->resolve(),
 			expected: 'Name: Alternate'
 		);
 
 		$this->assertSame(
-			actual: $this->resolver->resolve( cb: $test::class, default: 'get' ),
+			actual: $this->resolver->withCallback( $test::class, 'get' )->resolve(),
 			expected: 'Name: Default'
 		);
 
 		$this->assertSame(
-			actual: $this->resolver->resolve( cb: $test, default: 'ignored when $cb is invocable object' ),
+			actual: $this->resolver->withCallback( $test, 'ignored when $cb is invocable object' )->resolve(),
 			expected: 'Name: Invocable'
 		);
 
-		$this->assertSame(
-			actual: $this->resolver->resolve( cb: $test, default: 'ignored', params: array( 'name' => 'Inject' ) ),
-			expected: 'Name: Inject'
-		);
+		$this->param->push( array( 'name' => 'Inject' ) );
+
+		$this->assertSame( actual: $this->resolver->withCallback( $test, 'ignored' )->resolve(), expected: 'Name: Inject' );
 	}
 
 	public function testLazyClassInstantiationAndMethodCallWithVariousParamResolver(): void {
@@ -230,7 +232,7 @@ class MethodResolverTest extends TestCase {
 		// If no contextual, eventual or injected value, default value used.
 		$this->assertSame(
 			expected: 'Name: Default',
-			actual: $this->resolver->resolve( cb: $withGetMethod, default: null )
+			actual: $this->resolver->withCallback( $withGetMethod )->resolve()
 		);
 
 		// Contextual value will take precedence over default value.
@@ -259,26 +261,30 @@ class MethodResolverTest extends TestCase {
 
 		$this->assertSame(
 			expected: 'Name: Eventual',
-			actual: $this->resolver->resolve( cb: $withGetMethod, default: null )
+			actual: $this->resolver->withCallback( $withGetMethod )->resolve()
 		);
 
 		// Falling back to contextual value when eventual value is "null".
 		$this->assertSame(
 			expected: 'Name: Contextual',
-			actual: $this->resolver->resolve( cb: $withGetMethod, default: null )
+			actual: $this->resolver->withCallback( $withGetMethod )->resolve()
 		);
+
+		$this->param->push( array( 'name' => 'Injected' ) );
 
 		// Injected value will take precedence over all other values.
 		$this->assertSame(
 			expected: 'Name: Injected',
-			actual: $this->resolver
-				->resolve( cb: $withGetMethod, default: null, params: array( 'name' => 'Injected' ) ),
+			actual: $this->resolver->withCallback( $withGetMethod )->resolve()
 		);
+
+		$this->param->pull();
+		$this->param->push( array( 'ignored' ) );
 
 		// Binding will take precedence over everything else.
 		$this->assertSame(
 			expected: 'Name: Binding',
-			actual: $this->resolver->resolve( cb: $withGetMethod, default: 'ignored', params: array( 'ignored' ) ),
+			actual: $this->resolver->withCallback( $withGetMethod, 'ignored' )->resolve(),
 			message: 'Even though cb string is passed with ::get() method, binding value is '
 							. ' resolved by directly invoking class (has __invoke() method).',
 		);
