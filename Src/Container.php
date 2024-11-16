@@ -109,7 +109,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/** @return bool `true` if has binding or given ID is an alias, `false` otherwise. */
 	public function has( string $id ): bool {
-		return $this->hasBinding( $id ) || $this->isAlias( $id );
+		return $this->hasBinding( $id ) ?: $this->isAlias( $id );
 	}
 
 	public function hasResolved( string $id ): bool {
@@ -284,7 +284,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param string|class-string|callable|null $concrete
 	 */
 	public function set( string $id, callable|string|null $concrete = null ): void {
-		$this->register( $id, concreteOrItsAlias: $concrete ?? $id, singleton: false );
+		$this->register( $id, concreteOrAlias: $concrete ?? $id, singleton: false );
 	}
 
 	/**
@@ -292,7 +292,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param class-string|callable|null $concrete
 	 */
 	public function setShared( string $id, callable|string|null $concrete = null ): void {
-		$this->register( $id, concreteOrItsAlias: $concrete ?? $id, singleton: true );
+		$this->register( $id, concreteOrAlias: $concrete ?? $id, singleton: true );
 	}
 
 	/**
@@ -355,44 +355,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$ids      = array_map( $this->getEntryFrom( ... ), array: Unwrap::asArray( $concrete ) );
 
 		return new ContextBuilder( for: $ids, app: $this, contextual: $this->contextual );
-	}
-
-	/**
-	 * @param class-string<T>|Closure $concrete
-	 * @return ($concrete is class-string ? T : mixed)
-	 * @throws ContainerExceptionInterface When cannot build `$concrete`.
-	 * @throws ContainerError              When non-instantiable class-string `$concrete` given.
-	 * @template T
-	 */
-	public function build( string|Closure $concrete, bool $dispatch = true ): mixed {
-		if ( $concrete instanceof Closure ) {
-			return $concrete( $this, $this->dependencies->latest() ?? array() );
-		}
-
-		try {
-			$reflector       = $this->reflector ?? Unwrap::classReflection( $concrete );
-			$this->reflector = $reflector;
-		} catch ( ReflectionException | LogicException $e ) {
-			throw ContainerError::whenResolving( entry: $concrete, exception: $e, artefact: $this->artefact );
-		}
-
-		if ( null === ( $constructor = $reflector->getConstructor() ) ) {
-			return new $concrete();
-		}
-
-		$this->artefact->push( value: $concrete );
-
-		try {
-			$dispatcher = $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null;
-			$resolver   = new ParamResolver( $this, $this->dependencies, $dispatcher );
-			$resolved   = $resolver->resolve( dependencies: $constructor->getParameters() );
-		} catch ( ContainerExceptionInterface $e ) {
-			throw $e;
-		}
-
-		$this->artefact->pull();
-
-		return $reflector->newInstanceArgs( args: $resolved );
 	}
 
 	/** @return iterable<int,object> */
@@ -464,14 +426,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/**
 	 * @param string|class-string          $id
-	 * @param string|class-string|callable $concreteOrItsAlias
+	 * @param string|class-string|callable $concreteOrAlias
 	 */
-	protected function register( string $id, callable|string $concreteOrItsAlias, bool $singleton ): void {
+	protected function register( string $id, callable|string $concreteOrAlias, bool $singleton ): void {
 		$this->maybePurgeIfAliasOrInstance( $id );
 
-		$material = is_callable( $concreteOrItsAlias )
-			? $concreteOrItsAlias( ... )
-			: $this->getEntryFrom( $id === $concreteOrItsAlias ? $id : $concreteOrItsAlias );
+		$material = is_callable( $concreteOrAlias ) ? $concreteOrAlias( ... ) : $this->getEntryFrom( $concreteOrAlias );
 
 		$this->bindings->set( key: $id, value: new Binding( $material, $singleton ) );
 
@@ -554,6 +514,44 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected function maybePurgeIfAliasOrInstance( string $id ): void {
 		$this->removeInstance( $id );
 		$this->aliases->remove( $id );
+	}
+
+	/**
+	 * @param class-string<T>|Closure $concrete
+	 * @return ($concrete is class-string ? T : mixed)
+	 * @throws ContainerExceptionInterface When cannot build `$concrete`.
+	 * @throws ContainerError              When non-instantiable class-string `$concrete` given.
+	 * @template T
+	 */
+	private function build( string|Closure $concrete, bool $dispatch = true ): mixed {
+		if ( $concrete instanceof Closure ) {
+			return $concrete( $this, $this->dependencies->latest() ?? array() );
+		}
+
+		try {
+			$reflector       = $this->reflector ?? Unwrap::classReflection( $concrete );
+			$this->reflector = $reflector;
+		} catch ( ReflectionException | LogicException $e ) {
+			throw ContainerError::whenResolving( entry: $concrete, exception: $e, artefact: $this->artefact );
+		}
+
+		if ( null === ( $constructor = $reflector->getConstructor() ) ) {
+			return new $concrete();
+		}
+
+		$this->artefact->push( value: $concrete );
+
+		try {
+			$dispatcher = $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null;
+			$resolver   = new ParamResolver( $this, $this->dependencies, $dispatcher );
+			$resolved   = $resolver->resolve( dependencies: $constructor->getParameters() );
+		} catch ( ContainerExceptionInterface $e ) {
+			throw $e;
+		}
+
+		$this->artefact->pull();
+
+		return $reflector->newInstanceArgs( args: $resolved );
 	}
 
 	/**
