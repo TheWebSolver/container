@@ -35,6 +35,8 @@ class AfterBuildHandler {
 	private ?string $currentDecoratorClass = null;
 	/** @var TResolved */
 	private object $resolved;
+	/** @var (EventDispatcherInterface&ListenerRegistry<AfterBuildEvent>)|null */
+	private (EventDispatcherInterface&ListenerRegistry)|null $dispatcher = null;
 
 	public function __construct( private readonly Container $app, private readonly string $entry ) {}
 
@@ -48,15 +50,19 @@ class AfterBuildHandler {
 		string $entry,
 		object $resolved,
 		Artefact $artefact,
-		?ReflectionClass $reflector
+		?ReflectionClass $reflector,
+		(EventDispatcherInterface&ListenerRegistry)|null $dispatcher,
 	): object {
 		/** @var self<TResolved> */
-		$handler = new self( $app, $entry );
+		$handler = ( new self( $app, $entry ) );
 
 		try {
 			$artefact->push( $entry );
 
-			$handler->withListenerFromAttributeOf( $reflector )->handle( $resolved );
+			$handler
+				->usingEventDispatcher( $dispatcher )
+				->withListenerFromAttributeOf( $reflector )
+				->handle( $resolved );
 
 			$artefact->pull();
 
@@ -71,8 +77,14 @@ class AfterBuildHandler {
 		return $this->currentDecoratorClass;
 	}
 
+	public function usingEventDispatcher( (EventDispatcherInterface&ListenerRegistry)|null $dispatcher ): self {
+		$this->dispatcher = $dispatcher;
+
+		return $this;
+	}
+
 	public function withListenerFromAttributeOf( ?ReflectionClass $reflection ): self {
-		if ( ! $reflection || ! ( $dispatcher = $this->getDispatcher() ) ) {
+		if ( ! $reflection || ! $this->dispatcher ) {
 			return $this;
 		}
 
@@ -82,11 +94,11 @@ class AfterBuildHandler {
 			return $this;
 		}
 
-		$priorities = $dispatcher->getPriorities();
+		$priorities = $this->dispatcher->getPriorities();
 		$attribute  = $attrs[0]->newInstance();
 		$priority   = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
 
-		$dispatcher->addListener( ( $attribute->listener )( ... ), $this->entry, $priority );
+		$this->dispatcher->addListener( ( $attribute->listener )( ... ), $this->entry, $priority );
 
 		return $this;
 	}
@@ -102,12 +114,12 @@ class AfterBuildHandler {
 	public function handle( object $resolved ): object {
 		$this->resolved = $resolved;
 
-		if ( ! $dispatcher = $this->getDispatcher() ) {
+		if ( ! $this->dispatcher ) {
 			return $resolved;
 		}
 
 		/** @var ?AfterBuildEvent<TResolved> */
-		$event = $dispatcher->dispatch( event: new AfterBuildEvent( $this->entry ) );
+		$event = $this->dispatcher->dispatch( event: new AfterBuildEvent( $this->entry ) );
 
 		if ( ! $event instanceof AfterBuildEvent ) {
 			return $resolved;
@@ -152,11 +164,6 @@ class AfterBuildHandler {
 		return $this->isValidParameterInDecorator( $param )
 			? $param
 			: $this->throwBadArgument( self::INVALID_TYPE_HINT_OR_NOT_FIRST_PARAM, get_debug_type( $this->resolved ) );
-	}
-
-	/** @return (EventDispatcherInterface&ListenerRegistry<AfterBuildEvent>)|null */
-	private function getDispatcher(): (EventDispatcherInterface&ListenerRegistry)|null {
-		return $this->app->getEventManager()->getDispatcher( EventType::AfterBuild );
 	}
 
 	private function firstParameterIn( ReflectionClass $decorator ): ?ReflectionParameter {

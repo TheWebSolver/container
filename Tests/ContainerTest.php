@@ -860,7 +860,8 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testAfterBuildEventListenersAreInvalidatedForAnInstance(): void {
-		$dispatcher = $this->app->getEventManager()->getDispatcher( EventType::AfterBuild );
+		$this->app  = new Container( eventManager: $eventManager = new EventManager() );
+		$dispatcher = $eventManager->getDispatcher( EventType::AfterBuild );
 		$concrete   = $this->getClassWithDecoratorAttribute();
 
 		// When already instantiated class is set as a shared instance.

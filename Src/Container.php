@@ -244,10 +244,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->resolvedInstances[ $entry ] ?? $this->resolved[ $entry ];
 	}
 
-	public function getEventManager(): EventManager {
-		return $this->eventManager;
-	}
-
 	/*
 	|================================================================================================
 	| SETTER METHODS
@@ -567,7 +563,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	private function dispatchAfterBuilding( string $id, object $resolved ): object {
-		return AfterBuildHandler::handleWith( $this, $id, $resolved, $this->artefact, $this->reflector );
+		$dispatcher = $this->eventManager->getDispatcher( EventType::AfterBuild );
+
+		return AfterBuildHandler::handleWith( $this, $id, $resolved, $this->artefact, $this->reflector, $dispatcher );
 	}
 
 	private function dispatchAfterBuildingInstance( string $entry, object $built, bool $resolved ): object {
