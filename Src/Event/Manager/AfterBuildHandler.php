@@ -170,7 +170,7 @@ class AfterBuildHandler {
 		return ( $type = Unwrap::paramTypeFrom( reflection: $param ) ) && $this->resolved instanceof $type;
 	}
 
-	private function throwBadArgument( string $msg, string $type = null ): never {
-		throw new BadResolverArgument( sprintf( $msg, $this->currentDecoratorClass, $type ) );
+	private function throwBadArgument( string $msg, string ...$args ): never {
+		throw new BadResolverArgument( sprintf( $msg, $this->currentDecoratorClass, ...$args ) );
 	}
 }
