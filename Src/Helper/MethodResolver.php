@@ -99,9 +99,8 @@ class MethodResolver {
 		}
 
 		$resolved = ( new ParamResolver( $this->app ) )
-			->withReflectionParameters( static::reflector( of: $cb )->getParameters() )
+			->withParameter( $this->dependencies, static::reflector( of: $cb )->getParameters() )
 			->usingEventDispatcher( $this->dispatcher )
-			->withParameterStack( $this->stack )
 			->resolve();
 
 		if ( $this->artefact->has( value: $this->context ) ) {

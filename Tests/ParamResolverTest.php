@@ -18,7 +18,6 @@ use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
@@ -26,22 +25,17 @@ use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 
 class ParamResolverTest extends TestCase {
 	private ParamResolver $resolver;
-	/** @var array{0:Container&MockObject,1:Param&MockObject,2:EventDispatcher&MockObject} */
+	/** @var array{0:Container&MockObject,1:EventDispatcher&MockObject} */
 	private array $mockedArgs;
-	private Param $stack;
 
 	protected function setUp(): void {
 		$this->mockedArgs = array(
 			$this->createMock( Container::class ),
-			$this->createMock( Param::class ),
 			$this->createMock( EventDispatcher::class ),
 		);
 
-		$this->stack    = new Param();
 		$this->resolver = ( new ParamResolver( $this->mockedArgs[0] ) )
-			->withParameterStack( $this->mockedArgs[1] )
-			->usingEventDispatcher( $this->mockedArgs[2] )
-			->withParameterStack( $this->stack );
+			->usingEventDispatcher( $this->mockedArgs[1] );
 	}
 
 	protected function tearDown(): void {
@@ -146,16 +140,9 @@ class ParamResolverTest extends TestCase {
 	}
 
 	public function testResolveWithTypedOrUntyped() {
-		[ $app, $p, $dispatcher ] = $this->mockedArgs;
-		$testFn                   = static function ( TestCase $class, ?string $text, ...$other ) {};
-		$ref                      = new ReflectionFunction( $testFn );
-
-		$this->stack->push(
-			value: array(
-				'text'  => 'injected value',
-				'class' => $this->createStub( self::class ),
-			)
-		);
+		[ $app, $dispatcher ] = $this->mockedArgs;
+		$testFn               = static function ( TestCase $class, ?string $text, ...$other ) {};
+		$ref                  = new ReflectionFunction( $testFn );
 
 		$app->expects( $this->exactly( 0 ) )->method( 'get' );
 		$app->expects( $this->once() )
@@ -190,8 +177,13 @@ class ParamResolverTest extends TestCase {
 
 		$resolved = ( new ParamResolver( $app ) )
 			->usingEventDispatcher( $dispatcher )
-			->withParameterStack( $this->stack )
-			->withReflectionParameters( $ref->getParameters() )
+			->withParameter(
+				args: array(
+					'text'  => 'injected value',
+					'class' => $this->createStub( self::class ),
+				),
+				reflections: $ref->getParameters()
+			)
 			->resolve();
 
 		$this->assertCount( expectedCount: 3, haystack: $resolved );
@@ -201,13 +193,9 @@ class ParamResolverTest extends TestCase {
 		$testFn2 = static function ( TestCase $class, string $text, int ...$other ) {};
 		$ref2    = new ReflectionFunction( $testFn2 );
 
-		$this->stack->pull();
-		$this->stack->push( value: array( 'class' => $this->createStub( self::class ) ) );
-
 		$resolved2 = ( new ParamResolver( $app ) )
 			->usingEventDispatcher( $dispatcher )
-			->withParameterStack( $this->stack )
-			->withReflectionParameters( $ref2->getParameters() )
+			->withParameter( array( 'class' => $this->createStub( self::class ) ), $ref2->getParameters() )
 			->resolve();
 
 		$this->assertCount( expectedCount: 3, haystack: $resolved2 ); // Variadic is an array.

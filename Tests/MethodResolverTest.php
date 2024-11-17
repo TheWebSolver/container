@@ -30,11 +30,7 @@ class MethodResolverTest extends TestCase {
 		$this->app = $this->createMock( Container::class );
 		/** @var EventDispatcher&MockObject */
 		$this->dispatcher = $this->createMock( EventDispatcher::class );
-		$this->param      = new Param();
-
-		$this->resolver = ( new MethodResolver( $this->app ) )
-			->usingEventDispatcher( $this->dispatcher )
-			->withParameterStack( $this->param );
+		$this->resolver   = ( new MethodResolver( $this->app ) )->usingEventDispatcher( $this->dispatcher );
 	}
 
 	protected function tearDown(): void {
@@ -211,9 +207,12 @@ class MethodResolverTest extends TestCase {
 			expected: 'Name: Invocable'
 		);
 
-		$this->param->push( array( 'name' => 'Inject' ) );
+		$resolved = $this->resolver
+			->withParameter( array( 'name' => 'Inject' ) )
+			->withCallback( $test, 'ignored' )
+			->resolve();
 
-		$this->assertSame( actual: $this->resolver->withCallback( $test, 'ignored' )->resolve(), expected: 'Name: Inject' );
+		$this->assertSame( actual: $resolved, expected: 'Name: Inject' );
 	}
 
 	public function testLazyClassInstantiationAndMethodCallWithVariousParamResolver(): void {
@@ -270,21 +269,22 @@ class MethodResolverTest extends TestCase {
 			actual: $this->resolver->withCallback( $withGetMethod )->resolve()
 		);
 
-		$this->param->push( array( 'name' => 'Injected' ) );
-
 		// Injected value will take precedence over all other values.
 		$this->assertSame(
 			expected: 'Name: Injected',
-			actual: $this->resolver->withCallback( $withGetMethod )->resolve()
+			actual: $this->resolver
+				->withParameter( array( 'name' => 'Injected' ) )
+				->withCallback( $withGetMethod )
+				->resolve()
 		);
-
-		$this->param->pull();
-		$this->param->push( array( 'ignored' ) );
 
 		// Binding will take precedence over everything else.
 		$this->assertSame(
 			expected: 'Name: Binding',
-			actual: $this->resolver->withCallback( $withGetMethod, 'ignored' )->resolve(),
+			actual: $this->resolver
+				->withCallback( $withGetMethod, 'ignored' )
+				->withParameter( array( 'ignored' ) )
+				->resolve(),
 			message: 'Even though cb string is passed with ::get() method, binding value is '
 							. ' resolved by directly invoking class (has __invoke() method).',
 		);

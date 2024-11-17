@@ -36,10 +36,10 @@ class ParamResolver {
 	 * @throws ContainerError When resolving dependencies fails.
 	 */
 	public function resolve(): array {
-		foreach ( $this->dependencies as $param ) {
+		foreach ( $this->reflections as $param ) {
 			$result = match ( true ) {
-				$this->stack->has( $param->name )              => $this->stack->get( $param->name ),
-				null !== ( $val = $this->fromEvent( $param ) ) => $val,
+				isset( $this->dependencies[ $param->name ] )   => $this->dependencies[ $param->name ],
+				( $val = $this->fromEvent( $param ) ) !== null => $val,
 				default                                        => $param
 			};
 

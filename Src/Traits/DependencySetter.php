@@ -9,23 +9,22 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Traits;
 
+use ArrayAccess;
 use ReflectionParameter;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
 
 trait DependencySetter {
+	/** @var array<string,mixed>|ArrayAccess<object|string,mixed> */
+	private array|ArrayAccess $dependencies = array();
 	/** @var ReflectionParameter[] */
-	private array $dependencies;
-	private Param $stack;
+	private array $reflections = array();
 
-	/** @param ReflectionParameter[] $parameters */
-	public function withReflectionParameters( array $parameters ): static {
-		$this->dependencies = $parameters;
-
-		return $this;
-	}
-
-	public function withParameterStack( Param $stack ): static {
-		$this->stack = $stack;
+	/**
+	 * @param array<string,mixed>|ArrayAccess<object|string,mixed> $args
+	 * @param ReflectionParameter[]                                $reflections
+	 */
+	public function withParameter( array|ArrayAccess $args, array $reflections = array() ): static {
+		$this->dependencies = $args;
+		$this->reflections  = $reflections;
 
 		return $this;
 	}
