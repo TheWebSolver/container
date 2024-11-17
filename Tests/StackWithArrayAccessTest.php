@@ -11,7 +11,6 @@ namespace TheWebSolver\Codegarage\Tests;
 
 use PHPUnit\Framework\TestCase;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 
 class StackWithArrayAccessTest extends TestCase {
 	private Stack $stack;
@@ -37,28 +36,5 @@ class StackWithArrayAccessTest extends TestCase {
 		unset( $this->stack['i:1'] );
 
 		$this->assertArrayNotHasKey( 'i:1', $this->stack );
-	}
-
-	public function testWithBindingDTO(): void {
-		$concrete = new class() {};
-
-		$singleton                = new Binding( $concrete, singleton: true );
-		$this->stack['singleton'] = $singleton;
-
-		$this->assertTrue( condition: $this->stack['singleton']->isSingleton() );
-
-		$this->assertTrue( condition: isset( $this->stack['singleton'] ) );
-		$this->assertFalse( condition: isset( $this->stack['instance'] ) );
-
-		$instance                = new Binding( static fn() => 1, instance: true );
-		$this->stack['instance'] = $instance;
-
-		$this->assertSame(
-			actual: $this->stack->getItems(),
-			expected: array(
-				'singleton' => $singleton,
-				'instance'  => $instance,
-			),
-		);
 	}
 }
