@@ -30,6 +30,7 @@ use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator;
+use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
 use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
@@ -58,7 +59,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected EventManager $eventManager;
 
 	/**
-	 * @param Stack<Binding>                               $bindings
+	 * @param Stack<Binding|SharedBinding>                 $bindings
 	 * @param CollectionStack<string,Closure|class-string> $contextual
 	 * @param CollectionStack<string,string>               $tags
 	 * @param CollectionStack<int,Closure>                 $rebounds
@@ -104,7 +105,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	public function isInstance( string $id ): bool {
-		return true === $this->getBinding( $id )?->isInstance();
+		return $this->getBinding( $id ) instanceof SharedBinding;
 	}
 
 	/** @return bool `true` if has binding or given ID is an alias, `false` otherwise. */
@@ -146,28 +147,19 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->aliases->has( $id ) ? $this->aliases->get( $id ) : $id;
 	}
 
-	public function getBinding( string $id ): ?Binding {
+	public function getBinding( string $id ): Binding|SharedBinding|null {
 		return $this->bindings[ $id ] ?? null;
 	}
 
 	/**
 	 * @param string|class-string $id
-	 * @return object|class-string|string Alias if not a class-string.
-	 * @throws ContainerError When concrete not found for given {@param $id}.
+	 * @return string|Closure|class-string Alias if not a class-string.
 	 * @see Container::register() For details on how entry is bound to the container.
 	 */
-	public function getConcrete( string $id ): object|string {
-		if ( ( ! $bound = $this->getBinding( $id ) ) ) {
-			return $id;
-		}
-
-		$material = $bound->material;
-
-		return match ( true ) {
-			default                                                => null,
-			$material === $id || $bound->isInstance()              => $id,
-			is_string( $material ) || $material instanceof Closure => $material,
-		} ?? throw ContainerError::unResolvableEntry( $id );
+	public function getConcrete( string $id ): Closure|string {
+		return ( ! $bound = $this->getBinding( $id ) ) || $bound instanceof SharedBinding
+			? $id
+			: $bound->material;
 	}
 
 	/** @param array<string,mixed>|ArrayAccess<object|string,mixed> $params */
@@ -191,21 +183,21 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	): mixed {
 		$resolved = ( new MethodResolver( $this, $this->artefact ) )
 			->usingEventDispatcher( $this->eventManager->getDispatcher( EventType::Building ) )
-			->withParameter( $params )
 			->withCallback( $callback, $defaultMethod )
+			->withParameter( $params )
 			->resolve();
 
 		return $resolved;
 	}
 
 	/**
-	 * @param array<string,mixed>|ArrayAccess<object|string,mixed> $with
+	 * @param array<string,mixed>|ArrayAccess<object|string,mixed> $args
 	 * @throws NotFoundExceptionInterface  When entry with given $id was not found in the container.
 	 * @throws ContainerExceptionInterface When cannot resolve concrete from the given $id.
 	 */
-	public function get( string $id, array|ArrayAccess $with = array() ): mixed {
+	public function get( string $id, array|ArrayAccess $args = array() ): mixed {
 		try {
-			return $this->resolve( $id, $with, dispatch: true );
+			return $this->resolve( $id, $args, dispatch: true );
 		} catch ( Exception $e ) {
 			throw $this->has( $id ) || $e instanceof ContainerExceptionInterface
 				? $e
@@ -304,7 +296,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->aliases->remove( $id );
 
-		$this->bindings->set( key: $id, value: new Binding( material: $instance, instance: true ) );
+		$this->bindings->set( key: $id, value: new SharedBinding( $instance ) );
 
 		if ( $hasEntry ) {
 			$this->rebound( $id );
@@ -439,17 +431,18 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 	}
 
-	/** @param ArrayAccess<object|string,mixed>|array<string,mixed> $with */
+	/** @param ArrayAccess<object|string,mixed>|array<string,mixed> $args */
 	public function resolve(
 		string $id,
-		array|ArrayAccess $with,
+		array|ArrayAccess $args,
 		bool $dispatch,
 		?ReflectionClass $reflector = null
 	): mixed {
 		$entry           = $this->getEntryFrom( $id );
 		$this->reflector = $reflector;
+		$bound           = $this->getBinding( $entry );
 
-		if ( ( $bound = $this->getBinding( $entry ) ) && $bound->isInstance() ) {
+		if ( $bound instanceof SharedBinding ) {
 			if ( ! $dispatch ) {
 				return $bound->material;
 			}
@@ -464,7 +457,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$concrete = $material instanceof Closure ? $entry : $material;
 
 		$this->dependencies->push(
-			value: $dispatch ? $this->dispatchBeforeBuilding( entry: $concrete, params: $with ) : $with
+			value: $dispatch ? $this->dispatchBeforeBuilding( entry: $concrete, params: $args ) : $args
 		);
 
 		$built = $this->build( $material, $dispatch );
@@ -501,7 +494,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	protected function shouldBeSingleton( string $entry ): bool {
-		return true === $this->getBinding( $entry )?->isSingleton();
+		return ( $bound = $this->getBinding( $entry ) )
+			&& $bound instanceof Binding
+			&& $bound->isShared;
 	}
 
 	protected function fromContextual( string $constraint ): Closure|string|null {

@@ -23,22 +23,21 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\NotFoundExceptionInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
-use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
+use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Attribute\UpdateOnReset;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
 
 class ContainerTest extends TestCase {
 	private Container $app;
@@ -273,7 +272,7 @@ class ContainerTest extends TestCase {
 	public function testResolvingParamDuringBuildEventIntegration(): void {
 		$this->app->when( EventType::Building )
 			->for( ArrayAccess::class, paramName: 'array' )
-			->listenTo( fn ( BuildingEvent $event ) => $event->setBinding( new Binding( new WeakMap() ) ) );
+			->listenTo( fn ( BuildingEvent $event ) => $event->setBinding( new Binding( WeakMap::class ) ) );
 
 		$this->assertInstanceOf(
 			expected: WeakMap::class,
@@ -285,7 +284,7 @@ class ContainerTest extends TestCase {
 			expected: Stub::class,
 			actual: $this->app->get(
 				id: _Stack__ContextualBindingWithArrayAccess__Stub::class,
-				with: array( 'array' => $this->createStub( ArrayAccess::class ) )
+				args: array( 'array' => $this->createStub( ArrayAccess::class ) )
 			)->array
 		);
 	}
@@ -326,7 +325,7 @@ class ContainerTest extends TestCase {
 			->for( _Secondary__EntryClass__Stub::class, paramName: 'secondary' )
 			->listenTo(
 				function ( BuildingEvent $event ) use ( $eventualClass ) {
-					$event->setBinding( new Binding( $eventualClass ) );
+					$event->setBinding( new SharedBinding( $eventualClass ) );
 				}
 			);
 
@@ -584,7 +583,7 @@ class ContainerTest extends TestCase {
 
 			$concrete[ EventType::Building ] = 'from user';
 
-			$e->setBinding( new Binding( $concrete ) );
+			$e->setBinding( new Binding( fn() => $concrete ) );
 		};
 
 		$this->app->when( EventType::Building )
@@ -601,11 +600,11 @@ class ContainerTest extends TestCase {
 
 		$stoppableListener = static function ( BuildingEvent $e ): void {
 			// Use binding from previous listener.
-			$concrete = $e->getBinding()->material;
+			$concrete = ( $e->getBinding()->material )();
 
 			$concrete[ EventType::Building ] = 'halted attribute listener';
 
-			$e->setBinding( new Binding( $concrete ) )->stopPropagation();
+			$e->setBinding( new Binding( fn() => $concrete ) )->stopPropagation();
 		};
 
 		$this->app->when( EventType::Building )
@@ -636,11 +635,27 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testEventOverridesPreviousListenerBindingDuringBuild(): void {
+		$id = ArrayAccess::class . ':array';
+
 		$this->app->when( EventType::Building )
 			->for( ArrayAccess::class, paramName: 'array' )
 			->listenTo(
 				static fn ( BuildingEvent $event ) => $event->setBinding(
-					new Binding( $event->app()->get( Stack::class ), instance: true )
+					new SharedBinding( new Stack() )
+				)
+			);
+
+		$this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class );
+
+		$this->assertTrue( $this->app->isInstance( $id ) );
+
+		$this->setUp();
+
+		$this->app->when( EventType::Building )
+			->for( ArrayAccess::class, paramName: 'array' )
+			->listenTo(
+				static fn ( BuildingEvent $event ) => $event->setBinding(
+					new SharedBinding( $event->app()->get( Stack::class ) )
 				)
 			);
 
@@ -648,7 +663,7 @@ class ContainerTest extends TestCase {
 			->for( ArrayAccess::class, paramName: 'array' )
 			->listenTo(
 				static fn ( BuildingEvent $event ) => $event->setBinding(
-					new Binding( $event->app()->get( Stack::class ), instance: false )
+					new Binding( Stack::class )
 				)
 			);
 
@@ -666,9 +681,8 @@ class ContainerTest extends TestCase {
 		$instance = $this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class );
 
 		$this->assertFalse(
-			condition: $this->app->isInstance( id: ArrayAccess::class . '||array' ),
-			message: 'Only one listener is allowed during build to resolve the particular entry parameter.'
-			. ' Subsequent listener will override the previous listener binding.'
+			condition: $this->app->isInstance( $id ),
+			message: 'Shared binding of a listener is overridden by subsequent listeners.'
 		);
 
 		$this->assertSame( 'Stack As ArrayAccess', actual: $instance->array['afterBuild'] );
@@ -802,7 +816,7 @@ class ContainerTest extends TestCase {
 			$this->expectExceptionMessage( sprintf( $exception, $decorator ) );
 		}
 
-		$this->app->get( JustTest__Stub::class, with: array( 'array' => $this->createStub( ArrayAccess::class ) ) );
+		$this->app->get( JustTest__Stub::class, args: array( 'array' => $this->createStub( ArrayAccess::class ) ) );
 	}
 
 	public function provideVariousExceptionTypesForAfterBuildEvent(): array {
@@ -908,7 +922,7 @@ class ContainerTest extends TestCase {
 		// Because concrete is a classname, "forEntry" will be the $concrete when set to container.
 		$this->assertTrue( $dispatcher->hasListeners( _Stack__ContextualBindingWithArrayAccess__Stub::class ) );
 
-		$instance = $this->app->get( JustTest__Stub::class, with: array( 'array' => new WeakMap() ) );
+		$instance = $this->app->get( JustTest__Stub::class, args: array( 'array' => new WeakMap() ) );
 
 		$this->assertTrue( $this->app->hasResolved( JustTest__Stub::class ) );
 		$this->assertTrue( $this->app->isInstance( JustTest__Stub::class ) );
@@ -984,7 +998,7 @@ class ContainerTest extends TestCase {
 			->listenTo(
 				static fn( BuildingEvent $e )
 					=> $e->setBinding(
-						new Binding( $e->app()->get( _Stack__ContextualBindingWithArrayAccess__Stub::class ), instance: true )
+						new SharedBinding( $e->app()->get( _Stack__ContextualBindingWithArrayAccess__Stub::class ) )
 					)
 			);
 
@@ -1006,10 +1020,10 @@ class ContainerTest extends TestCase {
 		$concreteStub  = $this->createStub( Stack::class )::class;
 
 		$bindings = array(
-			'usingAlias'          => new Binding( new stdClass(), instance: true ),
-			self::class           => new Binding( $this, instance: true ),
-			Compilable::class     => new Binding( $interfaceStub, singleton: true ),
-			'stack'               => new Binding( $concreteStub, singleton: true ),
+			'usingAlias'          => new SharedBinding( new stdClass() ),
+			self::class           => new SharedBinding( $this ),
+			Compilable::class     => new Binding( $interfaceStub, isShared: true ),
+			'stack'               => new Binding( $concreteStub, isShared: true ),
 			JustTest__Stub::class => new Binding( _Stack__ContextualBindingWithArrayAccess__Stub::class ),
 		);
 
@@ -1093,7 +1107,7 @@ class _Main__EntryClass__Stub {
 
 	public static function resolvePrimaryChild( BuildingEvent $event ): void {
 		$event->stopPropagation()->setBinding(
-			new Binding( $event->app()->get( _Primary__EntryClass__Stub_Child::class ), instance: true )
+			new SharedBinding( $event->app()->get( _Primary__EntryClass__Stub_Child::class ) )
 		);
 	}
 }
@@ -1155,10 +1169,10 @@ class _OverrideWth_Param_Event_Listener__Stub {
 
 		$concrete[ EventType::Building ] = 'from attribute';
 
-		$e->setBinding( new Binding( $concrete ) );
+		$e->setBinding( new Binding( fn() => $concrete ) );
 	}
 
 	public static function useType( BuildingEvent $e ): void {
-		$e->setBinding( new Binding( EventType::Building ) );
+		$e->setBinding( new Binding( fn() => EventType::Building ) );
 	}
 }

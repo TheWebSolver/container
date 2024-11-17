@@ -12,13 +12,14 @@ namespace TheWebSolver\Codegarage\Lib\Container\Event;
 use Psr\EventDispatcher\StoppableEventInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
+use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
 use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
 
 class BuildingEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;
 
-	private ?Binding $binding = null;
+	private Binding|SharedBinding|null $binding = null;
 
 	public function __construct( private readonly Container $app, private readonly string $paramTypeWithName ) {}
 
@@ -30,13 +31,13 @@ class BuildingEvent implements StoppableEventInterface, TaggableEvent {
 		return $this->paramTypeWithName;
 	}
 
-	public function setBinding( Binding $binding ): static {
+	public function setBinding( Binding|SharedBinding $binding ): static {
 		$this->binding = $binding;
 
 		return $this;
 	}
 
-	public function getBinding(): ?Binding {
+	public function getBinding(): Binding|SharedBinding|null {
 		return $this->binding;
 	}
 }

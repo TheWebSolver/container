@@ -15,6 +15,7 @@ use Psr\Container\ContainerInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
+use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
 use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
 use Psr\Container\ContainerExceptionInterface as ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Traits\DependencySetter;
@@ -99,23 +100,17 @@ class ParamResolver {
 
 		$event = $this->dispatcher->dispatch( new BuildingEvent( $this->app, paramTypeWithName: $entry ) );
 
-		if ( ! $event instanceof BuildingEvent || ! ( $binding = $event->getBinding() ) ) {
+		if ( ! $event instanceof BuildingEvent || ! ( $bound = $event->getBinding() ) ) {
 			return null;
 		}
 
-		if ( ( $material = $binding->material ) instanceof Closure ) {
-			return $material();
+		if ( ! $bound instanceof SharedBinding ) {
+			return ( $value = $bound->material ) instanceof Closure ? $value() : $this->app->get( $value );
 		}
 
-		if ( $binding->isInstance() ) {
-			$this->app->setInstance( $entry, $this->ensureObject( $material, $type, $param->name, $entry ) );
+		$this->app->setInstance( $entry, $this->ensureObject( $bound->material, $type, $param->name, $entry ) );
 
-			return $this->app->get( $entry );
-		}
-
-		return is_string( $material )
-			? $this->app->get( $material )
-			: $this->ensureObject( $material, $type, $param->name, $entry );
+		return $this->app->get( $entry );
 	}
 
 	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {

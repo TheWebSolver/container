@@ -147,7 +147,7 @@ class AfterBuildHandler {
 		$args       = array( $this->getDecoratorParamFrom( $reflection )->getName() => $this->resolved );
 
 		/** @var TResolved */
-		$decorated = $this->app->resolve( $decorator, with: $args, dispatch: true, reflector: $reflection );
+		$decorated = $this->app->resolve( $decorator, $args, dispatch: true, reflector: $reflection );
 
 		return $decorated;
 	}
