@@ -153,7 +153,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/**
 	 * @param string|class-string $id
-	 * @return string|Closure|class-string Alias if not a class-string.
+	 * @return ($id is class-string ? Closure|class-string : Closure|string)
 	 * @see Container::register() For details on how entry is bound to the container.
 	 */
 	public function getConcrete( string $id ): Closure|string {
@@ -452,7 +452,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			return $this->dispatchAfterBuildingInstance( $entry, $bound->material, resolved: false );
 		}
 
-		/** @var class-string|Closure At this point, it can only be a class-string or a closure. */
 		$material = $this->getConcrete( $entry );
 		$concrete = $material instanceof Closure ? $entry : $material;
 
