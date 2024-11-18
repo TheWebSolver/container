@@ -391,9 +391,19 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	public function reset( ?string $collectionId = null ): void {
-		$props = get_object_vars( $this );
+		$userHasProvidedCollectionId = array_key_exists( key: 0, array: func_get_args() );
 
-		array_walk( $props, static fn( mixed $pool ) => $pool instanceof Resettable && $pool->reset( $collectionId ) );
+		foreach ( get_object_vars( $this ) as $stack ) {
+			if ( ! $stack instanceof Resettable ) {
+				continue;
+			}
+
+			if ( $userHasProvidedCollectionId ) {
+				$stack->reset( $collectionId );
+			} else {
+				$stack->reset();
+			}
+		}
 	}
 
 	/*
