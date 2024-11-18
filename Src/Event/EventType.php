@@ -9,9 +9,11 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Event;
 
+use Closure;
 use LogicException;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BuildingListenerProvider;
@@ -57,19 +59,27 @@ enum EventType {
 		return match ( $this ) {
 			EventType::BeforeBuild => $entry,
 			EventType::Building    => self::assertParamNameProvided( $entry, $paramName ),
-			EventType::AfterBuild  => self::assertConcreteIsString( $app->getConcrete( $entry ), $entry )
+			EventType::AfterBuild  => self::assertConcreteIsString( $app, $entry )
 		};
 	}
 
 	private static function assertParamNameProvided( string $entry, ?string $paramName ): string {
-		return $paramName ? "$entry:$paramName" : throw new LogicException(
-			"Parameter name is required when adding event listener during build for entry {$entry}."
-		);
+		return $paramName
+			? "$entry:$paramName"
+			: throw new LogicException(
+				"Parameter name is required when adding event listener during build for entry {$entry}."
+			);
 	}
 
-	private static function assertConcreteIsString( string|object $concrete, string $entry ): string {
-		return is_string( $concrete ) ? $concrete : throw new LogicException(
-			"The concrete must be a string when adding event listener after build for entry {$entry}."
-		);
+	private static function assertConcreteIsString( Container $app, string $entry ): string {
+		if ( ! ( $bound = $app->getBinding( $entry ) ) || $bound instanceof SharedBinding ) {
+			return $entry;
+		}
+
+		return ! ( $classname = $bound->material ) instanceof Closure
+			? $classname
+			: throw new LogicException(
+				"The concrete must be a string when adding event listener after build for entry {$entry}."
+			);
 	}
 }
