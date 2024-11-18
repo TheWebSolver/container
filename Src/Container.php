@@ -423,21 +423,25 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$bound           = $this->getBinding( $entry );
 
 		if ( $bound instanceof SharedBinding ) {
-			return $dispatch ? $this->afterBuildingInstance( $entry, $bound->material ) : $bound->material;
+			$object = $dispatch ? $this->afterBuildingInstance( $entry, $bound->material ) : $bound->material;
+
+			unset( $this->reflector );
+
+			return $object;
 		}
 
 		$concrete  = ! $bound ? $entry : $bound->material;
 		$classname = $concrete instanceof Closure ? $entry : $concrete;
 
-		$this->dependencies->push(
-			value: $dispatch ? $this->beforeBuilding( $classname, $args ) : $args
-		);
+		$this->dependencies->push( $dispatch ? $this->beforeBuilding( $classname, $args ) : $args );
 
 		$built = $this->build( $concrete, $dispatch );
 
 		$this->dependencies->pull();
 
 		if ( ! $this->isResolvedAsObject( $classname, $built ) ) {
+			unset( $this->reflector );
+
 			return $built;
 		}
 
