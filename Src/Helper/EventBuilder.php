@@ -15,6 +15,7 @@ use Closure;
 use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
+use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
 final class EventBuilder {
@@ -25,6 +26,14 @@ final class EventBuilder {
 		private EventType $type,
 		private ListenerRegistry $registry
 	) {}
+
+	public static function buildWith( EventType $type, Container $app, EventManager $manager ): self {
+		return ( $registry = $manager->getDispatcher( $type ) )
+			? new self( $app, $type, $registry )
+			: throw new LogicException(
+				message: sprintf( 'Cannot add Event Listener for the "%s" Event Type.', $type->name )
+			);
+	}
 
 	/**
 	 * @throws LogicException When param name not passed for `EventType::Building`, or

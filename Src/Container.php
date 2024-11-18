@@ -183,8 +183,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 	}
 
-	public function getContextual( string $id, string $typeHintOrParamName ): Closure|string|null {
-		return $this->contextual->get( $this->getEntryFrom( $id ), $typeHintOrParamName );
+	/** @param string $concrete Class|method name for whom {@param $typeHintOrParamName} is contextually bound. */
+	public function getContextual( string $concrete, string $typeHintOrParamName ): Closure|string|null {
+		return $this->contextual->get( $concrete, $typeHintOrParamName );
 	}
 
 	/**
@@ -312,18 +313,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @throws LogicException When unregistered Event Dispatcher provided to add event listener.
 	 */
 	public function when( EventType|string|array|Closure $concrete ): ContextBuilder|EventBuilder {
-		if ( $concrete instanceof EventType ) {
-			return ( $registry = $this->eventManager->getDispatcher( $concrete ) )
-				? new EventBuilder( app: $this, type: $concrete, registry: $registry )
-				: throw new LogicException(
-					message: sprintf( 'Cannot add Event Listener for the "%s" Event Type.', $concrete->name )
-				);
-		}
-
-		$concrete = $concrete instanceof Closure ? Unwrap::forBinding( $concrete ) : $concrete;
-		$ids      = array_map( $this->getEntryFrom( ... ), array: Unwrap::asArray( $concrete ) );
-
-		return new ContextBuilder( for: $ids, app: $this, contextual: $this->contextual );
+		return $concrete instanceof EventType
+			? EventBuilder::buildWith( $concrete, $this, $this->eventManager )
+			: ContextBuilder::buildWith( $concrete, $this, $this->contextual );
 	}
 
 	/** @return iterable<int,object> */

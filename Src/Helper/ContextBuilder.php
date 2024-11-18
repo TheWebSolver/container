@@ -13,22 +13,31 @@ use Closure;
 use Generator;
 use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
+use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack as Context;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 
 final class ContextBuilder {
 	protected string $constraint;
 
 	/**
-	 * @param string[]                                     $for
-	 * @param Container                                    $app
-	 * @param CollectionStack<string,Closure|class-string> $contextual
+	 * @param string[]                             $ids
+	 * @param Container                            $app
+	 * @param Context<string,Closure|class-string> $contextual
 	 */
 	public function __construct(
-		private readonly array $for,
+		private readonly array $ids,
 		private readonly Container $app,
-		private readonly CollectionStack $contextual
+		private readonly Context $contextual
 	) {}
+
+	/** @param string|string[]|Closure $concrete */
+	public static function buildWith( string|array|Closure $concrete, Container $app, Context $stack ): self {
+		return new self(
+			ids: Unwrap::asArray( $concrete instanceof Closure ? Unwrap::forBinding( $concrete ) : $concrete ),
+			app: $app,
+			contextual: $stack
+		);
+	}
 
 	public function needs( string $constraint ): self {
 		$this->constraint = $constraint;
@@ -37,7 +46,7 @@ final class ContextBuilder {
 	}
 
 	public function give( Closure|string $value ): void {
-		foreach ( $this->for as $id ) {
+		foreach ( $this->ids as $id ) {
 			$this->contextual->set( $this->app->getEntryFrom( $id ), $value, index: $this->getConstraint() );
 		}
 	}
@@ -66,7 +75,7 @@ final class ContextBuilder {
 	private function getConstraint(): string {
 		return $this->constraint ?: throw new LogicException(
 			sprintf(
-				'The dependency to be resolved must be provided for using method "%1$s".',
+				'The dependency to be resolved must be provided using method "%1$s".',
 				self::class . '::needs()'
 			)
 		);

@@ -236,11 +236,11 @@ class ContainerTest extends TestCase {
 		$this->assertInstanceOf( expected: Stack::class, actual: $this->app->get( $class )->getStack() );
 	}
 
-	public function testContextualBindingWithAliasing(): void {
+	public function testContextualBindingNeedsConcreteInsteadOfAliasToGetContextualData(): void {
 		$this->app->setAlias( entry: Binding::class, alias: 'test' );
 		$this->app->when( 'test' )->needs( '$material' )->give( static fn() => 'update' );
 
-		$this->assertSame( 'update', $this->app->getContextual( 'test', '$material' )() );
+		$this->assertSame( 'update', $this->app->getContextual( Binding::class, '$material' )() );
 		$this->assertSame( 'update', $this->app->get( 'test' )->material );
 
 		$this->app->setAlias( entry: _Stack__ContextualBindingWithArrayAccess__Stub::class, alias: 'stack' );
@@ -250,7 +250,10 @@ class ContainerTest extends TestCase {
 
 		$this->app->when( 'stack' )->needs( ArrayAccess::class )->give( static fn() => $stub );
 
-		$this->assertSame( $stub, $this->app->getContextual( 'stack', ArrayAccess::class )() );
+		$this->assertSame(
+			$stub,
+			$this->app->getContextual( _Stack__ContextualBindingWithArrayAccess__Stub::class, ArrayAccess::class )()
+		);
 		$this->assertSame( $stub, $this->app->get( JustTest__Stub::class )->array );
 	}
 
