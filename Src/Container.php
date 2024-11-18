@@ -181,13 +181,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		array $params = array(),
 		?string $defaultMethod = null
 	): mixed {
-		$resolved = ( new MethodResolver( $this, $this->artefact ) )
+		return ( new MethodResolver( $this, $this->artefact ) )
 			->usingEventDispatcher( $this->eventManager->getDispatcher( EventType::Building ) )
 			->withCallback( $callback, $defaultMethod )
 			->withParameter( $params )
 			->resolve();
-
-		return $resolved;
 	}
 
 	/**
@@ -275,7 +273,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param string|class-string|callable|null $concrete
 	 */
 	public function set( string $id, callable|string|null $concrete = null ): void {
-		$this->register( $id, concreteOrAlias: $concrete ?? $id, singleton: false );
+		$this->register( $id, concreteOrAlias: $concrete ?? $id, shared: false );
 	}
 
 	/**
@@ -283,7 +281,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param class-string|callable|null $concrete
 	 */
 	public function setShared( string $id, callable|string|null $concrete = null ): void {
-		$this->register( $id, concreteOrAlias: $concrete ?? $id, singleton: true );
+		$this->register( $id, concreteOrAlias: $concrete ?? $id, shared: true );
 	}
 
 	/**
@@ -419,12 +417,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param string|class-string          $id
 	 * @param string|class-string|callable $concreteOrAlias
 	 */
-	protected function register( string $id, callable|string $concreteOrAlias, bool $singleton ): void {
+	protected function register( string $id, callable|string $concreteOrAlias, bool $shared ): void {
 		$this->maybePurgeIfAliasOrInstance( $id );
 
 		$material = is_callable( $concreteOrAlias ) ? $concreteOrAlias( ... ) : $this->getEntryFrom( $concreteOrAlias );
 
-		$this->bindings->set( key: $id, value: new Binding( $material, $singleton ) );
+		$this->bindings->set( key: $id, value: new Binding( $material, $shared ) );
 
 		if ( $this->hasResolved( $id ) ) {
 			$this->rebound( $id );
@@ -438,43 +436,33 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		bool $dispatch,
 		?ReflectionClass $reflector = null
 	): mixed {
-		$entry           = $this->getEntryFrom( $id );
 		$this->reflector = $reflector;
+		$entry           = $this->getEntryFrom( $id );
 		$bound           = $this->getBinding( $entry );
 
 		if ( $bound instanceof SharedBinding ) {
-			if ( ! $dispatch ) {
-				return $bound->material;
-			}
-
-			$this->prepareReflectorAfterBuilding( $entry, $bound->material );
-
-			return $this->dispatchAfterBuildingInstance( $entry, $bound->material, resolved: false );
+			return $dispatch ? $this->afterBuildingInstance( $entry, $bound->material ) : $bound->material;
 		}
 
-		$material = $this->getConcrete( $entry );
-		$concrete = $material instanceof Closure ? $entry : $material;
+		$concrete  = ! $bound ? $entry : $bound->material;
+		$classname = $concrete instanceof Closure ? $entry : $concrete;
 
 		$this->dependencies->push(
-			value: $dispatch ? $this->dispatchBeforeBuilding( entry: $concrete, params: $args ) : $args
+			value: $dispatch ? $this->beforeBuilding( $classname, $args ) : $args
 		);
 
-		$built = $this->build( $material, $dispatch );
+		$built = $this->build( $concrete, $dispatch );
 
 		$this->dependencies->pull();
 
-		if ( ! $this->isResolvedAsObject( $concrete, $built ) ) {
+		if ( ! $this->isResolvedAsObject( $classname, $built ) ) {
 			return $built;
 		}
 
-		if ( $dispatch ) {
-			$this->prepareReflectorAfterBuilding( $concrete, $built );
-		}
-
-		$object = match ( $shared = $this->shouldBeSingleton( $entry ) ) {
-			false => $dispatch ? $this->dispatchAfterBuilding( $concrete, $built ) : $built,
+		$object = match ( $shared = $this->shouldBeShared( $entry ) ) {
+			false => $dispatch ? $this->afterBuilding( $classname, $built ) : $built,
 			true  => $dispatch
-				? $this->dispatchAfterBuildingInstance( $entry, $built, resolved: true )
+				? $this->afterBuildingInstance( $entry, $built, resolved: true )
 				: $this->setInstance( $entry, $built )
 		};
 
@@ -492,16 +480,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $built instanceof $concrete;
 	}
 
-	protected function shouldBeSingleton( string $entry ): bool {
-		return ( $bound = $this->getBinding( $entry ) )
-			&& $bound instanceof Binding
-			&& $bound->isShared;
+	protected function shouldBeShared( string $entry ): bool {
+		return ( $binding = $this->getBinding( $entry ) ) && $binding instanceof Binding && $binding->isShared;
 	}
 
 	protected function fromContextual( string $constraint ): Closure|string|null {
-		return ( $artefact = $this->artefact->latest() )
-			? $this->getContextual( $artefact, $constraint )
-			: null;
+		return ( $current = $this->artefact->latest() ) ? $this->getContextual( $current, $constraint ) : null;
 	}
 
 	protected function maybePurgeIfAliasOrInstance( string $id ): void {
@@ -517,27 +501,29 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @template T
 	 */
 	private function build( string|Closure $concrete, bool $dispatch = true ): mixed {
+		$args = $this->dependencies->latest() ?? array();
+
 		if ( $concrete instanceof Closure ) {
-			return $concrete( $this, $this->dependencies->latest() ?? array() );
+			return $concrete( $this, $args );
 		}
 
 		try {
 			$reflector       = $this->reflector ?? Unwrap::classReflection( $concrete );
 			$this->reflector = $reflector;
-		} catch ( ReflectionException | LogicException $e ) {
-			throw ContainerError::whenResolving( entry: $concrete, exception: $e, artefact: $this->artefact );
+		} catch ( ReflectionException | LogicException $exception ) {
+			throw ContainerError::whenResolving( $concrete, $exception, $this->artefact );
 		}
 
 		if ( null === ( $constructor = $reflector->getConstructor() ) ) {
 			return new $concrete();
 		}
 
-		$this->artefact->push( value: $concrete );
+		$this->artefact->push( $concrete );
 
 		try {
 			$dispatcher = $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null;
 			$resolved   = ( new ParamResolver( $this ) )
-				->withParameter( $this->dependencies->latest() ?? array(), $constructor->getParameters() )
+				->withParameter( $args, reflections: $constructor->getParameters() )
 				->usingEventDispatcher( $dispatcher )
 				->resolve();
 		} catch ( ContainerExceptionInterface $e ) {
@@ -546,35 +532,36 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->artefact->pull();
 
-		return $reflector->newInstanceArgs( args: $resolved );
+		return $reflector->newInstanceArgs( $resolved );
 	}
 
 	/**
 	 * @param array<string,mixed>|ArrayAccess<object|string,mixed> $params
 	 * @return array<string,mixed>|ArrayAccess<object|string,mixed>
 	 */
-	private function dispatchBeforeBuilding( string $entry, array|ArrayAccess $params ): array|ArrayAccess {
+	private function beforeBuilding( string $entry, array|ArrayAccess $params ): array|ArrayAccess {
 		$event = $this->eventManager
 			->getDispatcher( EventType::BeforeBuild )
 			?->dispatch( new BeforeBuildEvent( $entry, $params ) );
 
-		return $event instanceof BeforeBuildEvent && ( $eventParams = $event->getParams() ) ? $eventParams : $params;
+		return $event instanceof BeforeBuildEvent && ( $args = $event->getParams() ) ? $args : $params;
 	}
 
-	private function dispatchAfterBuilding( string $id, object $resolved ): object {
+	private function afterBuilding( string $eventId, object $resolved ): object {
 		$dispatcher = $this->eventManager->getDispatcher( EventType::AfterBuild );
+		$reflector  = $this->getReflectionForEventHandler( $eventId, $resolved );
 
-		return AfterBuildHandler::handleWith( $this, $id, $resolved, $this->artefact, $this->reflector, $dispatcher );
+		return AfterBuildHandler::handleWith( $this, $eventId, $resolved, $this->artefact, $reflector, $dispatcher );
 	}
 
-	private function dispatchAfterBuildingInstance( string $entry, object $built, bool $resolved ): object {
+	private function afterBuildingInstance( string $entry, object $built, bool $resolved = false ): object {
 		if ( $this->resolvedInstances->has( key: $entry ) ) {
 			return $built;
 		}
 
 		$baseClass = $built::class;
 		$eventId   = $resolved ? $baseClass : $entry;
-		$built     = $this->dispatchAfterBuilding( $eventId, $built );
+		$built     = $this->afterBuilding( $eventId, $built );
 
 		$this->eventManager->getDispatcher( EventType::AfterBuild )?->reset( $eventId );
 		$this->resolvedInstances->set( key: $entry, value: array( $baseClass => $built::class ) );
@@ -582,10 +569,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->setInstance( $entry, $built );
 	}
 
-	/** @param class-string|object $concrete */
-	private function prepareReflectorAfterBuilding( string $entry, string|object $concrete ): ?ReflectionClass {
-		return $this->isListenerFetchedFrom( $entry, attributeName: DecorateWith::class )
-			? $this->reflector   = null
-			: $this->reflector ??= new ReflectionClass( $concrete );
+	private function getReflectionForEventHandler( string $entry, object $resolved ): ?ReflectionClass {
+		return ! $this->isListenerFetchedFrom( $entry, attributeName: DecorateWith::class )
+			? $this->reflector ?? new ReflectionClass( $resolved )
+			: null;
 	}
 }
