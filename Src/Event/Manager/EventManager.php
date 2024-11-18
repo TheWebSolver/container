@@ -12,9 +12,10 @@ namespace TheWebSolver\Codegarage\Lib\Container\Event\Manager;
 use WeakMap;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
+use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
-class EventManager {
+class EventManager implements Resettable {
 	/** @var WeakMap<EventType,(EventDispatcherInterface &ListenerRegistry)|false|null> */
 	private WeakMap $eventDispatchers;
 
@@ -57,5 +58,22 @@ class EventManager {
 
 	public function isDispatcherAssigned( EventType $eventType ): bool {
 		return true === ( $this->assignedEventTypes[ $eventType->name ] ?? false );
+	}
+
+	public function reset( ?string $collectionId = null ): void {
+		$idProvided = array_key_exists( key: 0, array: func_get_args() );
+
+		foreach ( $this->eventDispatchers as $dispatcher ) {
+			if ( ! $dispatcher ) {
+				continue;
+			}
+
+			if ( $idProvided ) {
+				$dispatcher->reset( $collectionId );
+			} else {
+				$dispatcher->reset( collectionId: null );
+				$dispatcher->reset( collectionId: '' );
+			}
+		}
 	}
 }

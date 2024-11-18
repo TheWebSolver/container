@@ -13,6 +13,7 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Tests\Event;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
@@ -28,9 +29,9 @@ class EventManagerTest extends TestCase {
 		$this->manager = new EventManager();
 	}
 
-	private function createDispatcherStub(): EventDispatcher {
-		/** @var EventDispatcher */
-		$dispatcher = $this->createStub( EventDispatcher::class );
+	private function createDispatcherMock(): EventDispatcher&MockObject {
+		/** @var EventDispatcher&MockObject */
+		$dispatcher = $this->createMock( EventDispatcher::class );
 
 		return $dispatcher;
 	}
@@ -42,28 +43,35 @@ class EventManagerTest extends TestCase {
 		$this->assertTrue( $this->manager->isDispatcherDisabled( EventType::BeforeBuild ) );
 		$this->assertTrue( $this->manager->isDispatcherAssigned( EventType::BeforeBuild ) );
 		$this->assertFalse(
-			condition: $this->manager->setDispatcher( $this->createDispatcherStub(), EventType::BeforeBuild ),
+			condition: $this->manager->setDispatcher( $this->createDispatcherMock(), EventType::BeforeBuild ),
 			message: 'Suppressed Event Dispatcher shall not be able to be re-assigned for same event type.'
 		);
 	}
 
 	public function testEventManagerSetterGetter(): void {
 		$this->assertEventDispatchersAssignedStatus( expected: false );
-		$this->assertTrue( $this->manager->setDispatcher( $beforeBuild = $this->createDispatcherStub(), EventType::BeforeBuild ) );
-		$this->assertTrue( $this->manager->setDispatcher( $building = $this->createDispatcherStub(), EventType::Building ) );
+		$this->assertTrue( $this->manager->setDispatcher( $beforeBuild = $this->createDispatcherMock(), EventType::BeforeBuild ) );
+		$this->assertTrue( $this->manager->setDispatcher( $building = $this->createDispatcherMock(), EventType::Building ) );
 		$this->assertFalse(
-			condition: $this->manager->setDispatcher( $this->createDispatcherStub(), EventType::Building ),
+			condition: $this->manager->setDispatcher( $this->createDispatcherMock(), EventType::Building ),
 			message: 'Already assigned Event Dispatcher shall not be able to be re-assigned for same event type.'
 		);
 		$this->assertSame( $beforeBuild, $this->manager->getDispatcher( EventType::BeforeBuild ) );
 		$this->assertSame( $building, $this->manager->getDispatcher( EventType::Building ) );
 		$this->assertNull( $this->manager->getDispatcher( EventType::AfterBuild ) );
 		$this->assertTrue(
-			condition: $this->manager->setDispatcher( $afterBuild = $this->createDispatcherStub(), EventType::AfterBuild ),
+			condition: $this->manager->setDispatcher( $afterBuild = $this->createDispatcherMock(), EventType::AfterBuild ),
 			message: 'Must be able to assign dispatcher if not previously set.'
 		);
 		$this->assertSame( $afterBuild, $this->manager->getDispatcher( EventType::AfterBuild ) );
 		$this->assertEventDispatchersAssignedStatus( expected: true );
+
+		foreach ( array( $beforeBuild, $building, $afterBuild ) as $dispatcher ) {
+			$dispatcher->expects( $this->exactly( 3 ) )->method( 'reset' );
+		}
+
+		$this->manager->reset();
+		$this->manager->reset( null );
 	}
 
 	private function assertEventDispatchersAssignedStatus( bool $expected ): void {
