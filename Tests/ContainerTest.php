@@ -421,28 +421,28 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 10, actual: $this->app->call( array( $test, 'addsTen' ) ) );
 
-		$this->assertSame( expected: 30, actual: $this->app->call( $test, params: array( 'val' => 25 ) ) );
+		$this->assertSame( expected: 30, actual: $this->app->call( $test, array( 'val' => 25 ) ) );
 		$this->assertSame(
 			expected: 30,
-			actual: $this->app->call( $test, params: array( 'val' => 25 ), defaultMethod: 'no effect' )
+			actual: $this->app->call( $test, array( 'val' => 25 ), 'no effect' )
 		);
 
 		$this->assertSame(
 			expected: 130,
-			actual: $this->app->call( $test::class, params: array( 'val' => 125 ), defaultMethod: '__invoke' )
+			actual: $this->app->call( $test::class, array( 'val' => 125 ), '__invoke' )
 		);
 		$this->assertSame(
 			expected: 127,
-			actual: $this->app->call( $test::class, params: array( 'val' => 125 ), defaultMethod: 'get' )
+			actual: $this->app->call( $test::class, array( 'val' => 125 ), 'get' )
 		);
 		$this->assertSame(
 			expected: 140,
-			actual: $this->app->call( $testGetString, params: array( 'val' => 138 ) )
+			actual: $this->app->call( $testGetString, array( 'val' => 138 ) )
 		);
 
 		$this->assertSame(
 			expected: 40,
-			actual: $this->app->call( $test->addsTen( ... ), params: array( 'val' => 30 ), defaultMethod: 'no effect' )
+			actual: $this->app->call( $test->addsTen( ... ), array( 'val' => 30 ), 'no effect' )
 		);
 
 		$this->app->setMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
@@ -458,7 +458,7 @@ class ContainerTest extends TestCase {
 		$this->assertSame( expected: 150, actual: $this->app->call( $testGetString ) );
 		$this->assertSame(
 			expected: 150,
-			actual: $this->app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'get' ),
+			actual: $this->app->call( $test::class, array( 'val' => 490 ), 'get' ),
 			message: 'Coz "$test::get" is already bound ($testGetString), we get binding result instead.'
 		);
 
@@ -469,7 +469,7 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame(
 			expected: 500,
-			actual: $this->app->call( $test::class, params: array( 'val' => 490 ), defaultMethod: 'addsTen' )
+			actual: $this->app->call( $test::class, array( 'val' => 490 ), 'addsTen' )
 		);
 	}
 

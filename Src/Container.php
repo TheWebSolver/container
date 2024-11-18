@@ -152,39 +152,19 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/**
-	 * @param string|class-string $id
-	 * @return ($id is class-string ? Closure|class-string : Closure|string)
-	 * @see Container::register() For details on how entry is bound to the container.
-	 */
-	public function getConcrete( string $id ): Closure|string {
-		return ( ! $bound = $this->getBinding( $id ) ) || $bound instanceof SharedBinding
-			? $id
-			: $bound->material;
-	}
-
-	/** @param array<string,mixed>|ArrayAccess<object|string,mixed> $params */
-	public function resolveWithoutEvents( string $id, array|ArrayAccess $params = array() ): mixed {
-		return $this->resolve( $id, $params, dispatch: false );
-	}
-
-	/**
-	 * @param callable|string     $callback Possible options are:
+	 * @param callable|string     $func Possible options are:
 	 * - `string`   -> 'classname::methodname'
 	 * - `string`   -> 'classname#' . spl_object_id($classInstance) . '::methodname'
 	 * - `callable` -> $classInstance->methodname(...) as first-class callable
 	 * - `callable` -> array($classInstance, 'methodname').
-	 * @param array<string,mixed> $params The method's injected parameters.
+	 * @param array<string,mixed> $args The method's injected parameters.
 	 * @throws BadResolverArgument When method cannot be resolved or no `$default`.
 	 */
-	public function call(
-		callable|string $callback,
-		array $params = array(),
-		?string $defaultMethod = null
-	): mixed {
+	public function call( callable|string $func, array $args = array(), ?string $default = null ): mixed {
 		return ( new MethodResolver( $this, $this->artefact ) )
 			->usingEventDispatcher( $this->eventManager->getDispatcher( EventType::Building ) )
-			->withCallback( $callback, $defaultMethod )
-			->withParameter( $params )
+			->withCallback( $func, $default )
+			->withParameter( $args )
 			->resolve();
 	}
 
@@ -209,12 +189,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/**
 	 * @access private
-	 * @internal This should never be used as an API to get the contextual
-	 *           data except when resolving the current artefact.
+	 * @internal This should never be used as an API to get the contextual data.
+	 *           This is used internally when resolving the current artefact.
 	 */
 	public function getContextualFor( string $typeHintOrParamName ): Closure|string|null {
-		if ( null !== ( $bound = $this->fromContextual( $typeHintOrParamName ) ) ) {
-			return $bound;
+		if ( null !== ( $contextualBinding = $this->fromContextual( $typeHintOrParamName ) ) ) {
+			return $contextualBinding;
 		}
 
 		if ( ! $this->aliases->has( id: $typeHintOrParamName, asEntry: true ) ) {
@@ -222,8 +202,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		}
 
 		foreach ( $this->aliases->get( id: $typeHintOrParamName, asEntry: true ) as $alias ) {
-			if ( null !== ( $bound = $this->fromContextual( $alias ) ) ) {
-				return $bound;
+			if ( null !== ( $contextualBinding = $this->fromContextual( $alias ) ) ) {
+				return $contextualBinding;
 			}
 		}
 
@@ -244,8 +224,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	*/
 
 	/**
-	 * @param string               $key
-	 * @param callable|string|null $value
+	 * @param string|class-string               $key
+	 * @param string|class-string|callable|null $value
 	 */
 	public function offsetSet( $key, $value ): void {
 		$this->set( id: $key, concrete: $value );
@@ -416,7 +396,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @param string $id The abstract or a concrete/alias.
 	 */
 	protected function rebound( string $id ): void {
-		$updated = $this->resolveWithoutEvents( $id );
+		$updated = $this->resolve( $id, args: array(), dispatch: false );
 
 		foreach ( ( $this->rebounds->get( $id ) ?? array() ) as $listener ) {
 			$listener( $updated, $this );
