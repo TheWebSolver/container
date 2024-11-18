@@ -25,6 +25,11 @@ interface ListenerRegistry extends Resettable {
 
 	/**
 	 * Verifies if current registry has listeners attached.
+	 *
+	 * Listeners existence must be checked in all of these scenarios:
+	 * - `null`             - Check for listeners registered without entries.
+	 * - `empty-string`     - Check for listeners registered only with entries.
+	 * - `non-empty-string` - Check for listeners registered only with the particular entry.
 	 */
 	public function hasListeners( ?string $forEntry = null ): bool;
 

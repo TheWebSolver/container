@@ -145,6 +145,13 @@ class ProvidersTest extends TestCase {
 		$registrar->addListener( $third, self::class, -1 );
 		$registrar->addListener( $parent, parent::class, 5 );
 
+		$this->assertTrue( $registrar->hasListeners( null ) );
+		$this->assertTrue( $registrar->hasListeners( '' ) );
+
+		foreach ( array( self::class, parent::class ) as $entry ) {
+			$this->assertTrue( $registrar->hasListeners( $entry ) );
+		}
+
 		$this->assertSame( array( 10 => array( $global ) ), $registrar->getListeners() );
 		$this->assertSame( array( 5 => array( $parent ) ), $registrar->getListeners( forEntry: parent::class ) );
 		$this->assertSame(
@@ -175,6 +182,35 @@ class ProvidersTest extends TestCase {
 		$invalidListeners = $registrar->getListenersForEvent( $this );
 
 		$this->assertEmpty( $invalidListeners->current() );
+
+		$registrar->reset( parent::class );
+
+		$this->assertFalse( $registrar->hasListeners( parent::class ) );
+		$this->assertTrue( $registrar->hasListeners( self::class ) );
+		$this->assertTrue( $registrar->hasListeners( '' ) );
+
+		$registrar->reset( '' );
+
+		$this->assertFalse(
+			condition: $registrar->hasListeners( '' ),
+			message: 'Listeners for entries must be reset when empty string passed.'
+		);
+
+		foreach ( array( self::class, parent::class ) as $entry ) {
+			$this->assertFalse( $registrar->hasListeners( $entry ) );
+		}
+
+		$this->assertTrue(
+			condition: $registrar->hasListeners(),
+			message: 'Listeners without entries must not be reset when empty string passed.'
+		);
+
+		$registrar->reset();
+
+		$this->assertFalse(
+			condition: $registrar->hasListeners(),
+			message: 'Listeners without entries must be reset when null (default value) passed.'
+		);
 	}
 
 	public function testListenerProviderWithCompiledListenersAsArray(): void {

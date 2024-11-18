@@ -64,7 +64,7 @@ trait ListenerRegistrar {
 	}
 
 	public function hasListeners( ?string $forEntry = null ): bool {
-		return ! empty( $this->getListeners( $forEntry ) );
+		return ! empty( $this->getListenersRegistered( $forEntry ) );
 	}
 
 	public function getListeners( ?string $forEntry = null ): array {
@@ -76,15 +76,7 @@ trait ListenerRegistrar {
 	}
 
 	public function reset( ?string $collectionId = null ): void {
-		if ( ! $collectionId ) {
-			$this->listeners = array();
-
-			return;
-		}
-
-		if ( isset( $this->listenersForEntry[ $collectionId ] ) ) {
-			$this->listenersForEntry[ $collectionId ] = array();
-		}
+		$this->resetListenersRegistered( $collectionId );
 	}
 
 	/** @return Generator */
@@ -141,5 +133,22 @@ trait ListenerRegistrar {
 
 	private function currentPrioritySet( string $forType ): int {
 		return $this->priorities[ $forType ];
+	}
+
+	/** @return array<int|string,array<int,array<int,callable>|callable>> */
+	private function getListenersRegistered( ?string $id ): array {
+		return match ( $id ) {
+			null    => $this->listeners,
+			''      => $this->listenersForEntry,
+			default => $this->listenersForEntry[ $id ] ?? array()
+		};
+	}
+
+	private function resetListenersRegistered( ?string $id ): void {
+		match ( $id ) {
+			null    => ( $this->listeners = array() ),
+			''      => ( $this->listenersForEntry = array() ),
+			default => isset( $this->listenersForEntry[ $id ] ) && ( $this->listenersForEntry[ $id ] = array() )
+		};
 	}
 }
