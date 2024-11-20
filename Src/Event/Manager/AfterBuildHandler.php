@@ -10,7 +10,6 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Event\Manager;
 
 use Closure;
-use LogicException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionParameter;
@@ -18,6 +17,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
+use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
 use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
@@ -69,7 +69,7 @@ class AfterBuildHandler {
 			$artefact->pull();
 
 			return $handler->resolved;
-		} catch ( ReflectionException | LogicException $exception ) {
+		} catch ( ReflectionException | LogicalError $exception ) {
 			// "BadResolverArgument" is not caught. It is not part of the container error.
 			throw ContainerError::whenResolving( $handler->getLastDecorator() ?? $entry, $exception, $artefact );
 		}
@@ -104,7 +104,7 @@ class AfterBuildHandler {
 	 * @return TResolved
 	 * @throws BadResolverArgument When `$resolved` Parameter could not be determined in decorator class.
 	 * @throws ReflectionException When decorator class is provided but it is not a valid class-string.
-	 * @throws LogicException      When decorator class is provided but it cannot be instantiated.
+	 * @throws LogicalError        When decorator class is provided but it cannot be instantiated.
 	 */
 	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function handle( object $resolved ): object {

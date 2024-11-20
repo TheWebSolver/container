@@ -16,7 +16,6 @@ use Closure;
 use Exception;
 use TypeError;
 use ArrayAccess;
-use LogicException;
 use ReflectionClass;
 use ReflectionException;
 use Psr\Container\ContainerInterface;
@@ -31,6 +30,7 @@ use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator;
 use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
+use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
 use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
 use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
 use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
@@ -234,7 +234,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/**
 	 * @param class-string $entry
-	 * @throws LogicException When entry ID and alias is same.
+	 * @throws LogicalError When entry ID and alias is same.
 	 */
 	public function setAlias( string $entry, string $alias ): void {
 		$this->aliases->set( $entry, $alias );
@@ -310,12 +310,13 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/**
 	 * @param EventType|string|string[]|Closure $concrete Closure for instantiated class method binding.
 	 * @return ($concrete is EventType ? EventBuilder : ContextBuilder)
-	 * @throws LogicException When unregistered Event Dispatcher provided to add event listener.
+	 * @throws LogicalError When unregistered Event Dispatcher provided to add event listener.
+	 * @throws LogicalError When contextual $concrete is first-class callable created using a static method.
 	 */
 	public function when( EventType|string|array|Closure $concrete ): ContextBuilder|EventBuilder {
 		return $concrete instanceof EventType
-			? EventBuilder::buildWith( $concrete, $this, $this->eventManager )
-			: ContextBuilder::buildWith( $concrete, $this, $this->contextual );
+			? EventBuilder::create( $concrete, $this, $this->eventManager )
+			: ContextBuilder::create( $concrete, $this, $this->contextual );
 	}
 
 	/** @return iterable<int,object> */
@@ -355,7 +356,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	public function removeInstance( string $entry ): bool {
-		return $this->isInstance( $entry ) && $this->bindings->remove( key: $entry );
+		return $this->isInstance( $entry ) && $this->bindings->remove( $entry );
 	}
 
 	public function removeResolved( string $entry ): bool {
@@ -445,7 +446,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			return $built;
 		}
 
-		$object = match ( $shared = $this->shouldBeShared( $entry ) ) {
+		$object = match ( $shared = $this->shouldBeShared( $bound ) ) {
 			false => $dispatch ? $this->afterBuilding( $classname, $built ) : $built,
 			true  => $dispatch
 				? $this->afterBuildingInstance( $entry, $built, resolved: true )
@@ -466,8 +467,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $built instanceof $concrete;
 	}
 
-	protected function shouldBeShared( string $entry ): bool {
-		return ( $binding = $this->getBinding( $entry ) ) && $binding instanceof Binding && $binding->isShared;
+	protected function shouldBeShared( ?Binding $binding ): bool {
+		return $binding?->isShared ?? false;
 	}
 
 	protected function fromContextual( string $constraint ): Closure|string|null {
@@ -496,7 +497,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		try {
 			$reflector       = $this->reflector ?? Unwrap::classReflection( $concrete );
 			$this->reflector = $reflector;
-		} catch ( ReflectionException | LogicException $exception ) {
+		} catch ( ReflectionException | LogicalError $exception ) {
 			throw ContainerError::whenResolving( $concrete, $exception, $this->artefact );
 		}
 
@@ -507,10 +508,9 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->artefact->push( $concrete );
 
 		try {
-			$dispatcher = $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null;
-			$resolved   = ( new ParamResolver( $this ) )
+			$resolved = ( new ParamResolver( $this ) )
+				->usingEventDispatcher( $dispatch ? $this->eventManager->getDispatcher( EventType::Building ) : null )
 				->withParameter( $args, reflections: $constructor->getParameters() )
-				->usingEventDispatcher( $dispatcher )
 				->resolve();
 		} catch ( ContainerExceptionInterface $e ) {
 			throw $e;

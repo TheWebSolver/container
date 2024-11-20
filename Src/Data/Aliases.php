@@ -9,8 +9,8 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Data;
 
-use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
+use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
 use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
 use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
@@ -31,11 +31,11 @@ class Aliases implements Resettable {
 
 	/**
 	 * @param class-string $entry
-	 * @throws LogicException When entry ID and alias is same.
+	 * @throws LogicalError When entry ID and alias is same.
 	 */
 	public function set( string $entry, string $alias ): void {
 		if ( $alias === $entry ) {
-			throw new LogicException( "[{$entry}] cannot be aliased by same name." );
+			throw LogicalError::entryAndAliasIsSame( $entry );
 		}
 
 		$this->stack[ $alias ] = $entry;

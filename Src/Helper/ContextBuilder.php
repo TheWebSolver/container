@@ -11,8 +11,8 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
 use Closure;
 use Generator;
-use LogicException;
 use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
 use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack as Context;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
 
@@ -31,7 +31,7 @@ final class ContextBuilder {
 	) {}
 
 	/** @param string|string[]|Closure $concrete */
-	public static function buildWith( string|array|Closure $concrete, Container $app, Context $stack ): self {
+	public static function create( string|array|Closure $concrete, Container $app, Context $stack ): self {
 		return new self(
 			ids: Unwrap::asArray( $concrete instanceof Closure ? Unwrap::forBinding( $concrete ) : $concrete ),
 			app: $app,
@@ -45,6 +45,7 @@ final class ContextBuilder {
 		return $this;
 	}
 
+	/** @throws LogicalError When this method is invoked before setting $constraint. */
 	public function give( Closure|string $value ): void {
 		foreach ( $this->ids as $id ) {
 			$this->contextual->set( $this->app->getEntryFrom( $id ), $value, index: $this->getConstraint() );
@@ -73,11 +74,6 @@ final class ContextBuilder {
 	}
 
 	private function getConstraint(): string {
-		return $this->constraint ?: throw new LogicException(
-			sprintf(
-				'The dependency to be resolved must be provided using method "%1$s".',
-				self::class . '::needs()'
-			)
-		);
+		return $this->constraint ?: throw LogicalError::contextualConstraintNotProvidedWith( method: 'needs' );
 	}
 }

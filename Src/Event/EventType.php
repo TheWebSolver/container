@@ -10,10 +10,10 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Lib\Container\Event;
 
 use Closure;
-use LogicException;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
+use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
 use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BuildingListenerProvider;
@@ -50,8 +50,8 @@ enum EventType {
 	 * - `EventType::Building`   -> The parameter type-hint (string, EventBuilder, etc).
 	 * @param string    $paramName  The type-hinted parameter name to auto-wire the param value
 	 *                              when `EventType::Building` the given {@param $id} type.
-	 * @throws LogicException       When param name not passed for `EventType::Building`, or
-	 *                              when concrete is a Closure for `EventType::AfterBuild`.
+	 * @throws LogicalError         When param name not passed for `EventType::Building`.
+	 *                              When concrete is a Closure for `EventType::AfterBuild`.
 	 */
 	public function getKeyFrom( Container $app, string $id, ?string $paramName ): string {
 		$entry = $app->getEntryFrom( $id );
@@ -64,11 +64,7 @@ enum EventType {
 	}
 
 	private static function assertParamNameProvided( string $entry, ?string $paramName ): string {
-		return $paramName
-			? "$entry:$paramName"
-			: throw new LogicException(
-				"Parameter name is required when adding event listener during build for entry {$entry}."
-			);
+		return $paramName ? "$entry:$paramName" : throw LogicalError::duringBuildEventNeedsParamName( $entry );
 	}
 
 	private static function assertConcreteIsString( Container $app, string $entry ): string {
@@ -78,8 +74,6 @@ enum EventType {
 
 		return ! ( $classname = $bound->material ) instanceof Closure
 			? $classname
-			: throw new LogicException(
-				"The concrete must be a string when adding event listener after build for entry {$entry}."
-			);
+			: throw LogicalError::afterBuildEventEntryMustBeClassname( $entry );
 	}
 }

@@ -11,16 +11,14 @@ namespace TheWebSolver\Codegarage\Lib\Container\Helper;
 
 use Closure;
 use TypeError;
-use LogicException;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionException;
 use ReflectionNamedType;
 use ReflectionParameter;
+use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
 
 class Unwrap {
-	private const NO_METHOD = 'Method name must be provided to create binding ID for class: "%s".';
-
 	/**
 	 * @param T|T[] $thing
 	 * @return T[]
@@ -39,7 +37,7 @@ class Unwrap {
 
 	/**
 	 * @return string|array{0:object,1:string}
-	 * @throws TypeError When static class member or a lambda function given as closure.
+	 * @throws LogicalError When static class member or a lambda function given as closure.
 	 * @phpstan-return ($asArray is true ? array{0:object,1:string} : string)
 	 */
 	public static function closure( Closure $closure, bool $asArray = false ) {
@@ -48,10 +46,7 @@ class Unwrap {
 			! is_null( $instance = self::asInstance( $source ) )       => $instance,
 			! is_null( $class = self::asStatic( $source, $closure ) )  => $class,
 			! is_null( $callable = self::asFirstClassFunc( $source ) ) => $callable,
-			default                                                    => throw new TypeError(
-				'Cannot unwrap closure. Currently, only supports non-static class members/'
-				. 'functions/methods and named functions.'
-			)
+			default                                                    => throw LogicalError::unwrappableClosure()
 		};
 
 		return $asArray ? $result[0] : $result[1];
@@ -60,8 +55,8 @@ class Unwrap {
 	/**
 	 * @param class-string|object $object
 	 * @return string|array{0:string|object,1:string}
-	 * @throws LogicException When method name not given if `$object` is a classname or an instance.
-	 * @throws TypeError      When first-class callable was not created using non-static method.
+	 * @throws LogicalError When method name not given if `$object` is a classname or an instance.
+	 *                       When first-class callable was not created using non-static method.
 	 * @phpstan-return ($asArray is true ? array{0:string|object,1:string} : string)
 	 */
 	public static function forBinding(
@@ -72,24 +67,20 @@ class Unwrap {
 		if ( is_string( $object ) ) {
 			return $methodName
 				? ( $asArray ? array( $object, $methodName ) : self::asString( $object, $methodName ) )
-				: throw new LogicException( sprintf( self::NO_METHOD, $object ) );
+				: throw LogicalError::noMethodNameForBinding( $object );
 		}
 
 		if ( ! $object instanceof Closure ) {
 			return method_exists( $object, $methodName )
 				? ( $asArray ? array( $object, $methodName ) : self::asString( $object, $methodName ) )
-				: throw new LogicException( sprintf( self::NO_METHOD, $object::class ) );
+				: throw LogicalError::noMethodNameForBinding( $object::class );
 		}
 
 		if ( $scoped = self::asInstance( source: new ReflectionFunction( $object ), binding: true ) ) {
 			return $asArray ? $scoped[0] : self::asString( ...$scoped[0] );
 		}
 
-		throw new TypeError(
-			'Method binding only accepts first-class callable of a named function or'
-			. ' a non-static method. Alternatively, pass an instantiated object as'
-			. ' param [#1] "$object" & its method name as param [#2] "$methodName".'
-		);
+		throw LogicalError::nonBindableClosure();
 	}
 
 	public static function paramTypeFrom( ReflectionParameter $reflection, bool $checkBuiltIn = true ): ?string {
@@ -141,12 +132,12 @@ class Unwrap {
 
 	/**
 	 * @throws ReflectionException When `$classname` is not a class-string.
-	 * @throws LogicException When non-instantiable `$classname` given.
+	 * @throws LogicalError         When non-instantiable `$classname` given.
 	 */
 	// phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Actual number is vague.
 	public static function classReflection( string $classname ): ReflectionClass {
 		return ! ( $classReflector = new ReflectionClass( $classname ) )->isInstantiable()
-			? throw new LogicException( "Non-instantiable class: {$classname}." )
+			? throw LogicalError::nonInstantiableClass( $classname )
 			: $classReflector;
 	}
 

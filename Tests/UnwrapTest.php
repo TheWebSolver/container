@@ -14,7 +14,6 @@ namespace TheWebSolver\Codegarage\Tests;
 use Closure;
 use WeakMap;
 use stdClass;
-use TypeError;
 use LogicException;
 use ReflectionException;
 use ReflectionParameter;
@@ -22,6 +21,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use TheWebSolver\Codegarage\Lib\Container\Container;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
+use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
 
 class UnwrapTest extends TestCase {
 	/** @dataProvider provideDataForArrayConversion */
@@ -65,10 +65,10 @@ class UnwrapTest extends TestCase {
 		string|array $expected,
 		object|string $object,
 		string $methodName,
-		?string $exception
+		?LogicalError $exception
 	): void {
 		if ( $exception ) {
-			$this->expectException( $exception );
+			$this->expectExceptionMessage( $exception->getMessage() );
 		}
 
 		$this->assertSame(
@@ -80,16 +80,16 @@ class UnwrapTest extends TestCase {
 	public function provideDataForMethodBinding(): array {
 		return array(
 			array( self::class . '::assertTrue', self::class, 'assertTrue', null ),
-			array( self::class, self::class, '', LogicException::class ),
-			array( 'lambda method is invalid', function () {}, '', TypeError::class ),
+			array( self::class, self::class, '', LogicalError::noMethodNameForBinding( self::class ) ),
+			array( 'lambda method is invalid', function () {}, '', LogicalError::nonBindableClosure() ),
 			array( "{$this->_gIdSpl()}assertTrue", $this, 'assertTrue', null ),
 			array( array( $this, 'assertTrue' ), $this, 'assertTrue', null ),
-			array( 'Undefined method given', $this, 'method-does-not-exist', LogicException::class ),
+			array( 'Undefined method given', $this, 'method-does-not-exist', LogicalError::noMethodNameForBinding( self::class ) ),
 			array(
 				'first-class of static method is invalid',
 				$this->assertTrue( ... ),
 				'',
-				TypeError::class,
+				LogicalError::nonBindableClosure(),
 			),
 			array(
 				"{$this->_gIdSpl()}provideDataForMethodBinding",
@@ -109,14 +109,14 @@ class UnwrapTest extends TestCase {
 				'',
 				null,
 			),
-			array( 'lambda func is invalid', _wrapped__Lambda(), '', TypeError::class ),
+			array( 'lambda func is invalid', _wrapped__Lambda(), '', LogicalError::nonBindableClosure() ),
 			array(
 				'lambda static func is invalid',
 				_wrapped__StaticLambda(),
 				'',
-				TypeError::class,
+				LogicalError::nonBindableClosure(),
 			),
-			array( 'named func is also invalid', phpinfo( ... ), '', TypeError::class ),
+			array( 'named func is also invalid', phpinfo( ... ), '', LogicalError::nonBindableClosure() ),
 		);
 	}
 
@@ -135,7 +135,7 @@ class UnwrapTest extends TestCase {
 		bool $asArray
 	): void {
 		if ( null === $expected ) {
-			$this->expectException( TypeError::class );
+			$this->expectExceptionMessage( LogicalError::unwrappableClosure()->getMessage() );
 		}
 
 		$this->assertSame( $expected, actual: Unwrap::closure( $firstClass, $asArray ) );
