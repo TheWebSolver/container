@@ -44,7 +44,7 @@ class ParamResolver {
 				default                                        => $param
 			};
 
-			$this->result->set( key: $param->getName(), value:  $param === $result ? $this->from( $param ) : $result );
+			$this->result->set( key: $param->name, value: $param === $result ? $this->from( $param ) : $result );
 		}
 
 		return $this->result->getItems();
@@ -52,7 +52,7 @@ class ParamResolver {
 
 	/** @throws ContainerError When resolving dependencies fails. */
 	public function fromUntypedOrBuiltin( ReflectionParameter $param ): mixed {
-		$value = $this->app->getContextualFor( typeHintOrParamName: "\${$param->getName()}" );
+		$value = $this->app->getContextualFor( typeHintOrParamName: "\${$param->name}" );
 
 		return null === $value
 			? static::defaultFrom( $param, error: BadResolverArgument::noParam( ref: $param ) )
@@ -122,7 +122,9 @@ class ParamResolver {
 	}
 
 	private function isApp( string $type ): bool {
-		return ContainerInterface::class === $type || Container::class === $type;
+		return ContainerInterface::class === $type
+			|| Container::class === $type
+			|| is_subclass_of( $type, Container::class );
 	}
 
 	private function maybeAddEventListenerFromAttributeOf( ReflectionParameter $param, string $entry ): void {

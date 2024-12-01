@@ -27,23 +27,15 @@ trait ListenerRegistrar {
 	);
 
 	/**
-	 * Validates whether current event is valid for listeners to be registered.
-	 *
-	 * Usually, validation id done whether the provided event is actually an
-	 * instanceof the desired event class for listeners to get registered.
+	 * Validates registered event listeners are for the given event.
 	 *
 	 * @param TEvent $event
-	 * @phpstan-assert-if-true TEvent $event
+	 * @phpstan-assert-if-true =TEvent $event
 	 */
 	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	abstract protected function isValid( object $event ): bool;
 
-	/**
-	 * Validates whether event listener should be invoked or not.
-	 *
-	 * Usually, validation is done by comparing if the event entry and current entry is same.
-	 * Also, check can be performed whether event entry is a subclass of the current entry.
-	 */
+	/** Ensures whether event listener should be listened. */
 	protected function shouldListenTo( TaggableEvent $event, string $currentEntry ): bool {
 		return $event->getEntry() === $currentEntry;
 	}

@@ -366,8 +366,8 @@ class ContainerTest extends TestCase {
 
 	public function testMethodCallForInvocableClassInstance(): void {
 		[ $test, $testGetString ] = $this->getTestClassInstanceStub();
-		$testInvokeInstance       = Unwrap::callback( cb: $test );
-		$testInvokeString         = Unwrap::asString( object: $test::class, methodName: '__invoke' );
+		$testInvokeInstance       = $test::class . '#' . spl_object_id( $test ) . '::__invoke';
+		$testInvokeString         = $test::class . '::__invoke';
 
 		$this->app->when( $testInvokeInstance )
 			->needs( '$val' )

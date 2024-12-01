@@ -63,7 +63,7 @@ class EventManager implements Resettable {
 		return $this->eventDispatchers;
 	}
 
-	protected function resetWithoutUserProvidedId( Resettable $resetter ): void {
+	protected function resetWhenCollectionIdNotProvided( Resettable $resetter ): void {
 		$resetter->reset( collectionId: null );
 		$resetter->reset( collectionId: '' );
 	}

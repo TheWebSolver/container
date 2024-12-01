@@ -16,6 +16,9 @@ use RuntimeException;
  * @template TValue
  */
 trait StackCompiler {
+	/** @var array<TKey,TValue> */
+	private array $stack;
+
 	/** @param array<TKey,TValue> $data */
 	public static function fromCompiledArray( array $data ): static {
 		$self        = new static();

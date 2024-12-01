@@ -23,12 +23,12 @@ trait Resetter {
 			if ( $userHasProvidedCollectionId ) {
 				$resetter->reset( $collectionId );
 			} else {
-				$this->resetWithoutUserProvidedId( $resetter );
+				$this->resetWhenCollectionIdNotProvided( $resetter );
 			}
 		}
 	}
 
-	protected function resetWithoutUserProvidedId( Resettable $resetter ): void {
+	protected function resetWhenCollectionIdNotProvided( Resettable $resetter ): void {
 		$resetter->reset();
 	}
 

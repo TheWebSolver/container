@@ -25,7 +25,7 @@ class BeforeBuildListenerProvider implements ListenerProviderInterface, Listener
 	*/
 	use ListenerRegistrar, ListenerCompiler;
 
-	public function isValid( object $event ): bool {
+	protected function isValid( object $event ): bool {
 		return $event instanceof BeforeBuildEvent;
 	}
 

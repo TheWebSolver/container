@@ -11,9 +11,9 @@ namespace TheWebSolver\Codegarage\Lib\Container\Interfaces;
 
 interface TaggableEvent {
 	/**
-	 * Gets the entry name being resolved by the container.
+	 * Gets the entry name.
 	 *
-	 * The entry name nay be any immutable string literal (alias) or a fully qualified classname.
+	 * The entry name may be any immutable string literal (alias) or a fully qualified classname.
 	 */
 	public function getEntry(): string;
 }

@@ -54,13 +54,12 @@ class MethodResolver {
 			return $this->instantiateFrom( $this->callback );
 		}
 
-		/** @var array{0:object|string,1:string} $unwrapped */
-		$unwrapped              = Unwrap::callback( $this->callback, asArray: true );
+		$unwrapped              = Unwrap::forBinding( ( $this->callback )( ... ), asArray: true );
 		$this->context          = static::artefactFrom( $unwrapped );
 		[ $cb, $this->default ] = $unwrapped;
 		$resolved               = is_string( $cb )
 			? $this->instantiateFrom( $cb )
-			: $this->resolveFrom( $this->context, cb: $unwrapped, obj: $cb ); // @phpstan-ignore-line
+			: $this->resolveFrom( cb: $unwrapped, obj: $cb ); // @phpstan-ignore-line
 
 		return $resolved;
 	}
@@ -71,10 +70,10 @@ class MethodResolver {
 		);
 	}
 
-	protected function resolveFrom( string $id, callable $cb, object $obj ): mixed {
-		return ( $bound = $this->app->getBinding( $id )?->material )
+	protected function resolveFrom( callable $cb, object $obj ): mixed {
+		return ( $bound = $this->app->getBinding( $this->context )?->material )
 			? Unwrap::andInvoke( $bound, $obj, $this->app )
-			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( cb: $cb ) );
+			: Unwrap::andInvoke( $cb, ...$this->dependenciesFrom( $cb ) );
 	}
 
 	protected function instantiateFrom( string $cb ): mixed {
@@ -83,19 +82,21 @@ class MethodResolver {
 
 		if ( null === $method ) {
 			throw BadResolverArgument::noMethod( class: $parts[0] );
-		} elseif ( $class = static::instantiatedClass( name: $parts[0] ) ) {
-			throw BadResolverArgument::instantiatedBeforehand( $class, $method );
-		} elseif ( ! is_callable( $om = $this->makeCallableFrom( $id = $parts[0], $method ) ) ) {
+		} elseif ( $instantiatedClassName = static::instantiatedClass( name: $parts[0] ) ) {
+			throw BadResolverArgument::instantiatedBeforehand( $instantiatedClassName, $method );
+		} elseif ( ! is_callable( $callable = $this->makeCallableFrom( $id = $parts[0], $method ) ) ) {
 			throw BadResolverArgument::nonInstantiableEntry( id: $id );
 		}
 
-		return $this->resolveFrom( id: Unwrap::asString( $parts[0], $method ), cb: $om, obj: $om[0] );
+		$this->context = Unwrap::asString( $parts[0], $method );
+
+		return $this->resolveFrom( $callable, obj: $callable[0] );
 	}
 
 	/** @return mixed[] */
 	protected function dependenciesFrom( callable $cb ): array {
-		if ( ! $this->artefact->has( value: $this->context ) ) {
-			$this->artefact->push( value: $this->context );
+		if ( ! $this->artefact->has( $this->context ) ) {
+			$this->artefact->push( $this->context );
 		}
 
 		$resolved = ( new ParamResolver( $this->app ) )
@@ -103,7 +104,7 @@ class MethodResolver {
 			->usingEventDispatcher( $this->dispatcher )
 			->resolve();
 
-		if ( $this->artefact->has( value: $this->context ) ) {
+		if ( $this->artefact->has( $this->context ) ) {
 			$this->artefact->pull();
 		}
 

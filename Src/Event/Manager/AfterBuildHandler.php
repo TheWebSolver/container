@@ -56,7 +56,7 @@ class AfterBuildHandler {
 		(EventDispatcherInterface&ListenerRegistry)|null $dispatcher,
 	): object {
 		/** @var self<TResolved> */
-		$handler = ( new self( $app, $entry ) );
+		$handler = new self( $app, $entry );
 
 		try {
 			$artefact->push( $entry );

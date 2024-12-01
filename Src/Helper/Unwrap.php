@@ -36,9 +36,8 @@ class Unwrap {
 	}
 
 	/**
-	 * @return string|array{0:object,1:string}
+	 * @return ($asArray is true ? array{0:object,1:string} : string)
 	 * @throws LogicalError When static class member or a lambda function given as closure.
-	 * @phpstan-return ($asArray is true ? array{0:object,1:string} : string)
 	 */
 	public static function closure( Closure $closure, bool $asArray = false ) {
 		$source = new ReflectionFunction( $closure );
@@ -54,10 +53,9 @@ class Unwrap {
 
 	/**
 	 * @param class-string|object $object
-	 * @return string|array{0:string|object,1:string}
+	 * @return ($asArray is true ? array{0:string|object,1:string} : string)
 	 * @throws LogicalError When method name not given if `$object` is a classname or an instance.
 	 *                       When first-class callable was not created using non-static method.
-	 * @phpstan-return ($asArray is true ? array{0:string|object,1:string} : string)
 	 */
 	public static function forBinding(
 		object|string $object,
@@ -94,7 +92,7 @@ class Unwrap {
 
 		return null === ( $class = $reflection->getDeclaringClass() ) ? $name : match ( $name ) {
 			'self'   => $class->getName(),
-			'parent' => ( $p = $class->getParentClass() ) ? $p->getName() : $name,
+			'parent' => ( $parentClass = $class->getParentClass() ) ? $parentClass->getName() : $name,
 			default  => $name
 		};
 	}
@@ -106,9 +104,8 @@ class Unwrap {
 	/**
 	 * @param (callable(TItem):TReturn)|string $cb Either a valid callback or a normalized
 	 *                                       string using `Unwrap::asString()`.
-	 * @return string|(callable(TItem):TReturn)|array{(callable(TItem):TReturn)|object|string,string}
+	 * @return ($asArray is true ? array{0:(callable(TItem):TReturn)|object|string,1:string} : string|(callable(TItem):TReturn))
 	 * @throws TypeError When `$cb` is a first-class callable of a static method.
-	 * @phpstan-return ($asArray is true ? array{(callable(TItem):TReturn)|object|string,string} : string|(callable(TItem):TReturn))
 	 * @template TItem
 	 * @template TReturn
 	 */
