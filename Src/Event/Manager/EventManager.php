@@ -9,71 +9,66 @@ declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Lib\Container\Event\Manager;
 
-use WeakMap;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
+use TheWebSolver\Codegarage\Lib\Container\Traits\Resetter;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
 use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
 
 class EventManager implements Resettable {
-	/** @var WeakMap<EventType,(EventDispatcherInterface &ListenerRegistry)|false|null> */
-	private WeakMap $eventDispatchers;
+	use Resetter;
+
+	/** @var array<string,(EventDispatcherInterface &ListenerRegistry)|false|null> */
+	private array $eventDispatchers;
 
 	/** @var array<string,bool> */
 	private array $assignedEventTypes;
 
-	public function __construct() {
-		$this->eventDispatchers = new WeakMap();
-	}
-
 	// phpcs:ignore Squiz.Commenting.FunctionComment.ParamNameNoMatch
-	/** @param (EventDispatcherInterface &ListenerRegistry)|false $dispatcher False to suppress event dispatcher being assigned altogether when this method is invoked again. */
+	/** @param (EventDispatcherInterface &ListenerRegistry)|false $dispatcher `false` to prevent event dispatcher from being assigned on subsequent invocation of this method. */
 	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function setDispatcher(
 		(EventDispatcherInterface&ListenerRegistry)|false $dispatcher,
 		EventType $eventType
 	): bool {
-		if ( $this->isDispatcherDisabled( $eventType ) || $this->isDispatcherAssigned( $eventType ) ) {
+		if ( $this->skipEventDispatcherFor( $eventType ) ) {
 			return false;
 		}
 
-		$this->eventDispatchers[ $eventType ]         = $dispatcher;
+		$this->eventDispatchers[ $eventType->name ]   = $dispatcher;
 		$this->assignedEventTypes[ $eventType->name ] = true;
 
 		return true;
 	}
 
 	public function getDispatcher( EventType $eventType ): (EventDispatcherInterface&ListenerRegistry)|null {
-		return ( $this->eventDispatchers[ $eventType ] ?? null ) ?: null;
+		return ( $this->eventDispatchers[ $eventType->name ] ?? null ) ?: null;
 	}
 
-	/** @return WeakMap<EventType,(EventDispatcherInterface&ListenerRegistry)|false|null> */
-	public function getDispatchers(): WeakMap {
+	/** @return array<string,(EventDispatcherInterface&ListenerRegistry)|false|null> */
+	public function getDispatchers(): array {
 		return $this->eventDispatchers;
 	}
 
 	public function isDispatcherDisabled( EventType $eventType ): bool {
-		return false === ( $this->eventDispatchers[ $eventType ] ?? null );
+		return false === ( $this->eventDispatchers[ $eventType->name ] ?? null );
 	}
 
 	public function isDispatcherAssigned( EventType $eventType ): bool {
-		return true === ( $this->assignedEventTypes[ $eventType->name ] ?? false );
+		return true === ( $this->assignedEventTypes[ $eventType->name ] ?? null );
 	}
 
-	public function reset( ?string $collectionId = null ): void {
-		$idProvided = array_key_exists( key: 0, array: func_get_args() );
+	/** @return iterable<string,Resettable|false|null> */
+	protected function getResettable(): iterable {
+		return $this->eventDispatchers;
+	}
 
-		foreach ( $this->eventDispatchers as $dispatcher ) {
-			if ( ! $dispatcher ) {
-				continue;
-			}
+	protected function resetWithoutUserProvidedId( Resettable $resetter ): void {
+		$resetter->reset( collectionId: null );
+		$resetter->reset( collectionId: '' );
+	}
 
-			if ( $idProvided ) {
-				$dispatcher->reset( $collectionId );
-			} else {
-				$dispatcher->reset( collectionId: null );
-				$dispatcher->reset( collectionId: '' );
-			}
-		}
+	private function skipEventDispatcherFor( EventType $eventType ): bool {
+		return $this->isDispatcherDisabled( $eventType ) || $this->isDispatcherAssigned( $eventType );
 	}
 }

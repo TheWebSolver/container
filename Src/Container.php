@@ -28,6 +28,7 @@ use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
 use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
+use TheWebSolver\Codegarage\Lib\Container\Traits\Resetter;
 use TheWebSolver\Codegarage\Lib\Container\Helper\Generator;
 use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
 use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
@@ -47,6 +48,8 @@ use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
 
 /** @template-implements ArrayAccess<string,mixed> */
 class Container implements ArrayAccess, ContainerInterface, Resettable {
+	use Resetter;
+
 	/** @var ?static */
 	protected static $instance;
 	/** @var Stack<class-string> */
@@ -56,11 +59,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @var Stack<array<class-string,class-string>> */
 	protected Stack $resolvedInstances;
 	private ?ReflectionClass $reflector;
-	protected EventManager $eventManager;
 
 	/**
 	 * @param Stack<Binding|SharedBinding>                 $bindings
-	 * @param CollectionStack<string,Closure|class-string> $contextual
+	 * @param CollectionStack<string,Closure|class-string> $contextManager
 	 * @param CollectionStack<string,string>               $tags
 	 * @param CollectionStack<int,Closure>                 $rebounds
 	 * @param CollectionStack<string,bool>                 $fetchedListenerAttributes
@@ -68,13 +70,14 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	final public function __construct(
 		protected Stack $bindings = new Stack(),
 		protected Aliases $aliases = new Aliases(),
-		protected CollectionStack $contextual = new CollectionStack(),
+		protected CollectionStack $contextManager = new CollectionStack(),
 		protected CollectionStack $tags = new CollectionStack(),
 		protected CollectionStack $rebounds = new CollectionStack(),
 		protected CollectionStack $fetchedListenerAttributes = new CollectionStack(),
-		EventManager $eventManager = null
+		protected EventManager $eventManager = new EventManager()
 	) {
-		$this->eventManager      = EventType::registerDispatchersTo( $eventManager ?? new EventManager() );
+		EventType::registerDispatchersTo( $this->eventManager );
+
 		$this->resolvedInstances = new Stack();
 		$this->resolved          = new Stack();
 		$this->dependencies      = new Param();
@@ -85,19 +88,13 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return static::$instance ??= new static();
 	}
 
-	/*
-	|================================================================================================
-	| ASSERTION METHODS
-	|================================================================================================
-	*/
-
 	/** @param string $key The key. */
 	public function offsetExists( $key ): bool {
-		return $this->has( id: $key );
+		return $this->has( $key );
 	}
 
 	public function hasBinding( string $id ): bool {
-		return $this->bindings->has( key: $id );
+		return $this->bindings->has( $id );
 	}
 
 	public function isAlias( string $id ): bool {
@@ -126,12 +123,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	public function isListenerFetchedFrom( string $entry, string $attributeName ): bool {
 		return true === $this->fetchedListenerAttributes->get( key: $attributeName, index: $entry );
 	}
-
-	/*
-	|================================================================================================
-	| GETTER METHODS
-	|================================================================================================
-	*/
 
 	/** @param string $key The key. */
 	#[\ReturnTypeWillChange]
@@ -185,7 +176,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	/** @param string $concrete Class|method name for whom {@param $typeHintOrParamName} is contextually bound. */
 	public function getContextual( string $concrete, string $typeHintOrParamName ): Closure|string|null {
-		return $this->contextual->get( $concrete, $typeHintOrParamName );
+		return $this->contextManager->get( $concrete, $typeHintOrParamName );
 	}
 
 	/**
@@ -198,11 +189,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 			return $contextualBinding;
 		}
 
-		if ( ! $this->aliases->has( id: $typeHintOrParamName, asEntry: true ) ) {
+		if ( ! $this->aliases->has( $typeHintOrParamName, asEntry: true ) ) {
 			return null;
 		}
 
-		foreach ( $this->aliases->get( id: $typeHintOrParamName, asEntry: true ) as $alias ) {
+		foreach ( $this->aliases->get( $typeHintOrParamName, asEntry: true ) as $alias ) {
 			if ( null !== ( $contextualBinding = $this->fromContextual( $alias ) ) ) {
 				return $contextualBinding;
 			}
@@ -218,18 +209,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->resolvedInstances[ $entry ] ?? $this->resolved[ $entry ];
 	}
 
-	/*
-	|================================================================================================
-	| SETTER METHODS
-	|================================================================================================
-	*/
-
 	/**
 	 * @param string|class-string               $key
 	 * @param string|class-string|callable|null $value
 	 */
 	public function offsetSet( $key, $value ): void {
-		$this->set( id: $key, concrete: $value );
+		$this->set( $key, $value );
 	}
 
 	/**
@@ -243,8 +228,8 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	/** @param string|string[] $ids */
 	public function tag( string|array $ids, string $tag, string ...$tags ): void {
 		foreach ( array( $tag, ...$tags ) as $key ) {
-			foreach ( Unwrap::asArray( thing: $ids ) as $id ) {
-				$this->tags->set( $key, value: $id );
+			foreach ( Unwrap::asArray( $ids ) as $value ) {
+				$this->tags->set( $key, $value );
 			}
 		}
 	}
@@ -275,7 +260,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$this->aliases->remove( $id );
 
-		$this->bindings->set( key: $id, value: new SharedBinding( $instance ) );
+		$this->bindings->set( $id, value: new SharedBinding( $instance ) );
 
 		if ( $hasEntry ) {
 			$this->rebound( $id );
@@ -290,7 +275,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @throws TypeError When `$entry` first-class callable was created using static method.
 	 */
 	public function setMethod( Closure|string $entry, Closure $callback ): void {
-		$this->set( id: MethodResolver::keyFrom( id: $entry ), concrete: $callback );
+		$this->set( id: MethodResolver::keyFrom( $entry ), concrete: $callback );
 	}
 
 	/**
@@ -301,12 +286,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		$this->fetchedListenerAttributes->set( key: $attributeName, value: true, index: $entry );
 	}
 
-	/*
-	|================================================================================================
-	| CREATOR METHODS
-	|================================================================================================
-	*/
-
 	/**
 	 * @param EventType|string|string[]|Closure $concrete Closure for instantiated class method binding.
 	 * @return ($concrete is EventType ? EventBuilder : ContextBuilder)
@@ -316,12 +295,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	public function when( EventType|string|array|Closure $concrete ): ContextBuilder|EventBuilder {
 		return $concrete instanceof EventType
 			? EventBuilder::create( $concrete, $this, $this->eventManager )
-			: ContextBuilder::create( $concrete, $this, $this->contextual );
+			: ContextBuilder::create( $concrete, $this, $this->contextManager );
 	}
 
 	/** @return iterable<int,object> */
 	public function tagged( string $name ): iterable {
-		return ! $this->tags->has( key: $name ) ? array() : new Generator(
+		return ! $this->tags->has( $name ) ? array() : new Generator(
 			count: $this->tags->countFor( $name ),
 			generator: function () use ( $name ) {
 				foreach ( ( $this->tags->get( $name ) ?? array() ) as $id ) {
@@ -344,12 +323,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->has( $id ) ? $this->get( $id ) : throw EntryNotFound::forRebound( $id );
 	}
 
-	/*
-	|================================================================================================
-	| DESTRUCTOR METHODS
-	|================================================================================================
-	*/
-
 	/** @param string $key */
 	public function offsetUnset( $key ): void {
 		unset( $this->bindings[ $key ], $this->resolved[ $key ], $this->resolvedInstances[ $key ] );
@@ -361,55 +334,6 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 	public function removeResolved( string $entry ): bool {
 		return $this->resolvedInstances->remove( $entry ) ?: $this->resolved->remove( $entry );
-	}
-
-	public function reset( ?string $collectionId = null ): void {
-		$userHasProvidedCollectionId = array_key_exists( key: 0, array: func_get_args() );
-
-		foreach ( get_object_vars( $this ) as $stack ) {
-			if ( ! $stack instanceof Resettable ) {
-				continue;
-			}
-
-			if ( $userHasProvidedCollectionId ) {
-				$stack->reset( $collectionId );
-			} else {
-				$stack->reset();
-			}
-		}
-	}
-
-	/*
-	|================================================================================================
-	| HELPER METHODS
-	|================================================================================================
-	*/
-
-	/**
-	 * @param string $id The abstract or a concrete/alias.
-	 */
-	protected function rebound( string $id ): void {
-		$updated = $this->resolve( $id, args: array(), dispatch: false );
-
-		foreach ( ( $this->rebounds->get( $id ) ?? array() ) as $listener ) {
-			$listener( $updated, $this );
-		}
-	}
-
-	/**
-	 * @param string|class-string          $id
-	 * @param string|class-string|callable $concreteOrAlias
-	 */
-	protected function register( string $id, callable|string $concreteOrAlias, bool $shared ): void {
-		$this->maybePurgeIfAliasOrInstance( $id );
-
-		$material = is_callable( $concreteOrAlias ) ? $concreteOrAlias( ... ) : $this->getEntryFrom( $concreteOrAlias );
-
-		$this->bindings->set( key: $id, value: new Binding( $material, $shared ) );
-
-		if ( $this->hasResolved( $id ) ) {
-			$this->rebound( $id );
-		}
 	}
 
 	/** @param ArrayAccess<object|string,mixed>|array<string,mixed> $args */
@@ -460,6 +384,36 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		unset( $this->reflector );
 
 		return $object;
+	}
+
+	/**
+	 * @param string|class-string          $id
+	 * @param string|class-string|callable $concreteOrAlias
+	 */
+	protected function register( string $id, callable|string $concreteOrAlias, bool $shared ): void {
+		$this->maybePurgeIfAliasOrInstance( $id );
+
+		$material = is_callable( $concreteOrAlias ) ? $concreteOrAlias( ... ) : $this->getEntryFrom( $concreteOrAlias );
+
+		$this->bindings->set( key: $id, value: new Binding( $material, $shared ) );
+
+		if ( $this->hasResolved( $id ) ) {
+			$this->rebound( $id );
+		}
+	}
+
+	/** @param string $id The abstract or a concrete/alias. */
+	protected function rebound( string $id ): void {
+		$updated = $this->resolve( $id, args: array(), dispatch: false );
+
+		foreach ( ( $this->rebounds->get( $id ) ?? array() ) as $listener ) {
+			$listener( $updated, $this );
+		}
+	}
+
+	/** @return iterable<string,mixed> */
+	protected function getResettable(): iterable {
+		return get_object_vars( $this );
 	}
 
 	/** @phpstan-assert-if-true =object $built */
@@ -526,16 +480,16 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 * @return array<string,mixed>|ArrayAccess<object|string,mixed>
 	 */
 	private function beforeBuilding( string $entry, array|ArrayAccess $params ): array|ArrayAccess {
-		$event = $this->eventManager
-			->getDispatcher( EventType::BeforeBuild )
-			?->dispatch( new BeforeBuildEvent( $entry, $params ) );
+		$event = $this->eventManager->getDispatcher( EventType::BeforeBuild )?->dispatch(
+			new BeforeBuildEvent( $entry, $params )
+		);
 
 		return $event instanceof BeforeBuildEvent && ( $args = $event->getParams() ) ? $args : $params;
 	}
 
 	private function afterBuilding( string $eventId, object $resolved ): object {
 		$dispatcher = $this->eventManager->getDispatcher( EventType::AfterBuild );
-		$reflector  = $this->getReflectionForEventHandler( $eventId, $resolved );
+		$reflector  = $this->getResolvedObjectReflector( $eventId, $resolved );
 
 		return AfterBuildHandler::handleWith( $this, $eventId, $resolved, $this->artefact, $reflector, $dispatcher );
 	}
@@ -547,15 +501,15 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 
 		$baseClass = $built::class;
 		$eventId   = $resolved ? $baseClass : $entry;
-		$built     = $this->afterBuilding( $eventId, $built );
+		$fromEvent = $this->afterBuilding( $eventId, $built );
 
 		$this->eventManager->getDispatcher( EventType::AfterBuild )?->reset( $eventId );
-		$this->resolvedInstances->set( key: $entry, value: array( $baseClass => $built::class ) );
+		$this->resolvedInstances->set( $entry, value: array( $baseClass => $fromEvent::class ) );
 
-		return $this->setInstance( $entry, $built );
+		return $this->setInstance( $entry, $fromEvent );
 	}
 
-	private function getReflectionForEventHandler( string $entry, object $resolved ): ?ReflectionClass {
+	private function getResolvedObjectReflector( string $entry, object $resolved ): ?ReflectionClass {
 		return ! $this->isListenerFetchedFrom( $entry, attributeName: DecorateWith::class )
 			? $this->reflector ?? new ReflectionClass( $resolved )
 			: null;

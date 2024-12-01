@@ -1038,7 +1038,7 @@ class ContainerTest extends TestCase {
 
 		$app = new Container(
 			bindings: Stack::fromCompiledArray( $bindings ),
-			contextual: CollectionStack::fromCompiledArray( $contextual )
+			contextManager: CollectionStack::fromCompiledArray( $contextual )
 		);
 
 		$this->assertInstanceOf( stdClass::class, $app->get( 'usingAlias' ) );
