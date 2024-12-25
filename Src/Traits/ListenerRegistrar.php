@@ -108,16 +108,16 @@ trait ListenerRegistrar {
 	protected function resetProperties( int $priority ): void {
 		$this->needsSorting = true;
 
-		if ( $this->currentPrioritySet( forType: 'low' ) > $priority ) {
+		if ( $this->getCurrentPriority( forType: 'low' ) > $priority ) {
 			$this->priorities['low'] = $priority;
 		}
 
-		if ( $this->currentPrioritySet( forType: 'high' ) < $priority ) {
+		if ( $this->getCurrentPriority( forType: 'high' ) < $priority ) {
 			$this->priorities['high'] = $priority;
 		}
 	}
 
-	private function currentPrioritySet( string $forType ): int {
+	private function getCurrentPriority( string $forType ): int {
 		return $this->priorities[ $forType ];
 	}
 
