@@ -105,15 +105,15 @@ trait ListenerRegistrar {
 		return $listeners;
 	}
 
-	protected function resetProperties( int $givenPriority ): void {
+	protected function resetProperties( int $currentPriority ): void {
 		$this->needsSorting = true;
 
-		if ( $givenPriority < $this->priorityPreviouslySetAs( 'low' ) ) {
-			$this->priorities['low'] = $givenPriority;
+		if ( $currentPriority < $this->priorityPreviouslySetAs( 'low' ) ) {
+			$this->priorities['low'] = $currentPriority;
 		}
 
-		if ( $givenPriority > $this->priorityPreviouslySetAs( 'high' ) ) {
-			$this->priorities['high'] = $givenPriority;
+		if ( $currentPriority > $this->priorityPreviouslySetAs( 'high' ) ) {
+			$this->priorities['high'] = $currentPriority;
 		}
 	}
 
