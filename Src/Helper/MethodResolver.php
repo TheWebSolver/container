@@ -1,25 +1,19 @@
 <?php
-/**
- * Resolves Dependency Injection of either class methods or functions.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Helper;
+namespace TheWebSolver\Codegarage\Container\Helper;
 
 use ReflectionMethod;
 use ReflectionFunction;
 use ReflectionFunctionAbstract;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Container\ContainerExceptionInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
-use TheWebSolver\Codegarage\Lib\Container\Traits\DependencySetter;
-use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
-use TheWebSolver\Codegarage\Lib\Container\Traits\EventDispatcherSetter;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Pool\Artefact;
+use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Container\Traits\DependencySetter;
+use TheWebSolver\Codegarage\Container\Error\BadResolverArgument;
+use TheWebSolver\Codegarage\Container\Traits\EventDispatcherSetter;
 
 class MethodResolver {
 	/** @use EventDispatcherSetter<BuildingEvent> */

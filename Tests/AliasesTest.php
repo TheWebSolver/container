@@ -1,17 +1,11 @@
 <?php
-/**
- * Entry aliasing test.
- *
- * @package TheWebSolver\Codegarage\Test
- */
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
 
 use LogicException;
 use PHPUnit\Framework\TestCase;
-use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
+use TheWebSolver\Codegarage\Container\Data\Aliases;
 
 class AliasesTest extends TestCase {
 	private Aliases $aliases;

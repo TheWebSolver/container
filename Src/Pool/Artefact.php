@@ -1,17 +1,11 @@
 <?php
-/**
- * The resolving stack data.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Pool;
+namespace TheWebSolver\Codegarage\Container\Pool;
 
 use Stringable;
-use TheWebSolver\Codegarage\Lib\Container\Traits\PushPullStack;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Container\Traits\PushPullStack;
+use TheWebSolver\Codegarage\Container\Interfaces\Resettable;
 
 class Artefact implements Stringable, Resettable {
 	/** @use PushPullStack<string> */

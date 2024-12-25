@@ -1,13 +1,7 @@
 <?php
-/**
- * Ensures event should propagate or not.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
 trait StopPropagation {
 	protected bool $shouldStopPropagation = false;

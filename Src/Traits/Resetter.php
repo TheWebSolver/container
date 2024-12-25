@@ -1,19 +1,13 @@
 <?php
-/**
- * Resets based on whether collection ID is explicitly passed by the user.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Container\Interfaces\Resettable;
 
 trait Resetter {
 	public function reset( ?string $collectionId = null ): void {
-		$userHasProvidedCollectionId = array_key_exists( key: 0, array: func_get_args() );
+		$userHasProvidedCollectionId = ! func_num_args();
 
 		foreach ( $this->getResettable() as $resetter ) {
 			if ( ! $resetter instanceof Resettable ) {

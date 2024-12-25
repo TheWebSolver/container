@@ -1,13 +1,7 @@
 <?php
-/**
- * Performs unwrapping for various container APIs.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Helper;
+namespace TheWebSolver\Codegarage\Container\Helper;
 
 use Closure;
 use TypeError;
@@ -16,7 +10,7 @@ use ReflectionFunction;
 use ReflectionException;
 use ReflectionNamedType;
 use ReflectionParameter;
-use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
 
 class Unwrap {
 	/**

@@ -1,10 +1,4 @@
 <?php
-/**
- * ParamPool test.
- *
- * @package TheWebSolver\Codegarage\Test
- */
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
@@ -12,7 +6,7 @@ namespace TheWebSolver\Codegarage\Tests;
 use ReflectionMethod;
 use ReflectionParameter;
 use PHPUnit\Framework\TestCase;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
+use TheWebSolver\Codegarage\Container\Pool\Param;
 
 class ParamPoolTest extends TestCase {
 	private ?Param $paramPool;

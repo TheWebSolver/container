@@ -1,22 +1,16 @@
 <?php
-/**
- * Stack of keyed stored items.
- *
- * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- */
+// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics & Closure type-hint OK.
+// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch  -- Generics & Closure type-hint OK.
 
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Pool;
+namespace TheWebSolver\Codegarage\Container\Pool;
 
 use Countable;
-use TheWebSolver\Codegarage\Lib\Container\Traits\Stack;
-use TheWebSolver\Codegarage\Lib\Container\Traits\StackCompiler;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Container\Traits\Stack;
+use TheWebSolver\Codegarage\Container\Traits\StackCompiler;
+use TheWebSolver\Codegarage\Container\Interfaces\Compilable;
+use TheWebSolver\Codegarage\Container\Interfaces\Resettable;
 
 /**
  * @template TKey of array-key

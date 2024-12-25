@@ -1,16 +1,10 @@
 <?php
-/**
- * Stack test for accessing as Array.
- *
- * @package TheWebSolver\Codegarage\Test
- */
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
 
 use PHPUnit\Framework\TestCase;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Container\Pool\Stack;
 
 class StackWithArrayAccessTest extends TestCase {
 	private Stack $stack;

@@ -1,13 +1,7 @@
 <?php
-/**
- * Sets Parameter Reflections & its arguments.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
 use ArrayAccess;
 use ReflectionParameter;

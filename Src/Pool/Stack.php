@@ -1,20 +1,14 @@
 <?php
-/**
- * Stack of items.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Pool;
+namespace TheWebSolver\Codegarage\Container\Pool;
 
 use Countable;
 use ArrayAccess;
-use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
-use TheWebSolver\Codegarage\Lib\Container\Traits\StackCompiler;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Container\Traits\KeyStack;
+use TheWebSolver\Codegarage\Container\Traits\StackCompiler;
+use TheWebSolver\Codegarage\Container\Interfaces\Compilable;
+use TheWebSolver\Codegarage\Container\Interfaces\Resettable;
 
 /**
  * @template TValue

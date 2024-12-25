@@ -1,10 +1,4 @@
 <?php
-/**
- * Compiled data for Listener provider.
- *
- * @package TheWebSolver\Codegarage\Test
- */
-
 use PHPUnit\Framework\TestCase;
 
 return array(

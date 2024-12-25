@@ -1,16 +1,10 @@
 <?php
-/**
- * Artefact test.
- *
- * @package TheWebSolver\Codegarage\Test
- */
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
 
 use PHPUnit\Framework\TestCase;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
+use TheWebSolver\Codegarage\Container\Pool\Artefact;
 
 class ArtefactTest extends TestCase {
 	private ?Artefact $contextPool;

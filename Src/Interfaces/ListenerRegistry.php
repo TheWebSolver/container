@@ -1,13 +1,7 @@
 <?php
-/**
- * Interface for registering listeners.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Interfaces;
+namespace TheWebSolver\Codegarage\Container\Interfaces;
 
 use Closure;
 

@@ -1,18 +1,12 @@
 <?php
-/**
- * Error for various runtime exceptions.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Error;
+namespace TheWebSolver\Codegarage\Container\Error;
 
 use LogicException;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
-use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
-use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
+use TheWebSolver\Codegarage\Container\Event\EventType;
+use TheWebSolver\Codegarage\Container\Helper\EventBuilder;
+use TheWebSolver\Codegarage\Container\Helper\ContextBuilder;
 
 class LogicalError extends LogicException {
 	public static function entryAndAliasIsSame( string $entry ): self {

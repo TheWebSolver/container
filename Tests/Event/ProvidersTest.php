@@ -1,12 +1,6 @@
 <?php
-/**
- * Listener providers test.
- *
- * @package TheWebSolver\Codegarage\Test
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
- */
+// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
+// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
 
 declare( strict_types = 1 );
 
@@ -17,17 +11,17 @@ use RuntimeException;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\EventDispatcher\ListenerProviderInterface;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
-use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
-use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Traits\ListenerCompiler;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
-use TheWebSolver\Codegarage\Lib\Container\Traits\ListenerRegistrar;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
-use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BuildingListenerProvider;
-use TheWebSolver\Codegarage\Lib\Container\Event\Provider\AfterBuildListenerProvider;
-use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BeforeBuildListenerProvider;
+use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Container\Event\AfterBuildEvent;
+use TheWebSolver\Codegarage\Container\Interfaces\Compilable;
+use TheWebSolver\Codegarage\Container\Event\BeforeBuildEvent;
+use TheWebSolver\Codegarage\Container\Traits\ListenerCompiler;
+use TheWebSolver\Codegarage\Container\Interfaces\TaggableEvent;
+use TheWebSolver\Codegarage\Container\Traits\ListenerRegistrar;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Container\Event\Provider\BuildingListenerProvider;
+use TheWebSolver\Codegarage\Container\Event\Provider\AfterBuildListenerProvider;
+use TheWebSolver\Codegarage\Container\Event\Provider\BeforeBuildListenerProvider;
 
 class ProvidersTest extends TestCase {
 	/**

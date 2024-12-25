@@ -1,18 +1,12 @@
 <?php
-/**
- * Registers event listeners.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
 use Closure;
 use Generator;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Container\Interfaces\TaggableEvent;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
 
 /** @template TEvent of object */
 trait ListenerRegistrar {

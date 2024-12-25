@@ -1,13 +1,7 @@
 <?php
-/**
- * Exception for entries not found in the container.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Error;
+namespace TheWebSolver\Codegarage\Container\Error;
 
 use Throwable;
 use Psr\Container\NotFoundExceptionInterface;

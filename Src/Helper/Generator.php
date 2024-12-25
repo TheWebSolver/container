@@ -1,19 +1,13 @@
 <?php
-/**
- * Generator that yields object built by the container.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Helper;
+namespace TheWebSolver\Codegarage\Container\Helper;
 
 use Closure;
 use Countable;
 use Traversable;
 use IteratorAggregate;
-use TheWebSolver\Codegarage\Lib\Container\Container;
+use TheWebSolver\Codegarage\Container\Container;
 
 /**
  * Generator that yields object built by the container.

@@ -1,20 +1,14 @@
 <?php
-/**
- * The event dispatched to all event listeners during app resolving the current parameter of the entry.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Event;
+namespace TheWebSolver\Codegarage\Container\Event;
 
 use Psr\EventDispatcher\StoppableEventInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
-use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Data\Binding;
+use TheWebSolver\Codegarage\Container\Data\SharedBinding;
+use TheWebSolver\Codegarage\Container\Traits\StopPropagation;
+use TheWebSolver\Codegarage\Container\Interfaces\TaggableEvent;
 
 class BuildingEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;

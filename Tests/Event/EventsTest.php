@@ -1,12 +1,6 @@
 <?php
-/**
- * All event objects test.
- *
- * @package TheWebSolver\Codegarage\Test
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
- */
+// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
+// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
 
 declare( strict_types = 1 );
 
@@ -17,14 +11,14 @@ use WeakMap;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\EventDispatcher\StoppableEventInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
-use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
-use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Data\Binding;
+use TheWebSolver\Codegarage\Container\Event\EventType;
+use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Container\Pool\CollectionStack;
+use TheWebSolver\Codegarage\Container\Event\AfterBuildEvent;
+use TheWebSolver\Codegarage\Container\Event\BeforeBuildEvent;
+use TheWebSolver\Codegarage\Container\Traits\StopPropagation;
 
 class EventsTest extends TestCase {
 	/** @return array{0:MockObject&CollectionStack,1:MockObject&CollectionStack} */

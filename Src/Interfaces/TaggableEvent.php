@@ -1,13 +1,7 @@
 <?php
-/**
- * The event that listens based on the given entry.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Interfaces;
+namespace TheWebSolver\Codegarage\Container\Interfaces;
 
 interface TaggableEvent {
 	/**

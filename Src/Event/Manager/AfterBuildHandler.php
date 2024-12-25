@@ -1,29 +1,23 @@
 <?php
-/**
- * Handles events dispatched after build event.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Event\Manager;
+namespace TheWebSolver\Codegarage\Container\Event\Manager;
 
 use Closure;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionParameter;
+use TheWebSolver\Codegarage\Container\Container;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
-use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
-use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
-use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
-use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
-use TheWebSolver\Codegarage\Lib\Container\Traits\EventDispatcherSetter;
+use TheWebSolver\Codegarage\Container\Helper\Unwrap;
+use TheWebSolver\Codegarage\Container\Pool\Artefact;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
+use TheWebSolver\Codegarage\Container\Error\ContainerError;
+use TheWebSolver\Codegarage\Container\Event\AfterBuildEvent;
+use TheWebSolver\Codegarage\Container\Attribute\DecorateWith;
+use TheWebSolver\Codegarage\Container\Error\BadResolverArgument;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Container\Traits\EventDispatcherSetter;
 
 /** @template TResolved of object */
 class AfterBuildHandler {

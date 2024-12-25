@@ -1,20 +1,14 @@
 <?php
-/**
- * Attribute for Event Listener when app is resolving the target parameter.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Attribute;
+namespace TheWebSolver\Codegarage\Container\Attribute;
 
 use Attribute;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
 
 #[Attribute( flags: Attribute::TARGET_PARAMETER )]
 final class ListenTo {
-	/** @var callable(BuildingEvent $event): void */
+	/** @var callable(BuildingEvent): void */
 	public $listener;
 
 	/**

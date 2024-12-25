@@ -1,20 +1,14 @@
 <?php
-/**
- * The event dispatcher.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Event;
+namespace TheWebSolver\Codegarage\Container\Event;
 
 use Closure;
 use Psr\EventDispatcher\StoppableEventInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\EventDispatcher\ListenerProviderInterface;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Container\Helper\Unwrap;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
 
 /**
  * @template TEvent of object

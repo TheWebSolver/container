@@ -1,18 +1,12 @@
 <?php
-/**
- * Main Container Exception class.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Error;
+namespace TheWebSolver\Codegarage\Container\Error;
 
 use Exception;
 use ReflectionException;
 use Psr\Container\ContainerExceptionInterface;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
+use TheWebSolver\Codegarage\Container\Pool\Artefact;
 
 class ContainerError extends Exception implements ContainerExceptionInterface {
 	public static function unResolvableEntry( string $id, ?ReflectionException $previous = null ): self {

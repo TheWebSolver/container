@@ -1,16 +1,10 @@
 <?php
-/**
- * Sets Event Dispatcher.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
 use Psr\EventDispatcher\EventDispatcherInterface;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
 
 /** @template TEvent */
 trait EventDispatcherSetter {

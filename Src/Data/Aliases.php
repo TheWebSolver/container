@@ -1,19 +1,13 @@
 <?php
-/**
- * Aliases for the container entry.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Data;
+namespace TheWebSolver\Codegarage\Container\Data;
 
-use TheWebSolver\Codegarage\Lib\Container\Traits\KeyStack;
-use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
-use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
-use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Container\Traits\KeyStack;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
+use TheWebSolver\Codegarage\Container\Error\EntryNotFound;
+use TheWebSolver\Codegarage\Container\Pool\CollectionStack;
+use TheWebSolver\Codegarage\Container\Interfaces\Resettable;
 
 class Aliases implements Resettable {
 	/** @use KeyStack<class-string> */

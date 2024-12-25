@@ -1,10 +1,4 @@
 <?php
-/**
- * Param Resolver test.
- *
- * @package TheWebSolver\Codegarage\Test
- */
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
@@ -17,11 +11,11 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\ContainerExceptionInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
-use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Data\Binding;
+use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Container\Helper\ParamResolver;
+use TheWebSolver\Codegarage\Container\Event\EventDispatcher;
 
 class ParamResolverTest extends TestCase {
 	private ParamResolver $resolver;

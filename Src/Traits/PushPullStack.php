@@ -1,13 +1,7 @@
 <?php
-/**
- * Stack to be used for pushing and pulling data.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
 /** @template TValue */
 trait PushPullStack {

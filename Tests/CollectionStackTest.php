@@ -1,16 +1,10 @@
 <?php
-/**
- * Collection stack.
- *
- * @package TheWebSolver\Codegarage\Test
- */
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
 
 use PHPUnit\Framework\TestCase;
-use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
+use TheWebSolver\Codegarage\Container\Pool\CollectionStack;
 
 class CollectionStackTest extends TestCase {
 	private CollectionStack $stack;

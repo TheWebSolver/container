@@ -1,29 +1,21 @@
 <?php
-/**
- * Method Resolver test.
- *
- * @package TheWebSolver\Codegarage\Test
- */
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
-use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
-use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Data\Binding;
+use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Container\Event\EventDispatcher;
+use TheWebSolver\Codegarage\Container\Helper\MethodResolver;
+use TheWebSolver\Codegarage\Container\Error\BadResolverArgument;
 
 class MethodResolverTest extends TestCase {
 	private EventDispatcher|MockObject $dispatcher;
 	private Container|MockObject $app;
 	private MethodResolver $resolver;
-	private Param $param;
 
 	protected function setUp(): void {
 		/** @var Container&MockObject */

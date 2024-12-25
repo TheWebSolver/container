@@ -1,24 +1,18 @@
 <?php
-/**
- * The event dispatched to all event listeners after app has resolved the entry.
- *
- * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics typ-hint OK.
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics typ-hint OK.
- * @phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType -- Param name of Closure OK.
- */
+// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint     -- Generics typ-hint OK.
+// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch      -- Generics typ-hint OK.
+// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType -- Param name of Closure OK.
 
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Event;
+namespace TheWebSolver\Codegarage\Container\Event;
 
 use Closure;
 use Psr\EventDispatcher\StoppableEventInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
-use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Pool\CollectionStack;
+use TheWebSolver\Codegarage\Container\Traits\StopPropagation;
+use TheWebSolver\Codegarage\Container\Interfaces\TaggableEvent;
 
 /** @template TResolved */
 class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {

@@ -1,13 +1,7 @@
 <?php
-/**
- * Registers complied data to Stack.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
 use RuntimeException;
 

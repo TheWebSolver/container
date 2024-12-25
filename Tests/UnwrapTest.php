@@ -1,12 +1,4 @@
-<?php
-/**
- * Unwrap test.
- *
- * @package TheWebSolver\Codegarage\Test
- *
- * @phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed -- For test OK.
- */
-
+<?php // phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
@@ -19,9 +11,9 @@ use ReflectionException;
 use ReflectionParameter;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
-use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Helper\Unwrap;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
 
 class UnwrapTest extends TestCase {
 	/** @dataProvider provideDataForArrayConversion */

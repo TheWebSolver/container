@@ -1,24 +1,18 @@
 <?php
-/**
- * The event type.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Event;
+namespace TheWebSolver\Codegarage\Container\Event;
 
 use Closure;
+use TheWebSolver\Codegarage\Container\Container;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
-use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
-use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
-use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BuildingListenerProvider;
-use TheWebSolver\Codegarage\Lib\Container\Event\Provider\AfterBuildListenerProvider;
-use TheWebSolver\Codegarage\Lib\Container\Event\Provider\BeforeBuildListenerProvider;
+use TheWebSolver\Codegarage\Container\Data\SharedBinding;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
+use TheWebSolver\Codegarage\Container\Event\Manager\EventManager;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Container\Event\Provider\BuildingListenerProvider;
+use TheWebSolver\Codegarage\Container\Event\Provider\AfterBuildListenerProvider;
+use TheWebSolver\Codegarage\Container\Event\Provider\BeforeBuildListenerProvider;
 
 enum EventType {
 	case BeforeBuild;

@@ -1,13 +1,7 @@
 <?php
-/**
- * Registers compiled data to listener provider.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
 use RuntimeException;
 

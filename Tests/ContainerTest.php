@@ -1,13 +1,7 @@
 <?php
-/**
- * Container test.
- *
- * @package TheWebSolver\Codegarage\Test
- *
- * @phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound
- * @phpcs:disable PEAR.NamingConventions.ValidClassName.StartWithCapital
- * @phpcs:disable PEAR.NamingConventions.ValidClassName.Invalid
- */
+// phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound
+// phpcs:disable PEAR.NamingConventions.ValidClassName.StartWithCapital
+// phpcs:disable PEAR.NamingConventions.ValidClassName.Invalid
 
 declare( strict_types = 1 );
 
@@ -21,23 +15,22 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\NotFoundExceptionInterface;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
-use TheWebSolver\Codegarage\Lib\Container\Attribute\ListenTo;
-use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
-use TheWebSolver\Codegarage\Lib\Container\Event\BuildingEvent;
-use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
-use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
-use TheWebSolver\Codegarage\Lib\Container\Event\AfterBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Compilable;
-use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
-use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
-use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Container\Data\Binding;
+use TheWebSolver\Codegarage\Container\Event\EventType;
+use TheWebSolver\Codegarage\Container\Attribute\ListenTo;
+use TheWebSolver\Codegarage\Container\Data\SharedBinding;
+use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
+use TheWebSolver\Codegarage\Container\Error\ContainerError;
+use TheWebSolver\Codegarage\Container\Pool\CollectionStack;
+use TheWebSolver\Codegarage\Container\Event\AfterBuildEvent;
+use TheWebSolver\Codegarage\Container\Event\EventDispatcher;
+use TheWebSolver\Codegarage\Container\Interfaces\Compilable;
+use TheWebSolver\Codegarage\Container\Attribute\DecorateWith;
+use TheWebSolver\Codegarage\Container\Event\BeforeBuildEvent;
+use TheWebSolver\Codegarage\Container\Event\Manager\EventManager;
+use TheWebSolver\Codegarage\Container\Event\Manager\AfterBuildHandler;
 
 class ContainerTest extends TestCase {
 	private Container $app;

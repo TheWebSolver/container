@@ -1,13 +1,7 @@
 <?php
-/**
- * Stack of items indexed by string key.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Traits;
+namespace TheWebSolver\Codegarage\Container\Traits;
 
 /** @template TValue */
 trait KeyStack {

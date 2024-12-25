@@ -1,20 +1,14 @@
 <?php
-/**
- * Contextual bindings for the container during the entry's build process.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Helper;
+namespace TheWebSolver\Codegarage\Container\Helper;
 
 use Closure;
 use Generator;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
-use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack as Context;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Generator as AppGenerator;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
+use TheWebSolver\Codegarage\Container\Pool\CollectionStack as Context;
+use TheWebSolver\Codegarage\Container\Helper\Generator as AppGenerator;
 
 final class ContextBuilder {
 	protected string $constraint;
@@ -24,11 +18,7 @@ final class ContextBuilder {
 	 * @param Container                            $app
 	 * @param Context<string,Closure|class-string> $contextual
 	 */
-	public function __construct(
-		private readonly array $ids,
-		private readonly Container $app,
-		private readonly Context $contextual
-	) {}
+	public function __construct( private array $ids, private Container $app, private Context $contextual ) {}
 
 	/** @param string|string[]|Closure $concrete */
 	public static function create( string|array|Closure $concrete, Container $app, Context $stack ): self {

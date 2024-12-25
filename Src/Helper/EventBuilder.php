@@ -1,22 +1,14 @@
-<?php
-/**
- * Event Dispatcher Builder Pattern API.
- *
- * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
- */
-
+<?php // phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Helper;
+namespace TheWebSolver\Codegarage\Container\Helper;
 
 use Closure;
-use TheWebSolver\Codegarage\Lib\Container\Container;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
-use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
-use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Container\Container;
+use TheWebSolver\Codegarage\Container\Event\EventType;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
+use TheWebSolver\Codegarage\Container\Event\Manager\EventManager;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
 
 final class EventBuilder {
 	private string $key;

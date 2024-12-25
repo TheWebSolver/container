@@ -1,19 +1,13 @@
 <?php
-/**
- * The event manager.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Event\Manager;
+namespace TheWebSolver\Codegarage\Container\Event\Manager;
 
 use Psr\EventDispatcher\EventDispatcherInterface;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
-use TheWebSolver\Codegarage\Lib\Container\Traits\Resetter;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\ListenerRegistry;
+use TheWebSolver\Codegarage\Container\Event\EventType;
+use TheWebSolver\Codegarage\Container\Traits\Resetter;
+use TheWebSolver\Codegarage\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
 
 class EventManager implements Resettable {
 	use Resetter;

@@ -1,12 +1,6 @@
 <?php
-/**
- * Event Manager test.
- *
- * @package TheWebSolver\Codegarage\Test
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
- */
+// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
+// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
 
 declare( strict_types = 1 );
 
@@ -14,9 +8,9 @@ namespace TheWebSolver\Codegarage\Tests\Event;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventDispatcher;
-use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
+use TheWebSolver\Codegarage\Container\Event\EventType;
+use TheWebSolver\Codegarage\Container\Event\EventDispatcher;
+use TheWebSolver\Codegarage\Container\Event\Manager\EventManager;
 
 class EventManagerTest extends TestCase {
 	private EventManager $manager;

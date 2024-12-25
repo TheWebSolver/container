@@ -1,18 +1,12 @@
 <?php
-/**
- * The event dispatched to all event listeners before app resolves the given entry.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Event;
+namespace TheWebSolver\Codegarage\Container\Event;
 
 use ArrayAccess;
 use Psr\EventDispatcher\StoppableEventInterface;
-use TheWebSolver\Codegarage\Lib\Container\Traits\StopPropagation;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\TaggableEvent;
+use TheWebSolver\Codegarage\Container\Traits\StopPropagation;
+use TheWebSolver\Codegarage\Container\Interfaces\TaggableEvent;
 
 class BeforeBuildEvent implements StoppableEventInterface, TaggableEvent {
 	use StopPropagation;

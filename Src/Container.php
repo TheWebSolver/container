@@ -1,16 +1,10 @@
 <?php
-/**
- * The container.
- *
- * @package TheWebSolver\Codegarage\Container
- *
- * @phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics & Closure type-hint OK.
- * @phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch -- Generics & Closure type-hint OK.
- */
+// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics & Closure type-hint OK.
+// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch  -- Generics & Closure type-hint OK.
 
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container;
+namespace TheWebSolver\Codegarage\Container;
 
 use Closure;
 use Exception;
@@ -21,30 +15,30 @@ use ReflectionException;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Container\ContainerExceptionInterface;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Param;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Stack;
-use TheWebSolver\Codegarage\Lib\Container\Data\Aliases;
-use TheWebSolver\Codegarage\Lib\Container\Data\Binding;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Unwrap;
-use TheWebSolver\Codegarage\Lib\Container\Pool\Artefact;
-use TheWebSolver\Codegarage\Lib\Container\Event\EventType;
-use TheWebSolver\Codegarage\Lib\Container\Traits\Resetter;
-use TheWebSolver\Codegarage\Lib\Container\Helper\Generator;
-use TheWebSolver\Codegarage\Lib\Container\Data\SharedBinding;
-use TheWebSolver\Codegarage\Lib\Container\Error\LogicalError;
-use TheWebSolver\Codegarage\Lib\Container\Error\EntryNotFound;
-use TheWebSolver\Codegarage\Lib\Container\Helper\EventBuilder;
-use TheWebSolver\Codegarage\Lib\Container\Error\ContainerError;
-use TheWebSolver\Codegarage\Lib\Container\Helper\ParamResolver;
-use TheWebSolver\Codegarage\Lib\Container\Pool\CollectionStack;
-use TheWebSolver\Codegarage\Lib\Container\Helper\ContextBuilder;
-use TheWebSolver\Codegarage\Lib\Container\Helper\MethodResolver;
-use TheWebSolver\Codegarage\Lib\Container\Interfaces\Resettable;
-use TheWebSolver\Codegarage\Lib\Container\Attribute\DecorateWith;
-use TheWebSolver\Codegarage\Lib\Container\Event\BeforeBuildEvent;
-use TheWebSolver\Codegarage\Lib\Container\Error\BadResolverArgument;
-use TheWebSolver\Codegarage\Lib\Container\Event\Manager\EventManager;
-use TheWebSolver\Codegarage\Lib\Container\Event\Manager\AfterBuildHandler;
+use TheWebSolver\Codegarage\Container\Pool\Param;
+use TheWebSolver\Codegarage\Container\Pool\Stack;
+use TheWebSolver\Codegarage\Container\Data\Aliases;
+use TheWebSolver\Codegarage\Container\Data\Binding;
+use TheWebSolver\Codegarage\Container\Helper\Unwrap;
+use TheWebSolver\Codegarage\Container\Pool\Artefact;
+use TheWebSolver\Codegarage\Container\Event\EventType;
+use TheWebSolver\Codegarage\Container\Traits\Resetter;
+use TheWebSolver\Codegarage\Container\Helper\Generator;
+use TheWebSolver\Codegarage\Container\Data\SharedBinding;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
+use TheWebSolver\Codegarage\Container\Error\EntryNotFound;
+use TheWebSolver\Codegarage\Container\Helper\EventBuilder;
+use TheWebSolver\Codegarage\Container\Error\ContainerError;
+use TheWebSolver\Codegarage\Container\Helper\ParamResolver;
+use TheWebSolver\Codegarage\Container\Pool\CollectionStack;
+use TheWebSolver\Codegarage\Container\Helper\ContextBuilder;
+use TheWebSolver\Codegarage\Container\Helper\MethodResolver;
+use TheWebSolver\Codegarage\Container\Interfaces\Resettable;
+use TheWebSolver\Codegarage\Container\Attribute\DecorateWith;
+use TheWebSolver\Codegarage\Container\Event\BeforeBuildEvent;
+use TheWebSolver\Codegarage\Container\Error\BadResolverArgument;
+use TheWebSolver\Codegarage\Container\Event\Manager\EventManager;
+use TheWebSolver\Codegarage\Container\Event\Manager\AfterBuildHandler;
 
 /** @template-implements ArrayAccess<string,mixed> */
 class Container implements ArrayAccess, ContainerInterface, Resettable {

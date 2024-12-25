@@ -19,7 +19,7 @@
 	-->
 	<arg value="psv"/>
 
-	<!-- Check up to 8 files simultanously. -->
+	<!-- Check up to 8 files simultaneously. -->
 	<arg name="parallel" value="8"/>
 	<arg name="colors"/>
 
@@ -109,6 +109,7 @@
 	</rule>
 
 	<rule ref="Squiz.Commenting">
+		<exclude name="Squiz.Commenting.FileComment.Missing"/>
 		<exclude name="Squiz.Commenting.FunctionComment.Missing"/>
 		<exclude name="Squiz.Commenting.ClassComment.Missing"/>
 		<exclude name="Squiz.Commenting.VariableComment.Missing"/>

@@ -1,13 +1,7 @@
 <?php
-/**
- * Exception for various resolvers.
- *
- * @package TheWebSolver\Codegarage\Container
- */
-
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Lib\Container\Error;
+namespace TheWebSolver\Codegarage\Container\Error;
 
 use ReflectionParameter;
 use Psr\Container\ContainerExceptionInterface;
