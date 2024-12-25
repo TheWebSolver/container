@@ -93,12 +93,10 @@ trait ListenerRegistrar {
 		}
 	}
 
-	// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
 	/**
-	 * @param array<int,array<int,callable(TEvent $event): void>> $listeners
-	 * @return array<int,array<int,callable(TEvent $event): void>>
+	 * @param array<int,array<int,callable(TEvent): void>> $listeners
+	 * @return array<int,array<int,callable(TEvent): void>>
 	 */
-	// phpcs:enable
 	protected function getSorted( array $listeners ): array {
 		ksort( $listeners, flags: SORT_NUMERIC );
 
