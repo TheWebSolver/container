@@ -7,7 +7,7 @@ use TheWebSolver\Codegarage\Container\Interfaces\Resettable;
 
 trait Resetter {
 	public function reset( ?string $collectionId = null ): void {
-		$userHasProvidedCollectionId = ! func_num_args();
+		$userHasProvidedCollectionId = ! ! func_num_args();
 
 		foreach ( $this->getResettable() as $resetter ) {
 			if ( ! $resetter instanceof Resettable ) {
