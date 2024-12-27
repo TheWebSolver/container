@@ -20,9 +20,9 @@ interface ListenerRegistry extends Resettable {
 	/**
 	 * Verifies if current registry has listeners attached.
 	 *
-	 * Listeners existence must be checked in all of these scenarios:
+	 * Listeners existence must be checked based on {@param $forEntry} value as:
 	 * - `null`             - Check for listeners registered without entries.
-	 * - `empty-string`     - Check for listeners registered only with entries.
+	 * - `empty-string`     - Check for listeners registered with all entries.
 	 * - `non-empty-string` - Check for listeners registered only with the particular entry.
 	 */
 	public function hasListeners( ?string $forEntry = null ): bool;
@@ -30,10 +30,10 @@ interface ListenerRegistry extends Resettable {
 	/**
 	 * Gets all event listeners registered to the registry.
 	 *
-	 * This should not return event listeners sorted by their priority and
-	 * should return event listeners in order they were registered.
+	 * This must not return event listeners sorted by their priority and
+	 * must return event listeners in order they were registered.
 	 *
-	 * @return array<int,array<int,callable(TEvent): void>>
+	 * @return ($forEntry is null|non-empty-string ? array<int,array<int,callable(TEvent): void>> : array<string,array<int,array<int,callable(TEvent): void>>>)
 	 */
 	public function getListeners( ?string $forEntry = null ): array;
 

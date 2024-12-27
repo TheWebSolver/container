@@ -43,6 +43,7 @@ trait ListenerRegistrar {
 
 		if ( $forEntry ) {
 			$this->listenersForEntry[ $forEntry ][ $priority ][] = $listener;
+
 			return;
 		}
 
@@ -54,7 +55,7 @@ trait ListenerRegistrar {
 	}
 
 	public function getListeners( ?string $forEntry = null ): array {
-		return ! $forEntry ? $this->listeners : $this->listenersForEntry[ $forEntry ] ?? array();
+		return $this->getListenersRegistered( $forEntry );
 	}
 
 	public function getPriorities(): array {
@@ -119,20 +120,20 @@ trait ListenerRegistrar {
 		return $this->priorities[ $type ];
 	}
 
-	/** @return array<int|string,array<int,array<int,callable>|callable>> */
-	private function getListenersRegistered( ?string $id ): array {
-		return match ( $id ) {
+	/** @return ($forEntry is null|non-empty-string ? array<int,array<int,callable(TEvent): void>> : array<string,array<int,array<int,callable(TEvent): void>>>) */
+	private function getListenersRegistered( ?string $forEntry ): array {
+		return match ( $forEntry ) {
 			null    => $this->listeners,
 			''      => $this->listenersForEntry,
-			default => $this->listenersForEntry[ $id ] ?? array()
+			default => $this->listenersForEntry[ $forEntry ] ?? array()
 		};
 	}
 
-	private function resetListenersRegistered( ?string $id ): void {
-		match ( $id ) {
+	private function resetListenersRegistered( ?string $forEntry ): void {
+		match ( $forEntry ) {
 			null    => ( $this->listeners = array() ),
 			''      => ( $this->listenersForEntry = array() ),
-			default => isset( $this->listenersForEntry[ $id ] ) && ( $this->listenersForEntry[ $id ] = array() )
+			default => isset( $this->listenersForEntry[ $forEntry ] ) && ( $this->listenersForEntry[ $forEntry ] = array() )
 		};
 	}
 }
