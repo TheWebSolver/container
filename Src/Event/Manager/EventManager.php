@@ -57,9 +57,12 @@ class EventManager implements Resettable {
 		return $this->eventDispatchers;
 	}
 
-	protected function resetWhenCollectionIdNotProvided( Resettable $resetter ): void {
-		$resetter->reset( collectionId: null );
-		$resetter->reset( collectionId: '' );
+	protected function resetWhenCollectionIdNotProvided( Resettable $dispatcher ): void {
+		// Reset listeners without entries.
+		$dispatcher->reset( collectionId: null );
+
+		// Reset all listeners with entries.
+		$dispatcher->reset( collectionId: '' );
 	}
 
 	private function skipEventDispatcherFor( EventType $eventType ): bool {

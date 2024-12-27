@@ -11,6 +11,9 @@ use PHPUnit\Framework\MockObject\MockObject;
 use TheWebSolver\Codegarage\Container\Event\EventType;
 use TheWebSolver\Codegarage\Container\Event\EventDispatcher;
 use TheWebSolver\Codegarage\Container\Event\Manager\EventManager;
+use TheWebSolver\Codegarage\Container\Event\Provider\BuildingListenerProvider;
+use TheWebSolver\Codegarage\Container\Event\Provider\AfterBuildListenerProvider;
+use TheWebSolver\Codegarage\Container\Event\Provider\BeforeBuildListenerProvider;
 
 class EventManagerTest extends TestCase {
 	private EventManager $manager;
@@ -42,10 +45,17 @@ class EventManagerTest extends TestCase {
 		);
 	}
 
-	public function testEventManagerSetterGetter(): void {
+	public function testEventManagerSetterGetterAndResetterIntegration(): void {
 		$this->assertEventDispatchersAssignedStatus( expected: false );
-		$this->assertTrue( $this->manager->setDispatcher( $beforeBuild = $this->createDispatcherMock(), EventType::BeforeBuild ) );
-		$this->assertTrue( $this->manager->setDispatcher( $building = $this->createDispatcherMock(), EventType::Building ) );
+
+		$dispatchers = array(
+			$beforeBuild = new EventDispatcher( new BeforeBuildListenerProvider() ),
+			$building    = new EventDispatcher( new BuildingListenerProvider() ),
+			$afterBuild  = new EventDispatcher( new AfterBuildListenerProvider() ),
+		);
+
+		$this->assertTrue( $this->manager->setDispatcher( $beforeBuild, EventType::BeforeBuild ) );
+		$this->assertTrue( $this->manager->setDispatcher( $building, EventType::Building ) );
 		$this->assertFalse(
 			condition: $this->manager->setDispatcher( $this->createDispatcherMock(), EventType::Building ),
 			message: 'Already assigned Event Dispatcher shall not be able to be re-assigned for same event type.'
@@ -54,23 +64,70 @@ class EventManagerTest extends TestCase {
 		$this->assertSame( $building, $this->manager->getDispatcher( EventType::Building ) );
 		$this->assertNull( $this->manager->getDispatcher( EventType::AfterBuild ) );
 		$this->assertTrue(
-			condition: $this->manager->setDispatcher( $afterBuild = $this->createDispatcherMock(), EventType::AfterBuild ),
+			condition: $this->manager->setDispatcher( $afterBuild, EventType::AfterBuild ),
 			message: 'Must be able to assign dispatcher if not previously set.'
 		);
 		$this->assertSame( $afterBuild, $this->manager->getDispatcher( EventType::AfterBuild ) );
 		$this->assertEventDispatchersAssignedStatus( expected: true );
 
-		foreach ( array( $beforeBuild, $building, $afterBuild ) as $dispatcher ) {
-			$dispatcher->expects( $this->exactly( 3 ) )->method( 'reset' );
-		}
+		array_walk( $dispatchers, $this->assertListenersAddedWithAndWithoutEntries( ... ) );
+
+		$this->manager->reset( null );
+
+		array_walk( $dispatchers, $this->assertResetListenersWithoutEntriesAndAddAnotherTestListener( ... ) );
+
+		$this->manager->reset( 'anotherTest' );
+
+		array_walk( $dispatchers, $this->assertResetListenersOnlyForAnotherTest( ... ) );
+
+		$this->manager->reset( '' );
+
+		array_walk( $dispatchers, $this->assertResetAllListenersRegisteredWithEntries( ... ) );
+
+		array_walk( $dispatchers, $this->assertListenersAddedWithAndWithoutEntries( ... ) );
 
 		$this->manager->reset();
-		$this->manager->reset( null );
+
+		array_walk( $dispatchers, $this->assertResetAllListenersIfArgNotPassedWhenResetting( ... ) );
 	}
 
 	private function assertEventDispatchersAssignedStatus( bool $expected ): void {
 		foreach ( EventType::cases() as $eventType ) {
 			$this->assertSame( $expected, actual: $this->manager->isDispatcherAssigned( $eventType ) );
 		}
+	}
+
+	private function assertListenersAddedWithAndWithoutEntries( EventDispatcher $dispatcher ): void {
+		$dispatcher->addListener( $this->any( ... ), null );
+		$dispatcher->addListener( $this->any( ... ), 'test' );
+
+		$this->assertCount( 1, $dispatcher->getListeners() );
+		$this->assertCount( 1, $dispatcher->getListeners( '' ) );
+	}
+
+	private function assertResetListenersWithoutEntriesAndAddAnotherTestListener( EventDispatcher $dispatcher ): void {
+		$this->assertCount( 0, $dispatcher->getListeners( null ) );
+
+		$dispatcher->addListener( $this->exactly( ... ), 'anotherTest' );
+
+		$this->assertCount( 2, $dispatcher->getListeners( '' ) );
+	}
+
+	private function assertResetListenersOnlyForAnotherTest( EventDispatcher $dispatcher ): void {
+			$this->assertArrayHasKey( 'anotherTest', $dispatcher->getListeners( '' ) );
+			$this->assertEmpty( $dispatcher->getListeners( 'anotherTest' ) );
+			$this->assertNotEmpty( $dispatcher->getListeners( 'test' ) );
+	}
+
+	private function assertResetAllListenersRegisteredWithEntries( EventDispatcher $dispatcher ): void {
+		$this->assertEmpty( $dispatcher->getListeners( '' ) );
+		$this->assertFalse( $dispatcher->hasListeners( '' ) );
+	}
+
+	private function assertResetAllListenersIfArgNotPassedWhenResetting( EventDispatcher $dispatcher ): void {
+		$this->assertEmpty( $dispatcher->getListeners( null ) );
+		$this->assertEmpty( $dispatcher->getListeners( '' ) );
+		$this->assertFalse( $dispatcher->hasListeners( null ) );
+		$this->assertFalse( $dispatcher->hasListeners( '' ) );
 	}
 }
