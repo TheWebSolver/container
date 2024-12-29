@@ -137,18 +137,18 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/**
-	 * @param callable|string     $func Possible options are:
+	 * @param callable|string     $entry Can either be a fully-qualified classname or:
 	 * - `string`   -> 'classname::methodname'
 	 * - `string`   -> 'classname#' . spl_object_id($classInstance) . '::methodname'
 	 * - `callable` -> $classInstance->methodname(...) as first-class callable
 	 * - `callable` -> array($classInstance, 'methodname').
 	 * @param array<string,mixed> $args The method's injected parameters.
-	 * @throws BadResolverArgument When method cannot be resolved or no `$default`.
+	 * @throws BadResolverArgument When method cannot be resolved or no `$methodName`.
 	 */
-	public function call( callable|string $func, array $args = array(), ?string $default = null ): mixed {
+	public function call( callable|string $entry, array $args = array(), ?string $methodName = null ): mixed {
 		return ( new MethodResolver( $this, $this->artefact ) )
 			->usingEventDispatcher( $this->eventManager->getDispatcher( EventType::Building ) )
-			->withCallback( $func, $default )
+			->withCallback( $entry, $methodName )
 			->withParameter( $args )
 			->resolve();
 	}

@@ -331,7 +331,20 @@ class ContainerTest extends TestCase {
 		$this->assertSame( expected: 'Using Event Builder', actual: $secondaryClass->value );
 	}
 
-	/** @return array{0:object,1:string,2:string} */
+	public function testMethodCallWithSplObjectStorage(): void {
+		$binding  = new Binding( '' );
+		$instance = $this->app->call(
+			entry: Container::class,
+			methodName: 'setInstance',
+			args: array(
+				'id'       => 'test',
+				'instance' => $binding,
+			)
+		);
+		$this->assertSame( $instance, $binding );
+	}
+
+	/** @return array{0:class-string,1:string,2:string} */
 	private function getTestClassInstanceStub(): array {
 		$test = new class() {
 			public function get( int $val ): int {
@@ -349,32 +362,46 @@ class ContainerTest extends TestCase {
 			public static function addsThree( int $val ): int {
 				return $val + 3;
 			}
+
+			private int $value;
+
+			public function setValue( int $val ): self {
+				$this->value = $val;
+
+				return $this;
+			}
+
+			public function getValue(): int {
+				return $this->value;
+			}
 		};
 
 		$normalId   = $test::class . '::get';
 		$instanceId = $test::class . '#' . spl_object_id( $test ) . '::get';
 
-		return array( $test, $normalId, $instanceId );
+		$this->app->setInstance( $test::class, $test );
+
+		return array( $test::class, $normalId, $instanceId );
 	}
 
 	public function testMethodCallForInvocableClassInstance(): void {
 		[ $test, $testGetString ] = $this->getTestClassInstanceStub();
-		$testInvokeInstance       = $test::class . '#' . spl_object_id( $test ) . '::__invoke';
-		$testInvokeString         = $test::class . '::__invoke';
+		$testInvokeInstance       = $test . '#' . spl_object_id( $this->app->get( $test ) ) . '::__invoke';
+		$testInvokeString         = $test . '::__invoke';
 
 		$this->app->when( $testInvokeInstance )
 			->needs( '$val' )
 			->give( static fn(): int => 95 );
 
-		$this->assertSame( expected: 100, actual: $this->app->call( $test ) );
-		$this->assertSame( expected: 100, actual: $this->app->call( array( $test, '__invoke' ) ) );
+		$this->assertSame( expected: 100, actual: $this->app->call( $this->app->get( $test ) ) );
+		$this->assertSame( expected: 100, actual: $this->app->call( array( $this->app->get( $test ), '__invoke' ) ) );
 
 		$this->app->when( $testInvokeString )
 			->needs( '$val' )
 			->give( static fn(): int => 195 );
 
 		$this->assertSame( expected: 200, actual: $this->app->call( $testInvokeString ) );
-		$this->assertSame( expected: 200, actual: $this->app->call( $test::class ) );
+		$this->assertSame( expected: 200, actual: $this->app->call( $test ) );
 
 		$this->app->when( $testGetString )
 			->needs( '$val' )
@@ -382,28 +409,29 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 300, actual: $this->app->call( $testGetString ) );
 
-		$this->app->when( $test->addsTen( ... ) )
+		$this->app->when( $this->app->get( $test )->addsTen( ... ) )
 			->needs( '$val' )
 			->give( static fn(): int => 380 );
 
-		$this->assertSame( expected: 390, actual: $this->app->call( $test->addsTen( ... ) ) );
-		$this->assertSame( expected: 390, actual: $this->app->call( array( $test, 'addsTen' ) ) );
+		$this->assertSame( expected: 390, actual: $this->app->call( $this->app->get( $test )->addsTen( ... ) ) );
+		$this->assertSame( expected: 390, actual: $this->app->call( array( $this->app->get( $test ), 'addsTen' ) ) );
 
-		$this->app->when( $test::class . '::addsTen' )
+		$this->app->when( $test . '::addsTen' )
 			->needs( '$val' )
 			->give( static fn (): int => 2990 );
 
-		$this->assertSame( expected: 3000, actual: $this->app->call( $test::class . '::addsTen' ) );
+		$this->assertSame( expected: 3000, actual: $this->app->call( $test . '::addsTen' ) );
+		$this->assertSame( expected: 3000, actual: $this->app->call( $test, methodName: 'addsTen' ) );
 
 		$this->withEventListenerValue( value: 85 );
 
 		$this->assertSame( expected: 90, actual: $this->app->call( $test ) );
 
-		$this->assertSame( expected: 90, actual: $this->app->call( array( $test, '__invoke' ) ) );
+		$this->assertSame( expected: 90, actual: $this->app->call( array( $this->app->get( $test ), '__invoke' ) ) );
 
 		$this->withEventListenerValue( value: 185 );
 
-		$this->assertSame( expected: 190, actual: $this->app->call( $test::class ) );
+		$this->assertSame( expected: 190, actual: $this->app->call( $test ) );
 
 		$this->withEventListenerValue( value: 188 );
 
@@ -411,25 +439,25 @@ class ContainerTest extends TestCase {
 
 		$this->withEventListenerValue( value: 0 );
 
-		$this->assertSame( expected: 10, actual: $this->app->call( $test->addsTen( ... ) ) );
+		$this->assertSame( expected: 10, actual: $this->app->call( $this->app->get( $test )->addsTen( ... ) ) );
 
 		$this->withEventListenerValue( value: 0 );
 
-		$this->assertSame( expected: 10, actual: $this->app->call( array( $test, 'addsTen' ) ) );
+		$this->assertSame( expected: 10, actual: $this->app->call( array( $this->app->get( $test ), 'addsTen' ) ) );
 
 		$this->assertSame( expected: 30, actual: $this->app->call( $test, array( 'val' => 25 ) ) );
 		$this->assertSame(
 			expected: 30,
-			actual: $this->app->call( $test, array( 'val' => 25 ), 'no effect' )
+			actual: $this->app->call( $this->app->get( $test ), array( 'val' => 25 ), 'no effect' )
 		);
 
 		$this->assertSame(
 			expected: 130,
-			actual: $this->app->call( $test::class, array( 'val' => 125 ), '__invoke' )
+			actual: $this->app->call( $test, array( 'val' => 125 ), '__invoke' )
 		);
 		$this->assertSame(
 			expected: 127,
-			actual: $this->app->call( $test::class, array( 'val' => 125 ), 'get' )
+			actual: $this->app->call( $test, array( 'val' => 125 ), 'get' )
 		);
 		$this->assertSame(
 			expected: 140,
@@ -438,35 +466,44 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame(
 			expected: 40,
-			actual: $this->app->call( $test->addsTen( ... ), array( 'val' => 30 ), 'no effect' )
+			actual: $this->app->call( $this->app->get( $test )->addsTen( ... ), array( 'val' => 30 ), 'no effect' )
 		);
 
 		$this->app->setMethod( entry: $testInvokeInstance, callback: static fn( $test ) => $test( 15 ) );
 
-		$this->assertSame( expected: 20, actual: $this->app->call( $test ) );
+		$this->assertSame( expected: 20, actual: $this->app->call( $this->app->get( $test ) ) );
 
 		$this->app->setMethod( entry: $testInvokeString, callback: static fn( $test ) => $test( 115 ) );
 
-		$this->assertSame( expected: 120, actual: $this->app->call( $test::class ) );
+		$this->assertSame( expected: 120, actual: $this->app->call( $test ) );
 
 		$this->app->setMethod( entry: $testGetString, callback: static fn( $test ) => $test->addsTen( 140 ) );
 
 		$this->assertSame( expected: 150, actual: $this->app->call( $testGetString ) );
 		$this->assertSame(
 			expected: 150,
-			actual: $this->app->call( $test::class, array( 'val' => 490 ), 'get' ),
+			actual: $this->app->call( $test, array( 'val' => 490 ), 'get' ),
 			message: 'Coz "$test::get" is already bound ($testGetString), we get binding result instead.'
 		);
 
-		$this->app->setMethod( entry: $test->addsTen( ... ), callback: static fn() => 23 );
+		$this->app->setMethod( entry: $this->app->get( $test )->addsTen( ... ), callback: static fn() => 23 );
 
-		$this->assertSame( expected: 23, actual: $this->app->call( $test->addsTen( ... ) ) );
-		$this->assertSame( expected: 23, actual: $this->app->call( array( $test, 'addsTen' ) ) );
+		$this->assertSame( expected: 23, actual: $this->app->call( $this->app->get( $test )->addsTen( ... ) ) );
+		$this->assertSame( expected: 23, actual: $this->app->call( array( $this->app->get( $test ), 'addsTen' ) ) );
 
 		$this->assertSame(
 			expected: 500,
-			actual: $this->app->call( $test::class, array( 'val' => 490 ), 'addsTen' )
+			actual: $this->app->call( $test, array( 'val' => 490 ), 'addsTen' )
 		);
+
+		// $this->app->setMethod( $this->app->get( $test )->getValue( ... ), static fn( $test ) => $test->setValue( 99 )->getValue() );
+		// Or
+		// $this->app->call( $this->app->get( $test )->setValue( ... ), array( 'val' => 99 ) );
+		// Or
+		$this->app->get( $test )->setValue( 99 );
+
+		$this->assertSame( 99, $this->app->call( $this->app->get( $test )->getValue( ... ) ) );
+		$this->assertSame( 99, $this->app->get( $test )->getValue() );
 	}
 
 	private function withEventListenerValue( int $value ): void {
