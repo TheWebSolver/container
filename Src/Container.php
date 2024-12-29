@@ -162,9 +162,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		try {
 			return $this->resolve( $id, $args, dispatch: true );
 		} catch ( Exception $e ) {
-			throw $this->has( $id ) || $e instanceof ContainerExceptionInterface
-				? $e
-				: EntryNotFound::for( $id, previous: $e );
+			$this->throwContainerException( $id, $e );
 		}
 	}
 
@@ -426,6 +424,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	protected function maybePurgeIfAliasOrInstance( string $id ): void {
 		$this->removeInstance( $id );
 		$this->aliases->remove( $id );
+	}
+
+	private function throwContainerException( string $id, Exception $thrown ): never {
+		throw $this->has( $id ) || $thrown instanceof ContainerExceptionInterface
+				? $thrown
+				: EntryNotFound::for( $id, previous: $thrown );
 	}
 
 	/**
