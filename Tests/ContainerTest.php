@@ -11,6 +11,7 @@ use WeakMap;
 use stdClass;
 use ArrayAccess;
 use LogicException;
+use ReflectionClass;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -45,6 +46,26 @@ class ContainerTest extends TestCase {
 
 	public function testSingleton(): void {
 		$this->assertSame( Container::boot(), Container::boot() );
+	}
+
+	public function testInstanceAssignment(): void {
+		$reflection = new ReflectionClass( Container::class );
+		$original   = Container::boot();
+		$new        = new Container();
+
+		$this->assertFalse( Container::use( $new ) === $new );
+
+		// Already booted container cannot set instance again. Removing singleton.
+		$reflection->setStaticPropertyValue( 'instance', null );
+
+		$this->assertTrue( Container::use( $new ) === $new );
+		$this->assertTrue( Container::boot() === $new );
+
+		// Reset container singleton back to its original state.
+		$reflection->setStaticPropertyValue( 'instance', $original );
+
+		$this->assertFalse( Container::boot() === $new );
+		$this->assertTrue( Container::boot() === $original );
 	}
 
 	public function testArrayAccessible(): void {
@@ -148,6 +169,31 @@ class ContainerTest extends TestCase {
 			condition: $this->app->isInstance( WeakMap::class ),
 			message: 'Instance must be purged if another binding created.'
 		);
+
+		$this->tearDown();
+
+		$this->app->setAlias( WeakMap::class, 'mapOfEnums' );
+		$this->app->set( ArrayAccess::class, 'mapOfEnums' );
+
+		$this->assertInstanceOf( WeakMap::class, $this->app->get( 'mapOfEnums' ) );
+
+		$this->assertTrue( $this->app->has( ArrayAccess::class ) );
+		$this->assertFalse( $this->app->has( WeakMap::class ) );
+		$this->assertTrue( $this->app->has( 'mapOfEnums' ) );
+		$this->assertTrue( $this->app->isAlias( 'mapOfEnums' ) );
+		$this->assertTrue( $this->app->hasBinding( ArrayAccess::class ) );
+		$this->assertFalse( $this->app->hasResolved( ArrayAccess::class ) );
+		$this->assertInstanceOf( WeakMap::class, $this->app->get( ArrayAccess::class ) );
+		$this->assertTrue( $this->app->hasResolved( ArrayAccess::class ) );
+
+		$this->tearDown();
+
+		$this->app->setAlias( ArrayAccess::class, 'arrayAccessible' );
+		$this->app->set( 'arrayAccessible', WeakMap::class );
+
+		$this->assertFalse( $this->app->isAlias( 'arrayAccessible' ) );
+		$this->assertTrue( $this->app->hasBinding( 'arrayAccessible' ) );
+		$this->assertInstanceOf( WeakMap::class, $this->app['arrayAccessible'] );
 	}
 
 	public function testAliasAndGetWithoutBinding(): void {
@@ -197,12 +243,6 @@ class ContainerTest extends TestCase {
 	public function testContextualBinding(): void {
 		$this->app->when( Binding::class )
 			->needs( '$material' )
-			->give( 'With Builder' );
-
-		$this->assertSame( 'With Builder', $this->app->get( id: Binding::class )->material );
-
-		$this->app->when( Binding::class )
-			->needs( '$material' )
 			->give( static fn (): string => 'With Builder from closure' );
 
 		$this->assertSame( 'With Builder from closure', $this->app->get( id: Binding::class )->material );
@@ -227,6 +267,22 @@ class ContainerTest extends TestCase {
 			->give( Stack::class );
 
 		$this->assertInstanceOf( expected: Stack::class, actual: $this->app->get( $class )->getStack() );
+
+		$class1 = new class() {
+			public function __construct( public ArrayAccess $stack = new WeakMap() ) {}
+		};
+
+		$class2 = new class() {
+			public function __construct( public ArrayAccess $stack = new WeakMap() ) {}
+		};
+
+		$this->app->when( $classes = array( $class1::class, $class2::class ) )
+			->needs( ArrayAccess::class )
+			->give( Stack::class );
+
+		foreach ( $classes as $classname ) {
+			$this->assertInstanceOf( Stack::class, $this->app->get( $classname )->stack );
+		}
 	}
 
 	public function testContextualBindingNeedsConcreteInsteadOfAliasToGetContextualData(): void {
@@ -374,6 +430,10 @@ class ContainerTest extends TestCase {
 			public function getValue(): int {
 				return $this->value;
 			}
+
+			public function getArrayAccess( ArrayAccess $stack ): ArrayAccess {
+				return $stack;
+			}
 		};
 
 		$normalId   = $test::class . '::get';
@@ -422,6 +482,20 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( expected: 3000, actual: $this->app->call( $test . '::addsTen' ) );
 		$this->assertSame( expected: 3000, actual: $this->app->call( $test, methodName: 'addsTen' ) );
+
+		$this->app->when( "{$test}::getArrayAccess" )
+			->needs( ArrayAccess::class )
+			->give( WeakMap::class );
+
+		$this->assertInstanceOf( WeakMap::class, $this->app->call( $test, methodName: 'getArrayAccess' ) );
+
+		$arrayAccessMethod = $this->app->get( $test )->getArrayAccess( ... );
+
+		$this->app->when( $arrayAccessMethod )
+			->needs( ArrayAccess::class )
+			->give( WeakMap::class );
+
+		$this->assertInstanceOf( WeakMap::class, $this->app->call( $arrayAccessMethod ) );
 
 		$this->withEventListenerValue( value: 85 );
 
@@ -557,15 +631,19 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testEventListenerBeforeBuild(): void {
-		$app = new Container();
-
-		$app->when( EventType::BeforeBuild )
+		$this->app->when( EventType::BeforeBuild )
 			->for( _Stack__ContextualBindingWithArrayAccess__Stub::class )
-			->listenTo( static fn ( BeforeBuildEvent $e ) => $e->setParam( 'array', new WeakMap() ) );
+			->listenTo(
+				static function ( BeforeBuildEvent $e ) {
+					if ( _Stack__ContextualBindingWithArrayAccess__Stub::class === $e->getEntry() ) {
+						$e->setParam( 'array', new WeakMap() );
+					}
+				}
+			);
 
 		$this->assertInstanceOf(
 			expected: WeakMap::class,
-			actual: $app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class )->array
+			actual: $this->app->get( _Stack__ContextualBindingWithArrayAccess__Stub::class )->array
 		);
 	}
 
