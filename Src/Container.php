@@ -82,6 +82,11 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return static::$instance ??= new static();
 	}
 
+	/** @param static $instance */
+	public static function use( self $instance ): static {
+		return static::$instance ??= $instance;
+	}
+
 	/** @param string $key The key. */
 	public function offsetExists( $key ): bool {
 		return $this->has( $key );
