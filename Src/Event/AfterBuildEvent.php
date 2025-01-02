@@ -23,10 +23,15 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 	 * @param CollectionStack<string,Closure(TResolved $resolved, Container $app): void>                              $updaters
 	 */
 	public function __construct(
+		private readonly Container $app,
 		private readonly string $entry,
 		private readonly CollectionStack $decorators = new CollectionStack(),
 		private readonly CollectionStack $updaters = new CollectionStack()
 	) {}
+
+	public function app(): Container {
+		return $this->app;
+	}
 
 	/** @return CollectionStack<string,class-string<TResolved>|(Closure(TResolved $resolved, Container $app): TResolved)> */
 	public function getDecorators(): CollectionStack {

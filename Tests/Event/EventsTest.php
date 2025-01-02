@@ -60,7 +60,7 @@ class EventsTest extends TestCase {
 
 	public function testAfterBuildEvent(): void {
 		$mocks = $this->getDecoratorsAndUpdatersMock();
-		$event = new AfterBuildEvent( 'entry', ...$mocks );
+		$event = new AfterBuildEvent( $this->createStub( Container::class ), 'entry', ...$mocks );
 
 		$this->assertSame( 'entry', $event->getEntry() );
 		$this->assertSame( $mocks[0], $event->getDecorators() );
@@ -73,7 +73,7 @@ class EventsTest extends TestCase {
 		Closure $updater
 	): void {
 		[ $decorators, $updaters ] = $this->getDecoratorsAndUpdatersMock();
-		$event                     = new AfterBuildEvent( 'testDecorators', $decorators, $updaters );
+		$event                     = new AfterBuildEvent( $this->createStub( Container::class ), 'testDecorators', $decorators, $updaters );
 
 		$decorators->expects( $this->once() )
 			->method( 'set' )

@@ -109,7 +109,7 @@ class AfterBuildHandler {
 		}
 
 		/** @var ?AfterBuildEvent<TResolved> */
-		$event = $this->dispatcher->dispatch( event: new AfterBuildEvent( $this->entry ) );
+		$event = $this->dispatcher->dispatch( event: new AfterBuildEvent( $this->app, $this->entry ) );
 
 		if ( ! $event instanceof AfterBuildEvent ) {
 			return $resolved;
