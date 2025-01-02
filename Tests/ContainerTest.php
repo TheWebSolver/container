@@ -10,6 +10,7 @@ namespace TheWebSolver\Codegarage\Tests;
 use WeakMap;
 use stdClass;
 use ArrayAccess;
+use ArrayObject;
 use LogicException;
 use ReflectionClass;
 use PHPUnit\Framework\TestCase;
@@ -22,6 +23,7 @@ use TheWebSolver\Codegarage\Container\Data\Binding;
 use TheWebSolver\Codegarage\Container\Event\EventType;
 use TheWebSolver\Codegarage\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Container\Data\SharedBinding;
+use TheWebSolver\Codegarage\Container\Error\LogicalError;
 use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Container\Error\ContainerError;
 use TheWebSolver\Codegarage\Container\Pool\CollectionStack;
@@ -822,6 +824,42 @@ class ContainerTest extends TestCase {
 		};
 	}
 
+	public function testAfterBuildEventWithStubs(): void {
+		require_once __DIR__ . '/Wiki/AfterBuildEvent.php';
+
+		$this->app->set( Customer::class, CustomerDetails::class );
+
+		$this->app->when( CustomerDetails::class )
+			->needs( ArrayAccess::class )
+			->give( ArrayObject::class );
+
+		$customer = $this->app->get( Customer::class );
+
+		$this->assertInstanceOf( CustomerDetails::class, $customer );
+		$this->assertEmpty( $customer->getPersonalInfo() );
+
+		$this->app->when( MerchCustomerDetails::class )
+			->needs( ArrayAccess::class )
+			->give( static fn(): ArrayAccess => new ArrayObject( array( 'zip_code' => '44800' ) ) );
+
+		$this->app->when( EventType::AfterBuild )
+			->for( Customer::class )
+			->listenTo( customerDetailsEventListener( ... ) );
+
+		$customer = $this->app->get( Customer::class );
+
+		$this->assertInstanceOf( MerchCustomerDetails::class, $customer );
+		$this->assertSame( 'John', $customer->personalInfoToArray()['firstName'] );
+		$this->assertSame(
+			actual: $customer->billingInfoToArray(),
+			expected: array(
+				'state'   => 'Bagmati', // from CustomerDetails::$address.
+				'country' => 'Nepal',   // from CustomerDetails::$address.
+				'zipCode' => 44800,     // from MerchCustomerDetails::$billingAddress.
+			),
+		);
+	}
+
 	public function testAllEvents(): void {
 		$this->app->setAlias( _Stack__ContextualBindingWithArrayAccess__Stub::class, 'decoratorTest' );
 		$this->app->set( JustTest__Stub::class, 'decoratorTest' );
@@ -911,6 +949,17 @@ class ContainerTest extends TestCase {
 			);
 
 			$this->assertSame( 'asCallable', $this->app->get( JustTest__Stub::class )->name );
+
+			$eventManager = new EventManager();
+			$eventManager->setDispatcher( false, EventType::Building );
+
+			$this->app = new Container( eventManager: $eventManager );
+
+			$this->expectException( LogicalError::class );
+
+			$this->app->when( EventType::Building )
+				->for( 'string', paramName: 'name' )
+				->listenTo( static function () {} );
 	}
 
 	/** @dataProvider provideVariousExceptionTypesForAfterBuildEvent */
