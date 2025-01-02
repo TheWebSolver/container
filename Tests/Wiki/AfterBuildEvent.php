@@ -4,13 +4,18 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Tests;
 
 use ArrayAccess;
+use ArrayObject;
 use TheWebSolver\Codegarage\Container\Event\AfterBuildEvent;
 
 function customerDetailsEventListener( AfterBuildEvent $event ): void {
+	$event->app()->when( MerchCustomerDetails::class )
+		->needs( ArrayAccess::class )
+		->give( static fn(): ArrayAccess => new ArrayObject( array( 'zip_code' => '44800' ) ) );
+
 	$event
 		->decorateWith( MerchCustomerDetails::class )
 		->update(
-			function ( Customer $customer ): void {
+			static function ( Customer $customer ): void {
 				$personalInfo = $customer->getPersonalInfo();
 
 				$personalInfo['first_name'] = 'John';

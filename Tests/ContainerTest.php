@@ -838,10 +838,6 @@ class ContainerTest extends TestCase {
 		$this->assertInstanceOf( CustomerDetails::class, $customer );
 		$this->assertEmpty( $customer->getPersonalInfo() );
 
-		$this->app->when( MerchCustomerDetails::class )
-			->needs( ArrayAccess::class )
-			->give( static fn(): ArrayAccess => new ArrayObject( array( 'zip_code' => '44800' ) ) );
-
 		$this->app->when( EventType::AfterBuild )
 			->for( Customer::class )
 			->listenTo( customerDetailsEventListener( ... ) );
