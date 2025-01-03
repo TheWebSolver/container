@@ -1,16 +1,12 @@
 <?php // phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed, Generic.Files.OneObjectStructurePerFile.MultipleFound
 declare( strict_types = 1 );
 
-namespace TheWebSolver\Codegarage\Tests;
-
-use ArrayAccess;
-use ArrayObject;
 use TheWebSolver\Codegarage\Container\Event\AfterBuildEvent;
 
 function customerDetailsEventListener( AfterBuildEvent $event ): void {
 	$event->app()->when( MerchCustomerDetails::class )
 		->needs( ArrayAccess::class )
-		->give( static fn(): ArrayAccess => new ArrayObject( array( 'zip_code' => '44800' ) ) );
+		->give( static fn(): ArrayAccess => new ArrayObject( array( 'zip_code' => '44600' ) ) );
 
 	$event
 		->decorateWith( MerchCustomerDetails::class )
@@ -36,7 +32,7 @@ interface Customer {
 	public function personalInfoToArray(): array;
 
 	/** @return array{state:string,country:string,zipCode:int} */
-	public function billingInfoToArray(): array;
+	public function addressToArray(): array;
 }
 
 class CustomerDetails implements Customer {
@@ -69,7 +65,7 @@ class CustomerDetails implements Customer {
 		);
 	}
 
-	public function billingInfoToArray(): array {
+	public function addressToArray(): array {
 		return array(
 			'state'   => $this->address['state'],
 			'country' => $this->address['country'],
@@ -81,7 +77,7 @@ class CustomerDetails implements Customer {
 class MerchCustomerDetails implements Customer {
 	public function __construct(
 		private Customer $customer,
-		private ?ArrayAccess $billingAddress = null,
+		private ?ArrayAccess $shippingAddress = null,
 	) {}
 
 	public function setPersonalInfo( ArrayAccess $details ): void {
@@ -100,17 +96,17 @@ class MerchCustomerDetails implements Customer {
 		return $this->customer->personalInfoToArray();
 	}
 
-	public function billingInfoToArray(): array {
-		$address = $this->customer->billingInfoToArray();
+	public function addressToArray(): array {
+		$address = $this->customer->addressToArray();
 
-		if ( null === $this->billingAddress ) {
+		if ( null === $this->shippingAddress ) {
 			return $address;
 		}
 
 		return array(
-			'state'   => $this->billingAddress['state'] ?? $address['state'],
-			'country' => $this->billingAddress['country'] ?? $address['country'],
-			'zipCode' => (int) ( $this->billingAddress['zip_code'] ?? $address['zip_code'] ),
+			'state'   => $this->shippingAddress['state'] ?? $address['state'],
+			'country' => $this->shippingAddress['country'] ?? $address['country'],
+			'zipCode' => (int) ( $this->shippingAddress['zip_code'] ?? $address['zip_code'] ),
 		);
 	}
 }

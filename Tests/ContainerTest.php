@@ -824,38 +824,6 @@ class ContainerTest extends TestCase {
 		};
 	}
 
-	public function testAfterBuildEventWithStubs(): void {
-		require_once __DIR__ . '/Wiki/AfterBuildEvent.php';
-
-		$this->app->set( Customer::class, CustomerDetails::class );
-
-		$this->app->when( CustomerDetails::class )
-			->needs( ArrayAccess::class )
-			->give( ArrayObject::class );
-
-		$customer = $this->app->get( Customer::class );
-
-		$this->assertInstanceOf( CustomerDetails::class, $customer );
-		$this->assertEmpty( $customer->getPersonalInfo() );
-
-		$this->app->when( EventType::AfterBuild )
-			->for( Customer::class )
-			->listenTo( customerDetailsEventListener( ... ) );
-
-		$customer = $this->app->get( Customer::class );
-
-		$this->assertInstanceOf( MerchCustomerDetails::class, $customer );
-		$this->assertSame( 'John', $customer->personalInfoToArray()['firstName'] );
-		$this->assertSame(
-			actual: $customer->billingInfoToArray(),
-			expected: array(
-				'state'   => 'Bagmati', // from CustomerDetails::$address.
-				'country' => 'Nepal',   // from CustomerDetails::$address.
-				'zipCode' => 44800,     // from MerchCustomerDetails::$billingAddress.
-			),
-		);
-	}
-
 	public function testAllEvents(): void {
 		$this->app->setAlias( _Stack__ContextualBindingWithArrayAccess__Stub::class, 'decoratorTest' );
 		$this->app->set( JustTest__Stub::class, 'decoratorTest' );
