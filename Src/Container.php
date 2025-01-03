@@ -38,6 +38,7 @@ use TheWebSolver\Codegarage\Container\Attribute\DecorateWith;
 use TheWebSolver\Codegarage\Container\Event\BeforeBuildEvent;
 use TheWebSolver\Codegarage\Container\Error\BadResolverArgument;
 use TheWebSolver\Codegarage\Container\Event\Manager\EventManager;
+use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
 use TheWebSolver\Codegarage\Container\Event\Manager\AfterBuildHandler;
 
 /** @template-implements ArrayAccess<string,mixed> */
@@ -206,6 +207,10 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->resolvedInstances[ $entry ] ?? $this->resolved[ $entry ];
 	}
 
+	public function getListenerRegistry( EventType $eventType ): ?ListenerRegistry {
+		return $this->eventManager->getDispatcher( $eventType );
+	}
+
 	/**
 	 * @param string|class-string               $key
 	 * @param string|class-string|callable|null $value
@@ -291,7 +296,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	 */
 	public function when( EventType|string|array|Closure $concrete ): ContextBuilder|EventBuilder {
 		return $concrete instanceof EventType
-			? EventBuilder::create( $concrete, $this, $this->eventManager )
+			? EventBuilder::create( $concrete, $this )
 			: ContextBuilder::create( $concrete, $this, $this->contextManager );
 	}
 

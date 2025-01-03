@@ -1,4 +1,4 @@
-<?php // phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
+<?php
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Container\Helper;
@@ -7,22 +7,15 @@ use Closure;
 use TheWebSolver\Codegarage\Container\Container;
 use TheWebSolver\Codegarage\Container\Event\EventType;
 use TheWebSolver\Codegarage\Container\Error\LogicalError;
-use TheWebSolver\Codegarage\Container\Event\Manager\EventManager;
 use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
 
 final class EventBuilder {
 	private string $key;
 
-	public function __construct(
-		private Container $app,
-		private EventType $type,
-		private ListenerRegistry $registry
-	) {}
+	public function __construct( private Container $app, private EventType $type ) {}
 
-	public static function create( EventType $type, Container $app, EventManager $manager ): self {
-		return ( $registry = $manager->getDispatcher( $type ) )
-			? new self( $app, $type, $registry )
-			: throw LogicalError::unsupportedEventType( $type );
+	public static function create( EventType $type, Container $app ): self {
+		return new self( $app, $type );
 	}
 
 	/**
@@ -37,11 +30,16 @@ final class EventBuilder {
 
 	/**
 	 * @param Closure(object): void $listener
-	 * @throws LogicalError When this method is invoked before setting id and/or param name.
+	 * @throws LogicalError When no registry found or this method is invoked before setting id and/or param name.
 	 */
+	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
 	public function listenTo( Closure $listener, int $priority = ListenerRegistry::DEFAULT_PRIORITY ): void {
 		$forEntry = $this->key ?? throw LogicalError::eventListenerEntryNotProvidedWith( method: 'for' );
 
-		$this->registry->addListener( $listener, $forEntry, $priority );
+		if ( ! $registry = $this->app->getListenerRegistry( $this->type ) ) {
+			throw LogicalError::unsupportedEventType( $this->type );
+		}
+
+		$registry->addListener( $listener, $forEntry, $priority );
 	}
 }
