@@ -27,8 +27,8 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 		return $this->provider->getListeners( $forEntry );
 	}
 
-	public function getPriorities(): array {
-		return $this->provider->getPriorities();
+	public function getPriorities( ?string $forEntry = null ): array {
+		return $this->provider->getPriorities( $forEntry );
 	}
 
 	public function hasListeners( ?string $forEntry = null ): bool {

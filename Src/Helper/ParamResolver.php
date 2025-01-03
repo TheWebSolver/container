@@ -138,7 +138,7 @@ class ParamResolver {
 		/** @var ListenerRegistry<BuildingEvent> */
 		$dispatcher = $this->dispatcher;
 		$attribute  = $attributes[0]->newInstance();
-		$priorities = $dispatcher->getPriorities();
+		$priorities = $dispatcher->getPriorities( $entry );
 		$priority   = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
 
 		$dispatcher->addListener( ( $attribute->listener )( ... ), $entry, $priority );

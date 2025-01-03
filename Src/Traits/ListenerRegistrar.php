@@ -13,12 +13,12 @@ trait ListenerRegistrar {
 	/** @use EventListeners<TEvent> */
 	use EventListeners;
 
-	protected bool $needsSorting = false;
-	/** @var array{low:int,high:int} */
-	protected array $priorities = array(
+	private const DEFAULT_PRIORITIES = array(
 		'low'  => ListenerRegistry::DEFAULT_PRIORITY,
 		'high' => ListenerRegistry::DEFAULT_PRIORITY,
 	);
+
+	protected bool $needsSorting = false;
 
 	/**
 	 * Validates registered event listeners are for the given event.
@@ -39,7 +39,7 @@ trait ListenerRegistrar {
 		?string $forEntry = null,
 		int $priority = ListenerRegistry::DEFAULT_PRIORITY
 	): void {
-		$this->resetProperties( $priority );
+		$this->needsSorting = true;
 
 		if ( $forEntry ) {
 			$this->listenersForEntry[ $forEntry ][ $priority ][] = $listener;
@@ -58,8 +58,13 @@ trait ListenerRegistrar {
 		return $this->getListenersRegistered( $forEntry );
 	}
 
-	public function getPriorities(): array {
-		return $this->priorities;
+	public function getPriorities( ?string $forEntry = null ): array {
+		$priorities = array_keys( $forEntry ? $this->listenersForEntry[ $forEntry ] ?? array() : $this->listeners );
+
+		return empty( $priorities ) ? self::DEFAULT_PRIORITIES : array(
+			'low'  => min( $priorities ),
+			'high' => max( $priorities ),
+		);
 	}
 
 	public function reset( ?string $collectionId = null ): void {
@@ -102,22 +107,6 @@ trait ListenerRegistrar {
 		ksort( $listeners, flags: SORT_NUMERIC );
 
 		return $listeners;
-	}
-
-	protected function resetProperties( int $currentPriority ): void {
-		$this->needsSorting = true;
-
-		if ( $currentPriority < $this->priorityPreviouslySetAs( 'low' ) ) {
-			$this->priorities['low'] = $currentPriority;
-		}
-
-		if ( $currentPriority > $this->priorityPreviouslySetAs( 'high' ) ) {
-			$this->priorities['high'] = $currentPriority;
-		}
-	}
-
-	private function priorityPreviouslySetAs( string $type ): int {
-		return $this->priorities[ $type ];
 	}
 
 	/** @return ($forEntry is null|non-empty-string ? array<int,array<int,callable(TEvent): void>> : array<string,array<int,array<int,callable(TEvent): void>>>) */

@@ -18,12 +18,12 @@ interface ListenerRegistry extends Resettable {
 	public function addListener( Closure $listener, ?string $forEntry, int $priority ): void;
 
 	/**
-	 * Verifies if current registry has listeners attached.
+	 * Verifies if current registry has event listeners attached.
 	 *
-	 * Listeners existence must be checked based on {@param $forEntry} value as:
-	 * - `null`             - Check for listeners registered without entries.
-	 * - `empty-string`     - Check for listeners registered with all entries.
-	 * - `non-empty-string` - Check for listeners registered only with the particular entry.
+	 * Event Listeners existence must be checked based on {@param $forEntry} value as:
+	 * - `null`             - Check for event listeners registered without entries.
+	 * - `empty-string`     - Check for event listeners registered with all entries.
+	 * - `non-empty-string` - Check for event listeners registered only with the particular entry.
 	 */
 	public function hasListeners( ?string $forEntry = null ): bool;
 
@@ -40,7 +40,10 @@ interface ListenerRegistry extends Resettable {
 	/**
 	 * Gets the lowest and highest priorities set by registered Event Listeners.
 	 *
+	 * This must return event listeners' priorities without entries if {@param $forEntry} not passed,
+	 * or if {@param $forEntry} is passed, event listeners' priorities for that particular entry.
+	 *
 	 * @return array{low:int,high:int}
 	 */
-	public function getPriorities(): array;
+	public function getPriorities( ?string $forEntry = null ): array;
 }

@@ -84,7 +84,7 @@ class AfterBuildHandler {
 			return $this;
 		}
 
-		$priorities = $this->dispatcher->getPriorities();
+		$priorities = $this->dispatcher->getPriorities( $this->entry );
 		$attribute  = $attrs[0]->newInstance();
 		$priority   = $attribute->isFinal ? $priorities['high'] + 1 : $priorities['low'] - 1;
 
