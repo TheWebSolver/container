@@ -14,10 +14,10 @@ use TheWebSolver\Codegarage\Container\Event\Provider\BuildingListenerProvider;
 use TheWebSolver\Codegarage\Container\Event\Provider\AfterBuildListenerProvider;
 use TheWebSolver\Codegarage\Container\Event\Provider\BeforeBuildListenerProvider;
 
-enum EventType {
-	case BeforeBuild;
-	case Building;
-	case AfterBuild;
+enum EventType: string {
+	case BeforeBuild = BeforeBuildEvent::class;
+	case Building    = BuildingEvent::class;
+	case AfterBuild  = AfterBuildEvent::class;
 
 	public static function registerDispatchersTo( EventManager $manager ): EventManager {
 		foreach ( self::cases() as $eventType ) {
