@@ -7,6 +7,7 @@ use Closure;
 use ReflectionParameter;
 use Psr\Container\ContainerInterface;
 use TheWebSolver\Codegarage\Container\Container;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use TheWebSolver\Codegarage\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Container\Data\SharedBinding;
@@ -135,7 +136,7 @@ class ParamResolver {
 			return;
 		}
 
-		/** @var ListenerRegistry<BuildingEvent> */
+		/** @var EventDispatcherInterface&ListenerRegistry<BuildingEvent> */
 		$dispatcher = $this->dispatcher;
 		$attribute  = $attributes[0]->newInstance();
 		$priorities = $dispatcher->getPriorities( $entry );

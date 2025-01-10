@@ -10,6 +10,7 @@ use ReflectionParameter;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Container\ContainerExceptionInterface;
 use TheWebSolver\Codegarage\Container\Container;
 use TheWebSolver\Codegarage\Container\Data\Binding;
@@ -72,7 +73,7 @@ class ParamResolverTest extends TestCase {
 		$resolver->fromUntypedOrBuiltin( $param );
 	}
 
-	/** @dataProvider provideVariousTypeHintedFunction */
+	#[ DataProvider( 'provideVariousTypeHintedFunction' ) ]
 	public function testParamResolverForTypeHintedParam(
 		Closure $fn,
 		Closure|string|null $contextual,
@@ -116,8 +117,8 @@ class ParamResolverTest extends TestCase {
 	}
 
 	/** @return array<array{0:Closure,1:?string,2:mixed}> */
-	public function provideVariousTypeHintedFunction(): array {
-		$test = new self();
+	public static function provideVariousTypeHintedFunction(): array {
+		$test = new self( '' );
 
 		return array(
 			array( static function ( string $context ) {}, static fn() => 'from context', 'from context', null ),

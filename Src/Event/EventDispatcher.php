@@ -42,6 +42,7 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 	/** @param TEvent $event */
 	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function dispatch( object $event ) {
+		/** @var list<Closure(TEvent):void|Closure(TEvent):void[]> $iterables */
 		foreach ( $this->provider->getListenersForEvent( $event ) as $yielded => $iterables ) {
 			foreach ( $iterables as $sorted => $listeners ) {
 				foreach ( Unwrap::asArray( $listeners ) as $registered => $listener ) {

@@ -11,18 +11,18 @@ use ReflectionException;
 use ReflectionParameter;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use TheWebSolver\Codegarage\Container\Container;
 use TheWebSolver\Codegarage\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Container\Error\LogicalError;
 
 class UnwrapTest extends TestCase {
-	/** @dataProvider provideDataForArrayConversion */
+	#[ DataProvider( 'provideDataForArrayConversion' ) ]
 	public function testArrayConversion( array $expected, mixed $toConvert ): void {
 		$this->assertSame( $expected, actual: Unwrap::asArray( thing: $toConvert ) );
 	}
 
-	/** @return mixed[] */
-	public function provideDataForArrayConversion(): array {
+	public static function provideDataForArrayConversion(): array {
 		return array(
 			array( array( 123 ), 123 ),
 			array( array( '4' ), '4' ),
@@ -32,27 +32,25 @@ class UnwrapTest extends TestCase {
 		);
 	}
 
-	/** @dataProvider provideDataForStringConversion */
+	#[ DataProvider( 'provideDataForStringConversion' ) ]
 	public function testStringConversion( object $object, string $method, string $expected ): void {
 		$this->assertSame( $expected, actual: Unwrap::asString( $object, $method ) );
 	}
 
-	/** @return mixed[] */
-	public function provideDataForStringConversion(): array {
+	public static function provideDataForStringConversion(): array {
 		$class   = new class() {};
-		$closure = $this->assertContains( ... );
+		$closure = self::assertContains( ... );
+		$self    = new self( '' );
 
 		return array(
-			array( $class, '', $this->_gIdSpl( $class ), $class ),
-			array( $this, 'assertTrue', "{$this->_gIdSpl()}assertTrue" ),
-			array( $closure, '', $this->_gIdSpl( $closure ) ),
+			array( $class, '', self::_gIdSpl( $class ), $class ),
+			array( $self, 'assertTrue', self::_gIdSpl( $self ) . 'assertTrue' ),
+			array( $closure, '', self::_gIdSpl( $closure ) ),
 		);
 	}
 
-	/**
-	 * @param string|string[] $expected
-	 * @dataProvider provideDataForMethodBinding
-	 */
+	/** @param string|string[] $expected */
+	#[ DataProvider( 'provideDataForMethodBinding' ) ]
 	public function testForBinding(
 		string|array $expected,
 		object|string $object,
@@ -69,35 +67,39 @@ class UnwrapTest extends TestCase {
 		);
 	}
 
-	public function provideDataForMethodBinding(): array {
+	public static function provideDataForMethodBinding(): array {
+		$self = new self( '' );
+
 		return array(
 			array( self::class . '::assertTrue', self::class, 'assertTrue', null ),
 			array( self::class, self::class, '', LogicalError::noMethodNameForBinding( self::class ) ),
 			array( 'lambda method is invalid', function () {}, '', LogicalError::nonBindableClosure() ),
-			array( "{$this->_gIdSpl()}assertTrue", $this, 'assertTrue', null ),
-			array( array( $this, 'assertTrue' ), $this, 'assertTrue', null ),
-			array( 'Undefined method given', $this, 'method-does-not-exist', LogicalError::noMethodNameForBinding( self::class ) ),
+			array( self::_gIdSpl( $self ) . 'assertTrue', $self, 'assertTrue', null ),
+			array( array( $self, 'assertTrue' ), $self, 'assertTrue', null ),
+			array( 'Undefined method given', $self, 'method-does-not-exist', LogicalError::noMethodNameForBinding( self::class ) ),
 			array(
 				'first-class of static method is invalid',
-				$this->assertTrue( ... ),
+				$self->assertTrue( ... ),
 				'',
 				LogicalError::nonBindableClosure(),
 			),
 			array(
-				"{$this->_gIdSpl()}provideDataForMethodBinding",
-				$this->provideDataForMethodBinding( ... ),
+				self::_gIdSpl( $self ) . 'provideDataForMethodBinding',
+				// If it was (scoped) $this->provideDataForMethodBinding( ... ), then no LogicalError.
+				$self->provideDataForMethodBinding( ... ),
 				'',
-				null,
+				LogicalError::nonBindableClosure(),
 			),
 			array(
-				array( $this, 'provideDataForMethodBinding' ),
-				$this->provideDataForMethodBinding( ... ),
+				array( $self, 'provideDataForMethodBinding' ),
+				// Same case as above.
+				$self->provideDataForMethodBinding( ... ),
 				'',
-				null,
+				LogicalError::nonBindableClosure(),
 			),
 			array(
-				"{$this->_gIdSpl()}testArrayConversion",
-				$this->testArrayConversion( ... ),
+				self::_gIdSpl( $self ) . 'testArrayConversion',
+				$self->testArrayConversion( ... ),
 				'',
 				null,
 			),
@@ -108,19 +110,17 @@ class UnwrapTest extends TestCase {
 				'',
 				LogicalError::nonBindableClosure(),
 			),
-			array( 'named func is also invalid', phpinfo( ... ), '', LogicalError::nonBindableClosure() ),
+			array( 'named func is also invalid', strlen( ... ), '', LogicalError::nonBindableClosure() ),
 		);
 	}
 
-	private function _gIdSpl( ?object $object = null ): string {
+	private static function _gIdSpl( object $object ): string { // phpcs:ignore
 		return ( $object ? $object::class : self::class )
-			. '#' . spl_object_id( $object ?? $this ) . '::';
+			. '#' . spl_object_id( $object ) . '::';
 	}
 
-	/**
-	 * @param string|mixed[]|null $expected
-	 * @dataProvider provideDataForClosureUnwrap
-	 */
+	/** @param string|mixed[]|null $expected  */
+	#[ DataProvider( 'provideDataForClosureUnwrap' ) ]
 	public function testClosureUnwrap(
 		string|array|null $expected,
 		Closure $firstClass,
@@ -133,49 +133,50 @@ class UnwrapTest extends TestCase {
 		$this->assertSame( $expected, actual: Unwrap::closure( $firstClass, $asArray ) );
 	}
 
-	/** @return mixed[] */
-	public function provideDataForClosureUnwrap(): array {
-		$phpinfo = phpinfo( ... );
+	public static function provideDataForClosureUnwrap(): array {
+		$strlen  = strlen( ... );
 		$staticM = self::assertTrue( ... );
 		$staticF = static function () {};
+		$func    = function () {};
+		$self    = new self( '' );
 
 		return array(
 			array(
 				self::class . '::testForBinding',
-				$this->testForBinding( ... ),
+				$self->testForBinding( ... ),
 				false,
 			),
 			array(
-				array( $this, 'testForBinding' ),
-				$this->testForBinding( ... ),
+				array( $self, 'testForBinding' ),
+				$self->testForBinding( ... ),
 				true,
 			),
 			array( 'PHPUnit\Framework\Assert::assertTrue', self::assertTrue( ... ), false ),
 			array( array( $staticM, 'assertTrue' ), $staticM, true ),
 			array( self::class . '::' . __NAMESPACE__ . '\\{closure}', function () {}, false ),
-			array( array( $this, __NAMESPACE__ . '\\{closure}' ), function () {}, true ),
+			array( array( $func, __NAMESPACE__ . '\\{closure}' ), $func, true ),
 			array( self::class . '::' . __NAMESPACE__ . '\\{closure}', static function () {}, false ),
 			array( array( $staticF, __NAMESPACE__ . '\\{closure}' ), $staticF, true ),
-			array( 'phpinfo', $phpinfo, false ),
-			array( array( 'phpinfo' ), $phpinfo, true ),
+			array( 'strlen', $strlen, false ),
+			array( array( 'strlen' ), $strlen, true ),
 			array( null, _wrapped__Lambda(), false ),
 			array( null, _wrapped__staticLambda(), false ),
 		);
 	}
 
-	/** @dataProvider provideParamTypeFunc */
+	#[ DataProvider( 'provideParamTypeFunc' ) ]
 	public function testParamTypeFrom( ?string $expected, Closure $fn ): void {
 		$reflection = new ReflectionParameter( $fn, param: 0 );
 
 		$this->assertSame( $expected, actual: Unwrap::paramTypeFrom( $reflection ) );
 	}
 
-	public function provideParamTypeFunc(): array {
+	public static function provideParamTypeFunc(): array {
 		return array(
-			array( self::class, static function ( self $self ) {} ),
-			array( TestCase::class, static function ( parent $parent ) {} ),
+			array( self::class, static function ( self $_self ) {} ),
+			array( TestCase::class, static function ( parent $_parent ) {} ),
 			array( self::class, static function ( UnwrapTest $test ) {} ),
-			array( TestCase::class, static function ( TestCase $parent ) {} ),
+			array( TestCase::class, static function ( TestCase $_parent ) {} ),
 			array( null, static function ( string $name ) {} ),
 			array( null, static function ( int|float $currency ) {} ),
 			array( null, static function ( Container&ContainerInterface $app ) {} ),
@@ -196,26 +197,25 @@ class UnwrapTest extends TestCase {
 		);
 	}
 
-	/**
-	 * @param null|mixed[]|string $val
-	 * @dataProvider provideCallbackData
-	 */
+	/** @param null|mixed[]|string $val */
+	#[ DataProvider( 'provideCallbackData' ) ]
 	public function testCallback( null|array|string $val, callable|string $cb, bool $asArray ): void {
 		$this->assertSame( expected: $val ?? $cb, actual: Unwrap::callback( $cb, $asArray ) );
 	}
 
-	/** @return mixed[] */
-	public function provideCallbackData(): array {
+	public static function provideCallbackData(): array {
 		$class = new class() {
 			public function __invoke() {}
 		};
 
+		$self = new self( '' );
+
 		return array(
 			array( null, self::class . '::assertTrue', false ),
 			array( array( self::class . '::assertTrue', '' ), self::class . '::assertTrue', true ),
-			array( "{$this->_gIdSpl()}testCallback", $this->testCallback( ... ), false ),
-			array( array( $this, 'testCallback' ), $this->testCallback( ... ), true ),
-			array( "{$this->_gIdSpl( $class )}__invoke", $class, false ),
+			array( self::_gIdSpl( $self ) . 'testCallback', $self->testCallback( ... ), false ),
+			array( array( $self, 'testCallback' ), $self->testCallback( ... ), true ),
+			array( "{$self->_gIdSpl( $class )}__invoke", $class, false ),
 			array( array( $class, '__invoke' ), $class, true ),
 			array( self::class . '::assertTrue', array( self::class, 'assertTrue' ), false ),
 			array( array( self::class, 'assertTrue' ), array( self::class, 'assertTrue' ), true ),
@@ -223,16 +223,14 @@ class UnwrapTest extends TestCase {
 		);
 	}
 
-	/**
-	 * @param string[] $expected
-	 * @dataProvider provideParts
-	 */
+	/** @param string[] $expected */
+	#[ DataProvider( 'provideParts' ) ]
 	public function testPartsFrom( array $expected, string $string, string $separator ): void {
 		$this->assertSame( $expected, actual: Unwrap::partsFrom( $string, $separator ) );
 	}
 
 	/** @return mixed[] */
-	public function provideParts(): array {
+	public static function provideParts(): array {
 		return array(
 			array( array( 'one', 'two' ), 'one:two', ':' ),
 			array( array( 'one', 'two' ), 'one//two', '//' ),
@@ -245,9 +243,7 @@ class UnwrapTest extends TestCase {
 		);
 	}
 
-	/**
-	 * @dataProvider provideVariousClasses
-	 */
+	#[ DataProvider( 'provideVariousClasses' ) ]
 	public function testClassReflectionUnwrap( string $classname, ?string $throws = null ): void {
 		if ( $throws ) {
 			$this->expectException( $throws );
@@ -258,7 +254,7 @@ class UnwrapTest extends TestCase {
 		$this->assertSame( $classname, $reflection->getName() );
 	}
 
-	public function provideVariousClasses(): array {
+	public static function provideVariousClasses(): array {
 		return array(
 			array( stdClass::class ),
 			array( WeakMap::class ),

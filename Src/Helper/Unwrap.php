@@ -42,7 +42,7 @@ class Unwrap {
 			default                                                    => throw LogicalError::unwrappableClosure()
 		};
 
-		return $asArray ? $result[0] : $result[1];
+		return $asArray ? $result[0] : $result[1]; // @phpstan-ignore-line -- array offset OK.
 	}
 
 	/**
@@ -118,7 +118,7 @@ class Unwrap {
 	 * @return array{0:string,1?:string}
 	 */
 	public static function partsFrom( string $string, string $separator = '::' ): array {
-		return explode( $separator, $string, limit: 2 ); // @phpstan-ignore-line -- Only two parts returned.
+		return explode( $separator, $string, limit: 2 );
 	}
 
 	/**

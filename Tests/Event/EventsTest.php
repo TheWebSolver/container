@@ -10,6 +10,7 @@ use Closure;
 use WeakMap;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\EventDispatcher\StoppableEventInterface;
 use TheWebSolver\Codegarage\Container\Container;
 use TheWebSolver\Codegarage\Container\Data\Binding;
@@ -67,7 +68,7 @@ class EventsTest extends TestCase {
 		$this->assertSame( $mocks[1], $event->getUpdaters() );
 	}
 
-	/** @dataProvider provideDecoratorsAndUpdatersToAfterBuildEvent */
+	#[ DataProvider( 'provideDecoratorsAndUpdatersToAfterBuildEvent' )]
 	public function testAfterBuildEventAcceptsEitherStringOrCallableAsDecorator(
 		string|Closure $decorator,
 		Closure $updater
@@ -86,10 +87,10 @@ class EventsTest extends TestCase {
 		$event->decorateWith( $decorator )->update( with: $updater );
 	}
 
-	public function provideDecoratorsAndUpdatersToAfterBuildEvent(): array {
+	public static function provideDecoratorsAndUpdatersToAfterBuildEvent(): array {
 		return array(
 			array( self::class, function () {} ),
-			array( function () {}, $this->provideDecoratorsAndUpdatersToAfterBuildEvent( ... ) ),
+			array( function () {}, self::provideDecoratorsAndUpdatersToAfterBuildEvent( ... ) ),
 		);
 	}
 

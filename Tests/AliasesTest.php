@@ -5,6 +5,7 @@ namespace TheWebSolver\Codegarage\Tests;
 
 use LogicException;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\Depends;
 use TheWebSolver\Codegarage\Container\Data\Aliases;
 
 class AliasesTest extends TestCase {
@@ -40,10 +41,8 @@ class AliasesTest extends TestCase {
 		return $this->aliases;
 	}
 
-	/**
-	 * @return array{0:int,1:Aliases}
-	 * @depends testAddingAlias
-	 */
+	/** @return array{0:int,1:Aliases} */
+	#[ Depends( 'testAddingAlias' ) ]
 	public function testRemovingAliases( Aliases $aliases ): array {
 		$aliases->remove( 'alias1' );
 
@@ -53,10 +52,8 @@ class AliasesTest extends TestCase {
 		return array( 1, $aliases );
 	}
 
-	/**
-	 * @param array{0:int,1:Aliases} $data
-	 * @depends testRemovingAliases
-	 */
+	/** @param array{0:int,1:Aliases} $data */
+	#[ Depends( 'testRemovingAliases' ) ]
 	public function testFlushingAliases( array $data ): void {
 		[ $noOfTestToSkip, $aliases ] = $data;
 

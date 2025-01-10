@@ -7,8 +7,12 @@ parameters:
 		-
 			identifier: missingType.generics
 		-
+			identifier: argument.type
+			paths:
+				- Src/Helper/MethodResolver.php
+				- Src/Helper/Unwrap.php
+				- Src/Traits/ListenerCompiler.php
+				- Src/Traits/StackCompiler.php
+		-
 			path: Src/Event/BeforeBuildEvent.php
 			message: '#^Possibly invalid array key type object\|string\.$#'
-		-
-			path: Src/Helper/Unwrap.php
-			message: '#^Parameter \#1 \$objectOrClass of class ReflectionClass constructor expects class\-string\<T of object\>\|T of object, string given\.$#'

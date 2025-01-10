@@ -5,6 +5,7 @@ namespace TheWebSolver\Codegarage\Tests;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\Attributes\DataProvider;
 use TheWebSolver\Codegarage\Container\Container;
 use TheWebSolver\Codegarage\Container\Data\Binding;
 use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
@@ -140,7 +141,7 @@ class MethodResolverTest extends TestCase {
 		$this->resolver->withCallback( $instanceId )->resolve();
 	}
 
-	/** @dataProvider provideInvalidClassMethod */
+	#[ DataProvider( 'provideInvalidClassMethod' ) ]
 	public function testInvalidClassOrMethodThrowsException( string $cls, ?string $method ): void {
 		$msg                = "Unable to find method for class: {$cls}.";
 		$validNonResolvable = str_contains( haystack: $cls, needle: '::' );
@@ -160,7 +161,7 @@ class MethodResolverTest extends TestCase {
 	}
 
 	/** @return array<string[]> */
-	public function provideInvalidClassMethod(): array {
+	public static function provideInvalidClassMethod(): array {
 		return array(
 			array( 'invalidClass', null ),
 			array( self::class, null ),

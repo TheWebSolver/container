@@ -9,7 +9,8 @@ namespace TheWebSolver\Codegarage\Tests\Event;
 use Generator;
 use RuntimeException;
 use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\EventDispatcher\ListenerProviderInterface;
 use TheWebSolver\Codegarage\Container\Event\BuildingEvent;
 use TheWebSolver\Codegarage\Container\Event\AfterBuildEvent;
@@ -24,13 +25,11 @@ use TheWebSolver\Codegarage\Container\Event\Provider\AfterBuildListenerProvider;
 use TheWebSolver\Codegarage\Container\Event\Provider\BeforeBuildListenerProvider;
 
 class ProvidersTest extends TestCase {
-	/**
-	 * @param class-string<ListenerProviderInterface &ListenerRegistry> $className
-	 * @dataProvider provideListenerProvidersAndValidEvent
-	 */
+	/** @param class-string<ListenerProviderInterface &ListenerRegistry> $className */
+	#[ DataProvider( 'provideListenerProvidersAndValidEvent' ) ]
 	public function testListenerProviderProvidesListenersOnlyIfGivenObjectIsValidEvent(
 		string $className,
-		MockObject $event
+		string $eventClass
 	): void {
 		$listenerProvider = new $className();
 
@@ -41,9 +40,9 @@ class ProvidersTest extends TestCase {
 		$listenerProvider->addListener( function ( $e ) {}, parent::class, 7 );
 
 		// BeforeBuildListenerProvider can listen for event entry that is subclass of another entry.
-		$event->expects( $this->exactly( BeforeBuildListenerProvider::class === $className ? 3 : 2 ) )
-			->method( 'getEntry' )
-			->willReturn( self::class );
+		$event = $this->createMock( $eventClass );
+
+		$event->method( 'getEntry' )->willReturn( self::class );
 
 		/** @var Generator */
 		$invalidEventGenerator = $listenerProvider->getListenersForEvent( $this );
@@ -90,11 +89,32 @@ class ProvidersTest extends TestCase {
 		);
 	}
 
-	public function provideListenerProvidersAndValidEvent(): array {
+	#[ Test ]
+	public function itValidatesEntryIfIsASubclass(): void {
+		$listenerProvider = new BeforeBuildListenerProvider();
+		$event            = new BeforeBuildEvent( self::class );
+
+		$listenerProvider->addListener( function ( $e ) {}, null, 2 );
+		$listenerProvider->addListener( function ( $e ) {}, self::class, 7 );
+		$listenerProvider->addListener( function ( $e ) {}, self::class, 3 );
+		$listenerProvider->addListener( function ( $e ) {}, self::class, 3 );
+		$listenerProvider->addListener( function ( $e ) {}, parent::class, 7 );
+
+		$generator = $listenerProvider->getListenersForEvent( $event );
+
+		$this->assertSame( 0, $generator->key(), 'It should only be the non-entry listener.' );
+		$generator->next();
+		$this->assertSame( self::class, $generator->key(), 'It should be listeners with current class.' );
+		$generator->next();
+		$this->assertSame( parent::class, $generator->key(), 'It should be listeners with parent class.' );
+		$this->assertTrue( $generator->valid() );
+	}
+
+	public static function provideListenerProvidersAndValidEvent(): array {
 		return array(
-			array( BeforeBuildListenerProvider::class, $this->createMock( BeforeBuildEvent::class ) ),
-			array( BuildingListenerProvider::class, $this->createMock( BuildingEvent::class ) ),
-			array( AfterBuildListenerProvider::class, $this->createMock( AfterBuildEvent::class ) ),
+			array( BeforeBuildListenerProvider::class, BeforeBuildEvent::class ),
+			array( BuildingListenerProvider::class, BuildingEvent::class ),
+			array( AfterBuildListenerProvider::class, AfterBuildEvent::class ),
 		);
 	}
 

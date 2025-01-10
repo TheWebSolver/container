@@ -10,13 +10,13 @@ namespace TheWebSolver\Codegarage\Tests;
 use WeakMap;
 use stdClass;
 use ArrayAccess;
-use ArrayObject;
 use LogicException;
 use ReflectionClass;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Container\NotFoundExceptionInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use TheWebSolver\Codegarage\Container\Container;
 use TheWebSolver\Codegarage\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Container\Data\Binding;
@@ -71,46 +71,46 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testArrayAccessible(): void {
-		$this->app[ self::class ] = self::class;
+		$this->app[ WeakMap::class ] = WeakMap::class;
 
-		$this->assertTrue( isset( $this->app[ self::class ] ) );
-		$this->assertInstanceOf( self::class, $this->app[ self::class ] );
+		$this->assertTrue( isset( $this->app[ WeakMap::class ] ) );
+		$this->assertInstanceOf( WeakMap::class, $this->app[ WeakMap::class ] );
 
-		unset( $this->app[ self::class ] );
+		unset( $this->app[ WeakMap::class ] );
 
-		$this->assertFalse( isset( $this->app[ self::class ] ) );
+		$this->assertFalse( isset( $this->app[ WeakMap::class ] ) );
 	}
 
 	public function testBasicSetterGetterAndAssertionIntegration(): void {
 		$this->assertFalse( $this->app->has( id: 'testClass' ) );
-		$this->assertFalse( $this->app->has( id: self::class ) );
+		$this->assertFalse( $this->app->has( id: WeakMap::class ) );
 		$this->assertFalse( $this->app->hasBinding( 'testClass' ) );
 		$this->assertFalse( $this->app->isAlias( 'testClass' ) );
 		$this->assertFalse( $this->app->hasResolved( id: 'testClass' ) );
 
-		$this->app->setAlias( entry: self::class, alias: 'testClass' );
+		$this->app->setAlias( entry: WeakMap::class, alias: 'testClass' );
 
 		$this->assertTrue( $this->app->isAlias( id: 'testClass' ) );
-		$this->assertSame( self::class, $this->app->getEntryFrom( 'testClass' ) );
-		$this->assertInstanceOf( self::class, $this->app->get( 'testClass' ) );
+		$this->assertSame( WeakMap::class, $this->app->getEntryFrom( 'testClass' ) );
+		$this->assertInstanceOf( WeakMap::class, $this->app->get( 'testClass' ) );
 
-		$this->app->set( id: 'testClass', concrete: self::class );
+		$this->app->set( id: 'testClass', concrete: WeakMap::class );
 
 		// Bind will purge alias from the alias pool coz no need for storing same alias
 		// multiple places (like in alias pool as well as in binding pool).
 		$this->assertFalse( $this->app->isAlias( id: 'testClass' ) );
 		$this->assertTrue( $this->app->has( id: 'testClass' ) );
-		$this->assertFalse( $this->app->has( id: self::class ), 'Bound with alias.' );
+		$this->assertFalse( $this->app->has( id: WeakMap::class ), 'Bound with alias.' );
 		$this->assertTrue( $this->app->hasBinding( id: 'testClass' ) );
-		$this->assertFalse( $this->app->hasBinding( id: self::class ), 'Bound using alias.' );
+		$this->assertFalse( $this->app->hasBinding( id: WeakMap::class ), 'Bound using alias.' );
 		$this->assertSame( 'testClass', $this->app->getEntryFrom( 'testClass' ) );
-		$this->assertSame( self::class, $this->app->getBinding( 'testClass' )->material );
+		$this->assertSame( WeakMap::class, $this->app->getBinding( 'testClass' )->material );
 
-		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
+		$this->assertInstanceOf( WeakMap::class, $this->app->get( id: 'testClass' ) );
 		$this->assertTrue( $this->app->hasResolved( id: 'testClass' ) );
-		$this->assertTrue( $this->app->hasResolved( id: self::class ) );
-		$this->assertSame( self::class, $this->app->getResolved( self::class ) );
-		$this->assertTrue( $this->app->removeResolved( self::class ) );
+		$this->assertTrue( $this->app->hasResolved( id: WeakMap::class ) );
+		$this->assertSame( WeakMap::class, $this->app->getResolved( WeakMap::class ) );
+		$this->assertTrue( $this->app->removeResolved( WeakMap::class ) );
 
 		$this->app->setShared( id: stdClass::class );
 
@@ -199,10 +199,10 @@ class ContainerTest extends TestCase {
 	}
 
 	public function testAliasAndGetWithoutBinding(): void {
-		$this->app->setAlias( entry: self::class, alias: 'testClass' );
+		$this->app->setAlias( entry: WeakMap::class, alias: 'testClass' );
 
-		$this->assertInstanceOf( self::class, $this->app->get( id: 'testClass' ) );
-		$this->assertInstanceOf( self::class, $this->app->get( id: self::class ) );
+		$this->assertInstanceOf( WeakMap::class, $this->app->get( id: 'testClass' ) );
+		$this->assertInstanceOf( WeakMap::class, $this->app->get( id: WeakMap::class ) );
 	}
 
 	public function testKeepingBothAliasAndBinding(): void {
@@ -262,7 +262,7 @@ class ContainerTest extends TestCase {
 			->needs( ArrayAccess::class )
 			->give( $implementation );
 
-		$this->assertSame( expected: 'value', actual: $this->app->get( $class )->getStack()->get( 'key' ) );
+		$this->assertSame( expected: 'value', actual: $this->app->get( $class )->getStack()->offsetGet( 'key' ) );
 
 		$this->app->when( $class )
 			->needs( ArrayAccess::class )
@@ -371,8 +371,9 @@ class ContainerTest extends TestCase {
 			actual: $this->app->get( _Primary__EntryClass__Stub::class )->secondary
 		);
 
-		$eventualClass = new class() extends _Secondary__EntryClass__Stub {
-			public function __construct( public readonly string $value = 'Using Event Builder' ) {}
+		$stdClass      = new stdClass();
+		$eventualClass = new class( $stdClass ) extends _Secondary__EntryClass__Stub {
+			public function __construct( public readonly stdClass $opt ) {}
 		};
 
 		$this->app->when( EventType::Building )
@@ -386,7 +387,7 @@ class ContainerTest extends TestCase {
 		$secondaryClass = $this->app->get( _Primary__EntryClass__Stub::class )->secondary;
 
 		$this->assertInstanceOf( $eventualClass::class, $secondaryClass );
-		$this->assertSame( expected: 'Using Event Builder', actual: $secondaryClass->value );
+		$this->assertSame( expected: $stdClass, actual: $secondaryClass->opt );
 	}
 
 	public function testMethodCallWithSplObjectStorage(): void {
@@ -926,7 +927,7 @@ class ContainerTest extends TestCase {
 				->listenTo( static function () {} );
 	}
 
-	/** @dataProvider provideVariousExceptionTypesForAfterBuildEvent */
+	#[ DataProvider( 'provideVariousExceptionTypesForAfterBuildEvent' ) ]
 	public function testWaysDecoratorsCanFail( string $decorator, string $exception ): void {
 		$this->app->set( JustTest__Stub::class, _Stack__ContextualBindingWithArrayAccess__Stub::class );
 
@@ -943,7 +944,7 @@ class ContainerTest extends TestCase {
 		$this->app->get( JustTest__Stub::class, args: array( 'array' => $this->createStub( ArrayAccess::class ) ) );
 	}
 
-	public function provideVariousExceptionTypesForAfterBuildEvent(): array {
+	public static function provideVariousExceptionTypesForAfterBuildEvent(): array {
 		$building             = _Stack__ContextualBindingWithArrayAccess__Stub::class;
 		$invalidTypeOrNoParam = AfterBuildHandler::INVALID_TYPE_HINT_OR_NOT_FIRST_PARAM;
 		$withNoParam          = _Stack__ContextualBindingWithArrayAccess__DecoratorWithNoParam__Stub::class;
@@ -1141,7 +1142,7 @@ class ContainerTest extends TestCase {
 
 	public function testWithCompiledContainer(): void {
 		$interfaceStub = $this->createStub( Compilable::class )::class;
-		$concreteStub  = $this->createStub( Stack::class )::class;
+		$concreteStub  = $this->createStub( ArrayAccess::class )::class;
 
 		$bindings = array(
 			'usingAlias'          => new SharedBinding( new stdClass() ),
