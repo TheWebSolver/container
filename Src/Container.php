@@ -160,9 +160,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	/**
+	 * @param string|class-string<T>                               $id
 	 * @param array<string,mixed>|ArrayAccess<object|string,mixed> $args
+	 * @return ($id is class-string<T> ? T : mixed)
 	 * @throws NotFoundExceptionInterface  When entry with given $id was not found in the container.
 	 * @throws ContainerExceptionInterface When cannot resolve concrete from the given $id.
+	 * @template T
 	 */
 	public function get( string $id, array|ArrayAccess $args = array() ): mixed {
 		try {
@@ -424,7 +427,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	}
 
 	protected function shouldBeShared( ?Binding $binding ): bool {
-		return $binding?->isShared ?? false;
+		return $binding->isShared ?? false;
 	}
 
 	protected function fromContextual( string $constraint ): Closure|string|null {

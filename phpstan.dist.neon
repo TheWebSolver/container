@@ -1,10 +1,11 @@
 parameters:
-	checkGenericClassInNonGenericObjectType: false
 	level: max
 	paths:
 		- Src
 
 	ignoreErrors:
+		-
+			identifier: missingType.generics
 		-
 			path: Src/Event/BeforeBuildEvent.php
 			message: '#^Possibly invalid array key type object\|string\.$#'
