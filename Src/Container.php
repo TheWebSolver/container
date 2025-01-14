@@ -341,7 +341,12 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 		return $this->resolvedInstances->remove( $entry ) ?: $this->resolved->remove( $entry );
 	}
 
-	/** @param ArrayAccess<object|string,mixed>|array<string,mixed> $args */
+	/**
+	 * @param string|class-string<T>                               $id
+	 * @param ArrayAccess<object|string,mixed>|array<string,mixed> $args
+	 * @return ($id is class-string<T> ? T : mixed)
+	 * @template T of object
+	 */
 	public function resolve(
 		string $id,
 		array|ArrayAccess $args,
