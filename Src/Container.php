@@ -350,7 +350,7 @@ class Container implements ArrayAccess, ContainerInterface, Resettable {
 	public function resolve(
 		string $id,
 		array|ArrayAccess $args,
-		bool $dispatch,
+		bool $dispatch = true,
 		?ReflectionClass $reflector = null
 	): mixed {
 		$this->reflector = $reflector;
