@@ -15,8 +15,7 @@ use TheWebSolver\Codegarage\Container\Interfaces\ListenerRegistry;
  * @template-implements ListenerRegistry<TEvent>
  */
 class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
-	/** @param ListenerProviderInterface&ListenerRegistry<TEvent> $provider */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
+	/** @param ListenerProviderInterface &ListenerRegistry<TEvent> $provider */
 	public function __construct( private readonly ListenerProviderInterface&ListenerRegistry $provider ) {}
 
 	public function addListener( Closure $listener, ?string $forEntry, int $priority = self::DEFAULT_PRIORITY ): void {
@@ -40,7 +39,6 @@ class EventDispatcher implements EventDispatcherInterface, ListenerRegistry {
 	}
 
 	/** @param TEvent $event */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function dispatch( object $event ) {
 		/** @var list<Closure(TEvent):void|Closure(TEvent):void[]> $iterables */
 		foreach ( $this->provider->getListenersForEvent( $event ) as $yielded => $iterables ) {

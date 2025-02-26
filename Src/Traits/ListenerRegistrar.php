@@ -26,7 +26,6 @@ trait ListenerRegistrar {
 	 * @param TEvent $event
 	 * @phpstan-assert-if-true =TEvent $event
 	 */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	abstract protected function isValid( object $event ): bool;
 
 	/** Ensures whether event listener should be listened. */

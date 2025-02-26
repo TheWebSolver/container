@@ -1,8 +1,4 @@
 <?php
-// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint     -- Generics typ-hint OK.
-// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch      -- Generics typ-hint OK.
-// phpcs:disable Squiz.Commenting.FunctionComment.SpacingAfterParamType -- Param name of Closure OK.
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Container\Event;
@@ -20,7 +16,7 @@ class AfterBuildEvent implements StoppableEventInterface, TaggableEvent {
 
 	/**
 	 * @param CollectionStack<string,class-string<TResolved>|Closure(TResolved $resolved, Container $app): TResolved> $decorators
-	 * @param CollectionStack<string,Closure(TResolved $resolved, Container $app): void>                              $updaters
+	 * @param CollectionStack<string,Closure(TResolved                         $resolved, Container $app): void>      $updaters
 	 */
 	public function __construct(
 		private readonly Container $app,

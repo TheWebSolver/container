@@ -1,7 +1,4 @@
 <?php
-// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint
-// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests\Event;

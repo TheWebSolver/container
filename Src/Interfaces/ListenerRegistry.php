@@ -14,7 +14,6 @@ interface ListenerRegistry extends Resettable {
 	 *
 	 * @param Closure(TEvent): void $listener
 	 */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function addListener( Closure $listener, ?string $forEntry, int $priority ): void;
 
 	/**

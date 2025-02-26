@@ -40,7 +40,6 @@ class AfterBuildHandler {
 	 * @throws BadResolverArgument When `$resolved` Parameter could not be determined in decorator class.
 	 * @throws ContainerError      When decorator class is not a valid class-string or not instantiable.
 	 */
-	// phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Actual number is vague.
 	public static function handleWith(
 		Container $app,
 		string $entry,
@@ -100,7 +99,6 @@ class AfterBuildHandler {
 	 * @throws ReflectionException When decorator class is provided but it is not a valid class-string.
 	 * @throws LogicalError        When decorator class is provided but it cannot be instantiated.
 	 */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function handle( object $resolved ): object {
 		$this->resolved = $resolved;
 

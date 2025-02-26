@@ -9,7 +9,6 @@ trait PushPullStack {
 	use Stack;
 
 	/** @param TValue $value */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function push( mixed $value ): void {
 		$this->stack[] = $value;
 	}

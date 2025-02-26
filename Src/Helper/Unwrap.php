@@ -125,7 +125,6 @@ class Unwrap {
 	 * @throws ReflectionException When `$classname` is not a class-string.
 	 * @throws LogicalError         When non-instantiable `$classname` given.
 	 */
-	// phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Actual number is vague.
 	public static function classReflection( string $classname ): ReflectionClass {
 		return ! ( $classReflector = new ReflectionClass( $classname ) )->isInstantiable()
 			? throw LogicalError::nonInstantiableClass( $classname )

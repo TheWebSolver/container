@@ -1,7 +1,4 @@
 <?php
-// phpcs:disable Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Generics & Closure type-hint OK.
-// phpcs:disable Squiz.Commenting.FunctionComment.ParamNameNoMatch  -- Generics & Closure type-hint OK.
-
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Container\Pool;

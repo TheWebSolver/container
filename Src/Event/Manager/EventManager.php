@@ -18,9 +18,7 @@ class EventManager implements Resettable {
 	/** @var array<string,bool> */
 	private array $assignedEventTypes;
 
-	// phpcs:ignore Squiz.Commenting.FunctionComment.ParamNameNoMatch
 	/** @param (EventDispatcherInterface &ListenerRegistry)|false $dispatcher `false` to prevent event dispatcher from being assigned on subsequent invocation of this method. */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint
 	public function setDispatcher(
 		(EventDispatcherInterface&ListenerRegistry)|false $dispatcher,
 		EventType $eventType

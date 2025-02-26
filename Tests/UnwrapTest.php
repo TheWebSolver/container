@@ -1,4 +1,4 @@
-<?php // phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed
+<?php
 declare( strict_types = 1 );
 
 namespace TheWebSolver\Codegarage\Tests;
@@ -114,7 +114,8 @@ class UnwrapTest extends TestCase {
 		);
 	}
 
-	private static function _gIdSpl( object $object ): string { // phpcs:ignore
+	// phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
+	private static function _gIdSpl( object $object ): string {
 		return ( $object ? $object::class : self::class )
 			. '#' . spl_object_id( $object ) . '::';
 	}
@@ -264,6 +265,8 @@ class UnwrapTest extends TestCase {
 		);
 	}
 }
+
+// phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed
 
 function _wrapped__Lambda() {
 	return function () {};

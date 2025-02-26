@@ -1,4 +1,7 @@
-<?php // phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed, Generic.Files.OneObjectStructurePerFile.MultipleFound
+<?php
+// phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound
+// phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed,
+
 declare( strict_types = 1 );
 
 use TheWebSolver\Codegarage\Container\Event\AfterBuildEvent;

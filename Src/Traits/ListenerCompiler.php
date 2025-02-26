@@ -10,14 +10,12 @@ trait ListenerCompiler {
 	/** @use EventListeners<TEvent> */
 	use EventListeners;
 
-	// phpcs:disable Squiz.Commenting.FunctionComment.MissingParamName
 	/**
 	 * @param array{
-	 *  listenersForEntry?: array<string,array<int,array<int,callable(TEvent $event): void>>>,
-	 *  listeners?: array<int,array<int,callable(TEvent $event): void>>
+	 *  listenersForEntry ?: array<string,array<int,array<int,callable(TEvent $event): void>>>,
+	 *  listeners         ?: array<int,array<int,callable(TEvent $event): void>>
 	 * } $data
 	 */
-	// phpcs:enable
 	public static function fromCompiledArray( array $data ): static {
 		$provider = new static(
 			listenersForEntry: $data['listenersForEntry'] ?? array(),

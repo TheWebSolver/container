@@ -11,11 +11,12 @@
 
 	<config name="testVersion" value="8.2"/>
 
-	<!-- Pass some flags as PHPCS CLI arguments:
-		 p flag: Show progress of the run.
-		 s flag: Show sniff codes in all reports.
-		 v flag: Print verbose output.
-		 n flag: Do not print warnings.
+	<!--
+	Pass some flags as PHPCS CLI arguments:
+		p: Show progress of the run.
+		s: Show sniff codes in all reports.
+		v: Print verbose output.
+		n: Do not print warnings.
 	-->
 	<arg value="psv"/>
 
@@ -28,10 +29,10 @@
 
 	<!-- Check all files in this directory and the directories below it. -->
 	<file>.</file>
-	<!-- Exclude node modules -->
+	<!-- Exclude node modules. -->
 	<exclude-pattern>*/node_modules/*</exclude-pattern>
-	<!-- Exclude vendors except first-party libraries. -->
-	<exclude-pattern>*/vendor(?!\/thewebsolver\/).*</exclude-pattern>
+	<!-- Exclude composer vendors. -->
+	<exclude-pattern>*/vendor/*</exclude-pattern>
 	<!-- Ignore PHP files on asset directory. -->
 	<exclude-pattern>*/assets/css*.php</exclude-pattern>
 	<exclude-pattern>*/assets/js*.php</exclude-pattern>
@@ -60,15 +61,13 @@
 	</rule>
 
 	<!-- Allow setting param names: "$for", "$object", etc. -->
-	<rule ref="Universal.NamingConventions.NoReservedKeywordParameterNames">
-		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames.fnFound"/>
-		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames.forFound"/>
-		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames.arrayFound"/>
-		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames.classFound"/>
-		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames.stringFound"/>
-		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames.objectFound"/>
-		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames.defaultFound"/>
-		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames.abstractFound"/>
+	<rule ref="Universal.NamingConventions">
+		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames"/>
+	</rule>
+
+	<!-- Allow using double negation "!!". -->
+	<rule ref="Universal.CodeAnalysis">
+		<exclude name="Universal.CodeAnalysis.NoDoubleNegative.FoundDouble"/>
 	</rule>
 
 	<!--
@@ -116,10 +115,16 @@
 		<exclude name="Squiz.Commenting.FunctionComment.ParamCommentFullStop"/>
 		<exclude name="Squiz.Commenting.FunctionComment.MissingParamComment"/>
 		<exclude name="Squiz.Commenting.VariableComment.MissingVar"/>
-		<!-- Comments can appear on same line as code. -->
+		<!-- Allow comments on same line as code. -->
 		<exclude name="Squiz.Commenting.PostStatementComment.Found"/>
-		<!-- Comments after param names in docComment. -->
+		<!-- Allow annotations (such as silencing PHPStan error that starts with "@") on same line as code. -->
+		<exclude name="Squiz.Commenting.PostStatementComment.AnnotationFound"/>
+		<exclude name="Squiz.Commenting.FunctionComment.ParamNameNoMatch"/>
+		<!-- Do not sniff comments about @param & @throws in docComment. -->
 		<exclude name="Squiz.Commenting.FunctionComment.MissingParamTag"/>
+		<exclude name="Squiz.Commenting.FunctionComment.MissingParamName"/>
+		<exclude name="Squiz.Commenting.FunctionComment.IncorrectTypeHint"/>
+		<exclude name="Squiz.Commenting.FunctionCommentThrowTag.WrongNumber"/>
 	</rule>
 
 	<rule ref="Squiz.PHP.CommentedOutCode">
@@ -154,11 +159,11 @@
 	-->
 
 	<!--
-		Allow for named specific exceptions to the file name rules based
-		 on the directory hierarchy and ensure PSR-4 autoloading compatibility.
-		 - Remove strict class file name requirement.
-		 - Remove no hyphenated lowercase requirement.
-	-->
+	Allow for named specific exceptions to the file name rules based
+	on the directory hierarchy and ensure PSR-4 autoloading compatibility.
+		- Remove strict class file name requirement.
+		- Remove no hyphenated lowercase requirement.
+    -->
 	<rule ref="WordPress.Files.FileName">
 		<properties>
 			<property name="strict_class_file_names" value="false" />
@@ -193,10 +198,15 @@
 
 	<rule ref="WordPress.Security">
 		<exclude name="WordPress.Security.EscapeOutput.ExceptionNotEscaped"/>
+		<exclude name="WordPress.Security.EscapeOutput.OutputNotEscaped"/>
 	</rule>
 
 	<rule ref="WordPress.CodeAnalysis">
 		<exclude name="WordPress.CodeAnalysis.AssignmentInTernaryCondition.FoundInTernaryCondition"/>
+	</rule>
+
+	<rule ref="WordPress.WP">
+		<exclude name="WordPress.WP.AlternativeFunctions"/>
 	</rule>
 
 	<!--

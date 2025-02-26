@@ -32,7 +32,6 @@ final class EventBuilder {
 	 * @param Closure(object): void $listener
 	 * @throws LogicalError When no registry found or this method is invoked before setting id and/or param name.
 	 */
-	// phpcs:ignore Squiz.Commenting.FunctionComment.IncorrectTypeHint -- Closure type-hint OK.
 	public function listenTo( Closure $listener, int $priority = ListenerRegistry::DEFAULT_PRIORITY ): void {
 		$forEntry = $this->key ?? throw LogicalError::eventListenerEntryNotProvidedWith( method: 'for' );
 
