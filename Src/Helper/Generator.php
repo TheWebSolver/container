@@ -17,9 +17,15 @@ use TheWebSolver\Codegarage\Container\Container;
  * @implements IteratorAggregate<TKey, TValue>
  */
 class Generator implements Countable, IteratorAggregate {
+	/** @var int<0,max>|Countable|(Closure(): int<0,max>) */
 	private Closure|Countable|int $count;
+	/** @var Closure(): Traversable<mixed> */
 	private Closure $generator;
 
+	/**
+	 * @param Closure(): Traversable<mixed>                $generator
+	 * @param int<0,max>|Countable|(Closure(): int<0,max>) $count
+	 */
 	public function __construct( Closure $generator, Closure|Countable|int $count ) {
 		$this->count     = $count;
 		$this->generator = $generator;
