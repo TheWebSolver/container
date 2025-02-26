@@ -18,7 +18,16 @@
   },
   "require-dev": {
     "phpstan/phpstan": "^2.1",
-    "phpunit/phpunit": "^11.5"
+    "phpunit/phpunit": "^11.5",
+    "squizlabs/php_codesniffer": "^3.11",
+    "phpcompatibility/php-compatibility": "^9.3",
+    "phpcompatibility/phpcompatibility-wp": "^2.1",
+    "wp-coding-standards/wpcs": "^3.1"
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
   },
   "autoload": {
     "psr-4": {
@@ -31,12 +40,22 @@
     }
   },
   "scripts": {
-    "test:unit": "vendor/bin/phpunit",
+    "unittest": "vendor/bin/phpunit",
     "analyze": "vendor/bin/phpstan",
     "sniff": "vendor/bin/phpcs",
     "test": [
-      "@test:unit",
-      "@analyze"
+      "@analyze",
+      "@unittest",
+      "@sniff"
+    ],
+    "useDev": "@putenv COMPOSER=composer.dev.json",
+    "update:dev": [
+      "@useDev",
+      "@composer update:packages"
+    ],
+    "test:dev": [
+      "@useDev",
+      "@composer test"
     ]
   },
   "minimum-stability": "dev",

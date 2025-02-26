@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "useMainConfig": "@putenv COMPOSER=composer.json",
+    "update:packages": [
+      "@composer update --prefer-source",
+      "@useMainConfig",
+      "@composer dump-autoload -o"
+    ],
+    "test": ["phpstan", "phpunit"]
+  },
+  "require": {
+    "php": ">=8.2.0",
+    "psr/container": "^2.0",
+    "psr/event-dispatcher": "^1.0"
+  }
+}

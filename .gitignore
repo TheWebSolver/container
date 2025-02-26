@@ -2,6 +2,7 @@
 !/*.php
 !.editorconfig
 !composer.json
+!composer.dev.json
 !composer.lock
 !phpunit.xml.dist
 !phpstan.dist.neon
