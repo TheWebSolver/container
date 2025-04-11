@@ -9,7 +9,10 @@ namespace TheWebSolver\Codegarage\Tests;
 
 use WeakMap;
 use stdClass;
+use Countable;
 use ArrayAccess;
+use ArrayObject;
+use SplFixedArray;
 use LogicException;
 use ReflectionClass;
 use PHPUnit\Framework\TestCase;
@@ -20,6 +23,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use TheWebSolver\Codegarage\Container\Container;
 use TheWebSolver\Codegarage\Container\Pool\Stack;
 use TheWebSolver\Codegarage\Container\Data\Binding;
+use TheWebSolver\Codegarage\Container\Helper\Unwrap;
 use TheWebSolver\Codegarage\Container\Event\EventType;
 use TheWebSolver\Codegarage\Container\Attribute\ListenTo;
 use TheWebSolver\Codegarage\Container\Data\SharedBinding;
@@ -1172,6 +1176,24 @@ class ContainerTest extends TestCase {
 
 		$this->assertSame( $app->get( Compilable::class ), $app->get( Compilable::class ) );
 		$this->assertSame( $app->get( 'stack' ), $app->get( 'stack' ) );
+	}
+
+	public function acceptsDifferentTypesOfParameters( string $name, Countable $object, ArrayAccess ...$variadic ) {
+		$this->assertSame( 'test', $name );
+		$this->assertInstanceOf( ArrayObject::class, $object );
+		$this->assertInstanceOf( SplFixedArray::class, $variadic[0] );
+		$this->assertInstanceOf( WeakMap::class, $variadic[1] );
+	}
+
+	public function testParamResolverResolvesDependencies(): void {
+		$target = Unwrap::forBinding( $this->acceptsDifferentTypesOfParameters( ... ) );
+
+		$this->app->when( $target )->needs( '$name' )->give( 'test' );
+		$this->app->when( $target )->needs( ArrayAccess::class )->give(
+			static fn () => array( new SplFixedArray(), new WeakMap() )
+		);
+
+		$this->app->call( $this->acceptsDifferentTypesOfParameters( ... ), array( 'object' => new ArrayObject() ) );
 	}
 }
 

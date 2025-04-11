@@ -32,17 +32,21 @@ class ParamResolver {
 	 * @throws ContainerError When resolving dependencies fails.
 	 */
 	public function resolve(): array {
+		$variadic = null;
+
 		foreach ( $this->reflections as $param ) {
-			$result = match ( true ) {
+			$value = match ( true ) {
 				isset( $this->dependencies[ $param->name ] )   => $this->dependencies[ $param->name ],
 				( $val = $this->fromEvent( $param ) ) !== null => $val,
 				default                                        => $param
 			};
 
-			$this->result->set( key: $param->name, value: $param === $result ? $this->from( $param ) : $result );
+			$variadic = $this->resolveValueOf( $param, $value );
 		}
 
-		return $this->result->getItems();
+		$items = $this->result->getItems();
+
+		return array_values( $variadic ? array( ...$items, ...$variadic ) : $items );
 	}
 
 	/** @throws ContainerError When resolving dependencies fails. */
@@ -70,7 +74,7 @@ class ParamResolver {
 		}
 	}
 
-	protected function from( ReflectionParameter $param ): mixed {
+	protected function fromResolvedOrDefaultValueOf( ReflectionParameter $param ): mixed {
 		$type = Unwrap::paramTypeFrom( reflection: $param );
 
 		return $type ? $this->fromTyped( $param, $type ) : $this->fromUntypedOrBuiltin( $param );
@@ -111,7 +115,7 @@ class ParamResolver {
 	protected static function defaultFrom( ReflectionParameter $param, ContainerError $error ): mixed {
 		return match ( true ) {
 			$param->isDefaultValueAvailable() => $param->getDefaultValue(),
-			$param->isVariadic()              => array(),
+			$param->isVariadic()              => $param,
 			default                           => throw $error,
 		};
 	}
@@ -151,5 +155,24 @@ class ParamResolver {
 	 */
 	private function ensureObject( mixed $value, string $type, string $name, string $id ) {
 		return $value instanceof $type ? $value : throw BadResolverArgument::forBuildingParam( $type, $name, $id );
+	}
+
+	/** @return ?mixed[] Variadic values, if param is variadic. */
+	private function resolveValueOf( ReflectionParameter $param, mixed $value ): ?array {
+		$param === $value && ( $value = $this->fromResolvedOrDefaultValueOf( $param ) );
+
+		( $hasNoVariadicValue = $param === $value ) && ( $value = array() );
+
+		// Variadic gets special treatment. We'll collect variadic separately, and then
+		// append them to final result by spreading after other resolved parameters.
+		if ( $param->isVariadic() ) {
+			$hasNoVariadicValue || ( is_array( $value ) && ( $variadic = $value ) );
+
+			return $variadic ?? null;
+		}
+
+		$this->result->set( $param->name, $value );
+
+		return null;
 	}
 }

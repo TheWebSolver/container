@@ -4,7 +4,11 @@ declare( strict_types = 1 );
 namespace TheWebSolver\Codegarage\Tests;
 
 use Closure;
+use WeakMap;
 use Exception;
+use ArrayAccess;
+use ArrayObject;
+use SplFixedArray;
 use ReflectionFunction;
 use ReflectionParameter;
 use PHPUnit\Framework\TestCase;
@@ -61,7 +65,7 @@ class ParamResolverTest extends TestCase {
 		$param = new ReflectionParameter( function: static function ( ...$value ) {}, param: 0 );
 
 		$this->assertSame( array( 'one', 'two' ), actual: $resolver->fromUntypedOrBuiltin( $param ) );
-		$this->assertSame( expected: array(), actual: $resolver->fromUntypedOrBuiltin( $param ) );
+		$this->assertSame( $param, $resolver->fromUntypedOrBuiltin( $param ), 'Variadic uses $param as default.' );
 
 		$param = new ReflectionParameter( function: function ( $value ) {}, param: 0 );
 
@@ -101,7 +105,7 @@ class ParamResolverTest extends TestCase {
 
 				$expectedValue = match ( true ) {
 					$param->isDefaultValueAvailable() => $param->getDefaultValue(),
-					$param->isVariadic()              => array(),
+					$param->isVariadic()              => $param,
 					default                           => $appMocker,
 				};
 
@@ -181,9 +185,9 @@ class ParamResolverTest extends TestCase {
 			)
 			->resolve();
 
-		$this->assertCount( expectedCount: 3, haystack: $resolved );
-		$this->assertInstanceOf( expected: self::class, actual: $resolved['class'] );
-		$this->assertSame( expected: 'injected value', actual: $resolved['text'] );
+		$this->assertCount( 2, $resolved, 'variadic is not included when value not injected.' );
+		$this->assertInstanceOf( expected: self::class, actual: $resolved[0] );
+		$this->assertSame( expected: 'injected value', actual: $resolved[1] );
 
 		$testFn2 = static function ( TestCase $class, string $text, int ...$other ) {};
 		$ref2    = new ReflectionFunction( $testFn2 );
@@ -193,10 +197,15 @@ class ParamResolverTest extends TestCase {
 			->withParameter( array( 'class' => $this->createStub( self::class ) ), $ref2->getParameters() )
 			->resolve();
 
-		$this->assertCount( expectedCount: 3, haystack: $resolved2 ); // Variadic is an array.
-		$this->assertInstanceOf( expected: self::class, actual: $resolved2['class'] );
-		$this->assertSame( expected: 'event', actual: $resolved2['text'] );
-		$this->assertSame( expected: array( 2, array( 3 ), array( 4 ) ), actual: $resolved2['other'] );
+		$this->assertCount( expectedCount: 5, haystack: $resolved2 );
+		$this->assertInstanceOf( expected: self::class, actual: array_shift( $resolved2 ) );
+		$this->assertSame( expected: 'event', actual: array_shift( $resolved2 ) );
+
+		$this->assertSame(
+			expected: array( 2, array( 3 ), array( 4 ) ),
+			actual: $resolved2,
+			message: 'Variadic values are spread after other resolved values.'
+		);
 	}
 
 	public function testResolveContainerItself(): void {
@@ -212,5 +221,24 @@ class ParamResolverTest extends TestCase {
 		$actual     = $this->resolver->fromTyped( $param, type: $param->getType()->getName() );
 
 		$this->assertSame( $expected, $actual );
+	}
+
+	public function testVariadicWithDifferentValues(): void {
+		$resolver = new ParamResolver( $this->createStub( Container::class ) );
+		$target   = static function ( ArrayAccess $array, ArrayAccess ...$arrays ) {};
+
+		$resolver->withParameter(
+			array(
+				'array'  => new ArrayObject(),
+				'arrays' => array( new WeakMap(), new SplFixedArray() ),
+			),
+			( new ReflectionFunction( $target ) )->getParameters()
+		);
+
+		$args = $resolver->resolve();
+
+		$this->assertInstanceOf( ArrayObject::class, $args[0] );
+		$this->assertInstanceOf( WeakMap::class, $args[1] );
+		$this->assertInstanceOf( SplFixedArray::class, $args[2] );
 	}
 }
